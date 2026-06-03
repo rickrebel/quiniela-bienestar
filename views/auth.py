@@ -58,7 +58,10 @@ def register():
             user.password = form.password.data
             user.is_active = True
             db.session.commit()
-            return redirect(url_for('auth.login'))
+
+            # mejor que tras registrarse los loguee y los mande directo a grupos
+            login_user(user, True)
+            return redirect(url_for('groups.grupos'))
 
     return render_template('auth/register.html', form=form)
 
