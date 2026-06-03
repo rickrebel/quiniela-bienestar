@@ -1,0 +1,61 @@
+[
+  {"team_name":"México","flag":"mx","group_name":"A"},
+  {"team_name":"Sudáfrica","flag":"za","group_name":"A"},
+  {"team_name":"Corea del Sur","flag":"kr","group_name":"A"},
+  {"team_name":"Chequia","flag":"cz","group_name":"A"},
+
+  {"team_name":"Canadá","flag":"ca","group_name":"B"},
+  {"team_name":"Bosnia y Herzegovina","flag":"ba","group_name":"B"},
+  {"team_name":"Qatar","flag":"qa","group_name":"B"},
+  {"team_name":"Suiza","flag":"ch","group_name":"B"},
+
+  {"team_name":"Brasil","flag":"br","group_name":"C"},
+  {"team_name":"Escocia","flag":"gb-sct","group_name":"C"},
+  {"team_name":"Marruecos","flag":"ma","group_name":"C"},
+  {"team_name":"Haití","flag":"ht","group_name":"C"},
+
+  {"team_name":"Estados Unidos","flag":"us","group_name":"D"},
+  {"team_name":"Australia","flag":"au","group_name":"D"},
+  {"team_name":"Paraguay","flag":"py","group_name":"D"},
+  {"team_name":"Turquía","flag":"tr","group_name":"D"},
+
+  {"team_name":"Alemania","flag":"de","group_name":"E"},
+  {"team_name":"Ecuador","flag":"ec","group_name":"E"},
+  {"team_name":"Costa de Marfil","flag":"ci","group_name":"E"},
+  {"team_name":"Curazao","flag":"cw","group_name":"E"},
+
+  {"team_name":"Japón","flag":"jp","group_name":"F"},
+  {"team_name":"Países Bajos","flag":"nl","group_name":"F"},
+  {"team_name":"Túnez","flag":"tn","group_name":"F"},
+  {"team_name":"Suecia","flag":"se","group_name":"F"},
+
+  {"team_name":"Bélgica","flag":"be","group_name":"G"},
+  {"team_name":"Irán","flag":"ir","group_name":"G"},
+  {"team_name":"Egipto","flag":"eg","group_name":"G"},
+  {"team_name":"Nueva Zelanda","flag":"nz","group_name":"G"},
+
+  {"team_name":"España","flag":"es","group_name":"H"},
+  {"team_name":"Uruguay","flag":"uy","group_name":"H"},
+  {"team_name":"Arabia Saudita","flag":"sa","group_name":"H"},
+  {"team_name":"Cabo Verde","flag":"cv","group_name":"H"},
+
+  {"team_name":"Francia","flag":"fr","group_name":"I"},
+  {"team_name":"Senegal","flag":"sn","group_name":"I"},
+  {"team_name":"Noruega","flag":"no","group_name":"I"},
+  {"team_name":"Irak","flag":"iq","group_name":"I"},
+
+  {"team_name":"Argentina","flag":"ar","group_name":"J"},
+  {"team_name":"Austria","flag":"at","group_name":"J"},
+  {"team_name":"Jordania","flag":"jo","group_name":"J"},
+  {"team_name":"Argelia","flag":"dz","group_name":"J"},
+
+  {"team_name":"Portugal","flag":"pt","group_name":"K"},
+  {"team_name":"Colombia","flag":"co","group_name":"K"},
+  {"team_name":"Uzbekistán","flag":"uz","group_name":"K"},
+  {"team_name":"República Democrática del Congo","flag":"cd","group_name":"K"},
+
+  {"team_name":"Inglaterra","flag":"gb-eng","group_name":"L"},
+  {"team_name":"Croacia","flag":"hr","group_name":"L"},
+  {"team_name":"Ghana","flag":"gh","group_name":"L"},
+  {"team_name":"Panamá","flag":"pa","group_name":"L"}
+]

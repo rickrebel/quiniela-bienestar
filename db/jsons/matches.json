@@ -1,0 +1,109 @@
+[
+  {"group":"A","team_a":"México","team_b":"Sudáfrica","date":"2026-06-11, 13:00","stadium":"Ciudad de México"},
+  {"group":"A","team_a":"Corea del Sur","team_b":"Chequia","date":"2026-06-11, 20:00","stadium":"Guadalajara"},
+
+  {"group":"A","team_a":"Chequia","team_b":"Sudáfrica","date":"2026-06-18, 10:00","stadium":"Atlanta"},
+  {"group":"A","team_a":"México","team_b":"Corea del Sur","date":"2026-06-18, 19:00","stadium":"Guadalajara"},
+
+  {"group":"A","team_a":"Chequia","team_b":"México","date":"2026-06-24 19:00","stadium":"Ciudad de México"},
+  {"group":"A","team_a":"Sudáfrica","team_b":"Corea del Sur","date":"2026-06-24 19:00","stadium":"Monterrey"},
+
+  {"group":"B","team_a":"Canadá","team_b":"Bosnia y Herzegovina","date":"2026-06-12, 13:00","stadium":"Toronto"},
+  {"group":"B","team_a":"Qatar","team_b":"Suiza","date":"2026-06-13, 13:00","stadium":"San Francisco"},
+
+  {"group":"B","team_a":"Suiza","team_b":"Bosnia y Herzegovina","date":"2026-06-18, 13:00","stadium":"Los Ángeles"},
+  {"group":"B","team_a":"Canadá","team_b":"Qatar","date":"2026-06-18, 16:00","stadium":"Vancouver"},
+
+  {"group":"B","team_a":"Suiza","team_b":"Canadá","date":"2026-06-24, 13:00","stadium":"Vancouver"},
+  {"group":"B","team_a":"Bosnia y Herzegovina","team_b":"Qatar","date":"2026-06-24, 13:00","stadium":"Seattle"},
+
+  {"group":"C","team_a":"Brasil","team_b":"Marruecos","date":"2026-06-13, 16:00","stadium":"Nueva York"},
+  {"group":"C","team_a":"Haití","team_b":"Escocia","date":"2026-06-13, 19:00","stadium":"Boston"},
+
+  {"group":"C","team_a":"Escocia","team_b":"Marruecos","date":"2026-06-19, 16:00","stadium":"Boston"},
+  {"group":"C","team_a":"Brasil","team_b":"Haití","date":"2026-06-19, 18:30","stadium":"Filadelfia"},
+
+  {"group":"C","team_a":"Escocia","team_b":"Brasil","date":"2026-06-24 16:00","stadium":"Miami"},
+  {"group":"C","team_a":"Marruecos","team_b":"Haití","date":"2026-06-24, 16:00","stadium":"Atlanta"},
+
+  {"group":"D","team_a":"Estados Unidos","team_b":"Paraguay","date":"2026-06-12, 19:00","stadium":"Los Ángeles"},
+  {"group":"D","team_a":"Australia","team_b":"Turquía","date":"2026-06-13, 22:00","stadium":"Vancouver"},
+
+  {"group":"D","team_a":"Estados Unidos","team_b":"Australia","date":"2026-06-19, 13:00","stadium":"Seattle"},
+  {"group":"D","team_a":"Turquía","team_b":"Paraguay","date":"2026-06-19, 21:00","stadium":"San Francisco"},
+
+  {"group":"D","team_a":"Turquía","team_b":"Estados Unidos","date":"2026-06-25 20:00","stadium":"Los Ángeles"},
+  {"group":"D","team_a":"Paraguay","team_b":"Australia","date":"2026-06-25 20:00","stadium":"San Francisco"},
+
+  {"group":"E","team_a":"Alemania","team_b":"Curazao","date":"2026-06-14, 11:00","stadium":"Houston"},
+  {"group":"E","team_a":"Costa de Marfil","team_b":"Ecuador","date":"2026-06-14, 17:00","stadium":"Filadelfia"},
+
+  {"group":"E","team_a":"Alemania","team_b":"Costa de Marfil","date":"2026-06-20, 14:00","stadium":"Toronto"},
+  {"group":"E","team_a":"Ecuador","team_b":"Curazao","date":"2026-06-20, 18:00","stadium":"Kansas City"},
+
+  {"group":"E","team_a":"Curazao","team_b":"Costa de Marfil","date":"2026-06-25 14:00","stadium":"Filadelfia"},
+  {"group":"E","team_a":"Ecuador","team_b":"Alemania","date":"2026-06-25 14:00","stadium":"Nueva York"},
+
+  {"group":"F","team_a":"Países Bajos","team_b":"Japón","date":"2026-06-14, 14:00","stadium":"Dallas"},
+  {"group":"F","team_a":"Suecia","team_b":"Túnez","date":"2026-06-14, 20:00","stadium":"Monterrey"},
+
+  {"group":"F","team_a":"Túnez","team_b":"Japón","date":"2026-06-20, 22:00","stadium":"Monterrey"},
+  {"group":"F","team_a":"Países Bajos","team_b":"Suecia","date":"2026-06-20, 11:00","stadium":"Houston"},
+
+  {"group":"F","team_a":"Japón","team_b":"Suecia","date":"2026-06-25 17:00","stadium":"Dallas"},
+  {"group":"F","team_a":"Túnez","team_b":"Países Bajos","date":"2026-06-25 17:00","stadium":"Kansas City"},
+
+  {"group":"G","team_a":"Bélgica","team_b":"Egipto","date":"2026-06-15, 13:00","stadium":"Seattle"},
+  {"group":"G","team_a":"Irán","team_b":"Nueva Zelanda","date":"2026-06-15, 19:00","stadium":"Los Ángeles"},
+
+  {"group":"G","team_a":"Bélgica","team_b":"Irán","date":"2026-06-21 13:00","stadium":"Los Ángeles"},
+  {"group":"G","team_a":"Nueva Zelanda","team_b":"Egipto","date":"2026-06-21 19:00","stadium":"Vancouver"},
+
+  {"group":"G","team_a":"Egipto","team_b":"Irán","date":"2026-06-26 21:00","stadium":"Seattle"},
+  {"group":"G","team_a":"Nueva Zelanda","team_b":"Bélgica","date":"2026-06-26 21:00","stadium":"Vancouver"},
+
+  {"group":"H","team_a":"España","team_b":"Cabo Verde","date":"2026-06-15, 10:00","stadium":"Atlanta"},
+  {"group":"H","team_a":"Arabia Saudita","team_b":"Uruguay","date":"2026-06-15, 16:00","stadium":"Miami"},
+
+  {"group":"H","team_a":"España","team_b":"Arabia Saudita","date":"2026-06-21, 10:00","stadium":"Atlanta"},
+  {"group":"H","team_a":"Uruguay","team_b":"Cabo Verde","date":"2026-06-21, 16:00","stadium":"Miami"},
+
+  {"group":"H","team_a":"Cabo Verde","team_b":"Arabia Saudita","date":"2026-06-26, 18:00","stadium":"Houston"},
+  {"group":"H","team_a":"Uruguay","team_b":"España","date":"2026-06-26, 18:00","stadium":"Guadalajara"},
+
+  {"group":"I","team_a":"Francia","team_b":"Senegal","date":"2026-06-16, 13:00","stadium":"Nueva York"},
+  {"group":"I","team_a":"Irak","team_b":"Noruega","date":"2026-06-16, 16:00","stadium":"Boston"},
+
+  {"group":"I","team_a":"Francia","team_b":"Irak","date":"2026-06-22, 15:00","stadium":"Filadelfia"},
+  {"group":"I","team_a":"Noruega","team_b":"Senegal","date":"2026-06-22, 18:00","stadium":"Nueva York"},
+
+  {"group":"I","team_a":"Noruega","team_b":"Francia","date":"2026-06-26, 13:00","stadium":"Boston"},
+  {"group":"I","team_a":"Senegal","team_b":"Irak","date":"2026-06-26, 13:00","stadium":"Toronto"},
+
+  {"group":"J","team_a":"Argentina","team_b":"Argelia","date":"2026-06-16, 19:00","stadium":"Kansas City"},
+  {"group":"J","team_a":"Austria","team_b":"Jordania","date":"2026-06-16, 22:00","stadium":"San Francisco"},
+
+  {"group":"J","team_a":"Argentina","team_b":"Austria","date":"2026-06-22, 11:00","stadium":"Dallas"},
+  {"group":"J","team_a":"Jordania","team_b":"Argelia","date":"2026-06-22, 21:00","stadium":"San Francisco"},
+
+  {"group":"J","team_a":"Argelia","team_b":"Austria","date":"2026-06-27, 20:00","stadium":"Kansas City"},
+  {"group":"J","team_a":"Jordania","team_b":"Argentina","date":"2026-06-27, 20:00","stadium":"Dallas"},
+
+  {"group":"K","team_a":"Portugal","team_b":"República Democrática del Congo","date":"2026-06-17, 11:00","stadium":"Houston"},
+  {"group":"K","team_a":"Uzbekistán","team_b":"Colombia","date":"2026-06-17, 20:00","stadium":"Ciudad de México"},
+
+  {"group":"K","team_a":"Portugal","team_b":"Uzbekistán","date":"2026-06-23, 11:00","stadium":"Houston"},
+  {"group":"K","team_a":"Colombia","team_b":"República Democrática del Congo","date":"2026-06-23, 20:00","stadium":"Guadalajara"},
+
+  {"group":"K","team_a":"Colombia","team_b":"Portugal","date":"2026-06-27, 17:30","stadium":"Miami"},
+  {"group":"K","team_a":"República Democrática del Congo","team_b":"Uzbekistán","date":"2026-06-27, 17:30","stadium":"Atlanta"},
+
+  {"group":"L","team_a":"Inglaterra","team_b":"Croacia","date":"2026-06-17, 14:00","stadium":"Dallas"},
+  {"group":"L","team_a":"Ghana","team_b":"Panamá","date":"2026-06-17, 17:00","stadium":"Toronto"},
+
+  {"group":"L","team_a":"Inglaterra","team_b":"Ghana","date":"2026-06-23, 14:00","stadium":"Boston"},
+  {"group":"L","team_a":"Panamá","team_b":"Croacia","date":"2026-06-23, 17:00","stadium":"Toronto"},
+
+  {"group":"L","team_a":"Panamá","team_b":"Inglaterra","date":"2026-06-27 15:00","stadium":"Nueva York"},
+  {"group":"L","team_a":"Croacia","team_b":"Ghana","date":"2026-06-27 15:00","stadium":"Filadelfia"}
+]

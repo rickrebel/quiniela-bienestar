@@ -1,0 +1,19 @@
+@import url("header.css");
+@import url("styles.css");
+
+:root {
+  --bg: #0f1115;
+  --surface: #171a21;
+  --surface-2: #1f2430;
+
+  --text: #e7e7e7;
+  --muted: #a3a3a3;
+
+  --gold: #d4af37;
+  --gold-soft: rgba(212, 175, 55, 0.14);
+}
+
+body {
+    color: var(--text);
+}
+
