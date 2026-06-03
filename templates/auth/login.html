@@ -1,10 +1,28 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block content %}
+<form class="form-body" action="" method="post" novalidate>
+    {{ form.hidden_tag() }}
+    <h1 class="login-title"><span>⚽</span>sanginiela</h1>
+    <div class="inputs-layout" >
+        <p>
+            {{ form.email.label }}
+            {{ form.email(size=64) }}
+            <br>
+            {% for error in form.email.errors %}
+            <span style="color: #c86b52;">[{{ error }}]</span>
+            {% endfor %}
+        </p>
+        <p>
+            {{ form.password.label }}
+            {{ form.password(size=32) }}
+            <br>
+            {% for error in form.password.errors %}
+            <span style="color: #c86b52;">[{{ error }}]</span>
+            {% endfor %}
+        </p>
+    </div>
+    <p class="login-submit">{{ form.submit() }}</p>
+    <a class="login-anchor" href="{{ url_for('auth.register') }}">¿No has completado tu registro?</a>
+</form>
+{% endblock %}

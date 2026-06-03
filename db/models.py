@@ -1,17 +1,27 @@
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import UserMixin, LoginManager
 from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
+login_manager = LoginManager()
+login_manager.session_protection = 'basic'
+login_manager.login_view = 'auth.login'
 
-class User(db.Model):
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+class User(UserMixin, db.Model):
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     email = db.Column(db.String(120), nullable=False, unique=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=False)
+    did_pay = db.Column(db.Boolean, nullable=False, default=False)
 
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(128))
 
     @property
     def password(self):

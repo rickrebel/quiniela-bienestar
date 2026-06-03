@@ -4,7 +4,7 @@ import sqlite3
 with open("../jsons/teams.json", "r", encoding="utf-8") as f:
     teams = json.load(f)
 
-conn = sqlite3.connect("../instance/app.db")
+conn = sqlite3.connect("../app.db")
 cursor = conn.cursor()
 
 cursor.executemany("""

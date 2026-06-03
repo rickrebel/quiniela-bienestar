@@ -1,5 +1,9 @@
+# esto sólo existe porque los dates del json de matches son inconsistentes,
+# tendría que arreglarse el json
+# para que esto funcione hay que permitir temporalmente strings en el date del modelo Match
+
 from quiniela import app, db
-from models import Match
+from db.models import Match
 from datetime import datetime
 
 with app.app_context():

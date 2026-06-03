@@ -4,7 +4,7 @@ import sqlite3
 with open("../jsons/matches.json", "r", encoding="utf-8") as f:
     matches = json.load(f)
 
-conn = sqlite3.connect("../instance/app.db")
+conn = sqlite3.connect("../app.db")
 cursor = conn.cursor()
 
 def get_team_map(cursor):

@@ -1,10 +1,70 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+<aside class="sidebar">
+    <nav class="sidebar-nav" aria-label="Navegación principal">
+        Perenme, sigo en fa
+        <br/>
+        haciendo otras vistas
+
+        <!-- <a class="nav-item active" href="#">
+            Inicio
+        </a>
+        <a class="nav-item" href="#">
+            Resultados
+        </a>
+        <a class="nav-item" href="#">
+            Posiciones
+        </a>-->
+    </nav>
+</aside>
+
+<aside class="user-bar">
+    <nav class="user-bar-nav" aria-label="Navegación de usuario">
+        <span class="user-hi">Queonda {{user.name}}!</span>
+        <a class="logout-anchor" href="{{ url_for('auth.logout') }}">Salir
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <!-- puerta -->
+                <path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9"/>
+
+                <!-- flecha -->
+                <path d="M10 12h11"/>
+                <path d="M17 7l5 5-5 5"/>
+            </svg>
+        </a>
+    </nav>
+</aside>
+
+<header class="header">
+    <button class="menu-btn" aria-label="Menú">
+        <svg viewBox="0 0 20 24" class="burger-tricolor">
+            <rect class="line line-green" y="4" width="20" height="2.5" rx="1"/>
+            <rect class="line line-white" y="10" width="20" height="2.5" rx="1"/>
+            <rect class="line line-red" y="16" width="20" height="2.5" rx="1"/>
+        </svg>
+    </button>
+
+    <h1 class="title"><span>⚽</span>sanginiela</h1>
+
+    <button class="user-chip">
+    <span class="user-icon">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-4.42 0-8 1.79-8 4v2h16v-2c0-2.21-3.58-4-8-4z"
+        />
+      </svg>
+    </span>
+    <span class="user-name">
+      Nombrelargo
+    </span>
+
+  </button>
+
+</header>

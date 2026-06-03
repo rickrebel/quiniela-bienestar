@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Base de datos SQLite
+db/app.db
+
+# Entornos virtuales (si tienes uno)
+venv/
+.venv/
+
+# Variables de entorno
+.env
+
+# no sé bien qué onda con este:
+.idea/
+.idea/misc.xml

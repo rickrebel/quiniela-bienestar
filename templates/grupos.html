@@ -1,39 +1,78 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sanginiela</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body class="bg-dark">
-<header class="header">
-    <button class="menu-btn" aria-label="Menú">
-        <svg viewBox="0 0 20 24" class="burger-tricolor">
-            <rect class="line line-green" y="4" width="20" height="2.5" rx="1"/>
-            <rect class="line line-white" y="10" width="20" height="2.5" rx="1"/>
-            <rect class="line line-red" y="16" width="20" height="2.5" rx="1"/>
-        </svg>
-    </button>
-    <h1 class="title"><span>⚽</span> sanginiela</h1>
-</header>
-<div class="match-card p-2 rounded">
-    <div class="team">
-        <span>Bosnia y Herzegovina</span>
-        <img src="https://flagcdn.com/w80/ba.png">
-    </div>
+{% extends 'base.html' %}
 
-    <div class="score">
-        <input type="number">
-        <span>-</span>
-        <input type="number">
-    </div>
+{% block content %}
 
-    <div class="team">
-        <img src="https://flagcdn.com/w80/mx.png">
-        <span>México</span>
+{% include 'header.html' %}
+
+
+<h6 class="chip-title">FASE DE GRUPOS</h6>
+
+
+<main class="content">
+    {% for group, matches in groups.items() %}
+
+    <details class="group">
+        <summary class="group-summary">
+        <span class="chevron">
+            <svg viewBox="0 0 24 24">
+                <path d="M9 7 L17 12 L9 17"/>
+            </svg>
+        </span>
+            Grupo {{group}}
+        </summary>
+
+        {% for match in matches %}
+        <section class="match-card mx-2">
+            <div class="match" data-match-id="{{match.id}}">
+                <div class="team">
+                    <span>{{match.team_a.name}}</span>
+                    <img src="https://flagcdn.com/w80/{{match.team_a.flag}}.png">
+                </div>
+
+                <div class="score">
+                    <input type="number" min="0" step="1" data-field="goals_a" value="{{match.predicted_a}}">
+                    <span>-</span>
+                    <input type="number" min="0" step="1" data-field="goals_b" value="{{match.predicted_b}}">
+                </div>
+
+                <div class="team">
+                    <img src="https://flagcdn.com/w80/{{match.team_b.flag}}.png">
+                    <span>{{match.team_b.name}}</span>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="meta">
+                <span>{{match.formatted_date}}</span>
+                <span class="dot"></span>
+                <span>{{match.stadium}}</span>
+            </div>
+        </section>
+        {% endfor %}
+    </details>
+
+    {% endfor %}
+</main>
+
+<footer class="actions">
+    <div class="actions-layout">
+        {% if still_submitting %}
+        <button class="submit-btn" onclick="savePredictions()">
+            Guardar
+        </button>
+        <button class="submit-btn" onclick="sendPredictions()">
+            Enviar
+        </button>
+        {% else %}
+        <span class="action-span">Predicciones enviadas</span>
+        {% endif %}
     </div>
+</footer>
+
+<div id="saving-overlay" hidden>
+    <div class="spinner"></div>
+    <p>Guardando predicciones...</p>
 </div>
-</body>
-</html>
+
+{% endblock %}

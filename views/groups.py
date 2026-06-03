@@ -1,10 +1,12 @@
 from flask import Blueprint, render_template
-from models import Match, Prediction
+from flask_login import login_required, current_user
+
+from db.models import Match, Prediction
 from collections import defaultdict
 
 groups_bp = Blueprint("groups", __name__)
 
-# muévelo a un útil en cuanto tengas otro
+# muévelo a un util en cuanto tengas otro
 def convert_date(date):
     meses = [
         "enero", "febrero", "marzo", "abril",
@@ -13,12 +15,12 @@ def convert_date(date):
     ]
     return f"{date.day} de {meses[date.month - 1]}, {date:%H:%M}"
 
-@groups_bp.route("/")
-def home():
+@groups_bp.route("/grupos")
+@login_required
+def grupos():
     matches = Match.query.all()
     predictions = Prediction.query.filter_by(
-        # tendría que ser el current user
-        user_id = 1
+        user_id=current_user.id
     ).all()
     predictions_by_match = {
         p.match_id: p
@@ -29,7 +31,6 @@ def home():
     for match in matches:
         if match.phase == "groups":
             prediction = predictions_by_match.get(match.id)
-            print(prediction)
             if prediction:
                 match.predicted_a = prediction.goals_a
                 match.predicted_b = prediction.goals_b
@@ -37,14 +38,14 @@ def home():
             groups[match.group_name].append(match)
 
     return render_template(
-        "inicio.html",
+        "grupos.html",
         groups=groups,
-        # debería ser una bandera en el usuario
+        user=current_user,
         still_submitting = (
             Prediction.query
             .join(Match)
             .filter(
-                Prediction.user_id == 1,
+                Prediction.user_id == current_user.id,
                 Match.phase == "groups",
                 Prediction.status == "submitted"
             )

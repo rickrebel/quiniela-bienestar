@@ -1,11 +1,11 @@
 [
   {"group":"A","team_a":"México","team_b":"Sudáfrica","date":"2026-06-11, 13:00","stadium":"Ciudad de México"},
-  {"group":"A","team_a":"Corea del Sur","team_b":"Chequia","date":"2026-06-11, 20:00","stadium":"Guadalajara"},
+  {"group":"A","team_a":"Corea del Sur","team_b":"República Checa","date":"2026-06-11, 20:00","stadium":"Guadalajara"},
 
-  {"group":"A","team_a":"Chequia","team_b":"Sudáfrica","date":"2026-06-18, 10:00","stadium":"Atlanta"},
+  {"group":"A","team_a":"República Checa","team_b":"Sudáfrica","date":"2026-06-18, 10:00","stadium":"Atlanta"},
   {"group":"A","team_a":"México","team_b":"Corea del Sur","date":"2026-06-18, 19:00","stadium":"Guadalajara"},
 
-  {"group":"A","team_a":"Chequia","team_b":"México","date":"2026-06-24 19:00","stadium":"Ciudad de México"},
+  {"group":"A","team_a":"República Checa","team_b":"México","date":"2026-06-24 19:00","stadium":"Ciudad de México"},
   {"group":"A","team_a":"Sudáfrica","team_b":"Corea del Sur","date":"2026-06-24 19:00","stadium":"Monterrey"},
 
   {"group":"B","team_a":"Canadá","team_b":"Bosnia y Herzegovina","date":"2026-06-12, 13:00","stadium":"Toronto"},

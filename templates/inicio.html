@@ -1,10 +1,36 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+{% extends 'base.html' %}
+
+{% block content %}
+
+{% include 'header.html' %}
+
+<div class="chips">
+    <div class="chips-content">
+        <button class="chip active">grupos</button>
+        <button class="chip">16<sup>os</sup></button>
+        <button class="chip">8<sup>os</sup></button>
+        <button class="chip">4<sup>os</sup></button>
+        <button class="chip">semis</button>
+        <button class="chip">finales</button>
+    </div>
+</div>
+<main class="content view groups">
+    {% include 'grupos.html' %}
+</main>
+
+<footer class="actions">
+    <div class="actions-layout">
+        {% if still_submitting %}
+            <button class="submit-btn" onclick="savePredictions()">
+                Guardar
+            </button>
+            <button class="submit-btn" onclick="sendPredictions()">
+                Enviar
+            </button>
+        {% else %}
+            <span class="action-span">Predicciones enviadas</span>
+        {% endif %}
+    </div>
+</footer>
+
+{% endblock %}
