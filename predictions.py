@@ -2,7 +2,7 @@ from flask import Blueprint, request
 from flask_login import current_user
 from datetime import datetime
 from db.models import db, Prediction
-# from excels import generate_excel
+from excels import generate_excel
 
 bp = Blueprint("predictions", __name__)
 
@@ -47,11 +47,12 @@ def save_predictions():
     filtered_preds = [p for p in data["predictions"] if isinstance(p["goals_a"], int) and isinstance(p["goals_b"], int)]
 
     process_prediction(filtered_preds, "saved")
+
     return {"status": "ok"}
 
 @bp.route("/submit_predictions", methods=["POST"])
 def submit_predictions():
-    # generate_excel()
+    generate_excel()
 
     data = request.get_json()
 

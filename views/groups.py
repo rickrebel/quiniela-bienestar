@@ -15,12 +15,10 @@ def convert_date(date):
     ]
     return f"{date.day} de {meses[date.month - 1]}, {date:%H:%M}"
 
-@groups_bp.route("/grupos")
-@login_required
-def grupos():
+def renderMatchesByGroup(Match, Prediction, user):
     matches = Match.query.all()
     predictions = Prediction.query.filter_by(
-        user_id=current_user.id
+        user_id=user.id
     ).all()
     predictions_by_match = {
         p.match_id: p
@@ -36,6 +34,13 @@ def grupos():
                 match.predicted_b = prediction.goals_b
             match.formatted_date = convert_date(match.date)
             groups[match.group_name].append(match)
+
+    return groups
+
+@groups_bp.route("/grupos")
+@login_required
+def grupos():
+    groups = renderMatchesByGroup(Match, Prediction, current_user)
 
     return render_template(
         "grupos.html",
