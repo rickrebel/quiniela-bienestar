@@ -1,11 +1,12 @@
-"""Servicio de generación y envío del Excel de predicciones."""
+"""Servicio de generación y envío del Excel de predicciones por fase."""
 
 from io import BytesIO
 
 from django.core.mail import EmailMessage
 from openpyxl import Workbook
 
-from pool.views.groups import render_matches_by_group
+from pool.views.stages import render_stage_matches
+from tournament.models import Stage
 
 XLSX_MIMETYPE = (
     "application/vnd.openxmlformats-officedocument"
@@ -13,45 +14,41 @@ XLSX_MIMETYPE = (
 )
 
 HEADER_ROW = [
-    "Equipo A",
-    "Goles A",
-    "Goles B",
-    "Equipo B",
+    "Local",
+    "Goles local",
+    "Goles visitante",
+    "Visitante",
     "Fecha",
     "Sede",
 ]
 
-EMAIL_SUBJECT = "Tus predicciones"
-EMAIL_BODY = (
-    "Te adjunto el excel de tus predicciones de la fase de "
-    "grupos. Saludos!"
-)
+
+def _team_name(team, placeholder: str) -> str:
+    """Nombre corto del equipo, o su placeholder si aún no se define."""
+    return team.name_es if team is not None else placeholder
 
 
-def generate_excel(user) -> None:
-    """Genera el Excel de predicciones y lo envía por correo.
+def generate_excel(user, stage: Stage) -> None:
+    """Genera el Excel de una fase y lo envía por correo al usuario.
 
-    Construye un ``Workbook`` local (uno por llamada, para evitar
-    el bug del libro global que acumulaba hojas entre peticiones),
-    crea una hoja por grupo con ``render_matches_by_group(user)``,
-    serializa el archivo en memoria y lo adjunta a un correo
-    dirigido a ``user.email``.
+    Construye un ``Workbook`` local por llamada. En fase de grupos crea
+    una hoja por grupo; en eliminatoria, una sola hoja con la fase. Los
+    títulos de hoja se recortan a 31 caracteres (límite de openpyxl).
     """
     workbook = Workbook()
     workbook.remove(workbook.active)
 
-    groups = render_matches_by_group(user)
-    for group_name, matches in groups.items():
-        sheet = workbook.create_sheet(title=f"Grupo {group_name}")
+    grouped = render_stage_matches(user, stage)
+    for group_name, matches in grouped.items():
+        title = f"Grupo {group_name}" if group_name else stage.short_name
+        sheet = workbook.create_sheet(title=title[:31])
         sheet.append(HEADER_ROW)
         for match in matches:
-            predicted_home = getattr(match, "predicted_home", 0)
-            predicted_away = getattr(match, "predicted_away", 0)
             sheet.append([
-                match.home_team.name,
-                predicted_home,
-                predicted_away,
-                match.away_team.name,
+                _team_name(match.home_team, match.home_placeholder),
+                getattr(match, "predicted_home", 0),
+                getattr(match, "predicted_away", 0),
+                _team_name(match.away_team, match.away_placeholder),
                 match.formatted_date,
                 match.stadium.name,
             ])
@@ -59,10 +56,11 @@ def generate_excel(user) -> None:
     buffer = BytesIO()
     workbook.save(buffer)
 
-    message = EmailMessage(
-        subject=EMAIL_SUBJECT,
-        body=EMAIL_BODY,
-        to=[user.email],
+    subject = f"Tus predicciones · {stage.name}"
+    body = (
+        f"Te adjunto el Excel de tus predicciones de {stage.name}. "
+        "Saludos!"
     )
+    message = EmailMessage(subject=subject, body=body, to=[user.email])
     message.attach("predicciones.xlsx", buffer.getvalue(), XLSX_MIMETYPE)
     message.send()

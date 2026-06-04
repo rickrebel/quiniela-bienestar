@@ -12,7 +12,16 @@ class StadiumAdmin(admin.ModelAdmin):
 
 @admin.register(Stage)
 class StageAdmin(admin.ModelAdmin):
-    list_display = ("order", "key", "name", "short_name", "color")
+    list_display = (
+        "order",
+        "key",
+        "name",
+        "short_name",
+        "color",
+        "opens_at",
+        "confirm_deadline",
+    )
+    list_editable = ("opens_at", "confirm_deadline")
     ordering = ("order",)
 
 

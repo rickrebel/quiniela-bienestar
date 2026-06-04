@@ -27,7 +27,8 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 - `pool/`: `User` (custom, `AUTH_USER_MODEL = "pool.User"`), `Prediction`,
   `StageUser`.
 - Views split by concern in `pool/views/`: `auth.py` (email login),
-  `groups.py` (predictions page), `predictions.py` (JSON save/submit).
+  `stages.py` (per-stage predictions page + tabs), `predictions.py` (JSON
+  save/send/confirm).
 - Excel generation + email in `pool/services/excel.py`.
 - Data seeded from two sources committed under `db/jsons/`: OF (openfootball,
   base seed) and FD (football-data.org, `fd_id` + results). Manual overrides
@@ -40,10 +41,15 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   `set_unusable_password()`.
 - **`username` always equals `email`** (forced in `User.save()`). The player's
   display name lives in `first_name`, not `username`.
-- **`home`/`away`, not `a`/`b`.** Models use `home_team`/`away_team`,
-  `home_goals`/`away_goals` (Match) and `home_goals`/`away_goals` (Prediction),
-  aligned with FD. The frontend (templates, `static/submit.js`) still uses
-  `a`/`b` — realignment is pending.
+- **`home`/`away`, not `a`/`b`.** Models, templates and `static/submit.js` all
+  use `home_team`/`away_team`, `home_goals`/`away_goals`, aligned with FD.
+- **Per-stage flow.** Predictions are scoped to a `Stage` (tabs at
+  `/etapa/<key>/`). `StageUser.state` is a computed lifecycle
+  (`upcoming`→`editing`→`sent`→`confirmed`, plus `locked`) derived from
+  `sent_at`, `closed_at`, `Stage.opens_at` and `Stage.confirm_deadline`. A
+  stage is editable only once `opens_at` is set and reached (null = not yet
+  enabled). `close_expired_stages` (cron, pending on EC2) auto-confirms sent
+  stages past their deadline.
 - **`Match.datetime` is UTC**; local stadium time derives from
   `Stadium.utc_offset` (int). Group/`Stage` is derived on Match, not stored;
   `group_name` lives only on `Team` (CHOICES A–L).
@@ -52,7 +58,7 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 - **`Stage` has 6 rows, not 7**: FD `THIRD_PLACE`+`FINAL` collapse into `FINAL`;
   distinguish via `Match.of_number` (103 = third place, 104 = final). Note the
   ES false friend: `LAST_32` = "dieciseisavos", `LAST_16` = "octavos".
-- **`submit_predictions` persists first, then builds the Excel**, so the file
+- **`send`/`confirm` persist first, then build the Excel**, so the file
   reflects what was sent. Keep that order.
 - **JSON endpoints use a trailing slash** and require the `X-CSRFToken` header
   (set in `static/submit.js`).

@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+{% include 'header.html' %}
+
+<nav class="stage-tabs" aria-label="Fases">
+    {% for tab in tabs %}
+    <a class="stage-tab{% if tab.stage.key == stage.key %} active{% endif %}"
+       href="{% url 'etapa' tab.stage.key %}">
+        {{ tab.stage.short_name }}
+        {% if tab.state == 'confirmed' %}
+        <span class="tab-done" title="Confirmado">✓</span>
+        {% endif %}
+    </a>
+    {% endfor %}
+</nav>
+
+<h6 class="chip-title">{{ stage.name|upper }}</h6>
+
+<main class="content" data-stage="{{ stage.key }}">
+    {% if state == 'upcoming' %}
+    <p class="stage-note">Esta fase todavía no abre para predecir.</p>
+    {% elif state == 'locked' %}
+    <p class="stage-note">El plazo de esta fase terminó.</p>
+    {% endif %}
+
+    {% for group, matches in grouped.items %}
+
+    {% if is_group_stage %}
+    <details class="group">
+        <summary class="group-summary">
+            <span class="chevron">
+                <svg viewBox="0 0 24 24"><path d="M9 7 L17 12 L9 17"/></svg>
+            </span>
+            Grupo {{ group }}
+        </summary>
+    {% else %}
+    <div class="knockout">
+    {% endif %}
+
+        {% for match in matches %}
+        <section class="match-card mx-2">
+            <div class="match" data-match-id="{{ match.id }}">
+                <div class="team">
+                    {% if match.home_team %}
+                    <span>{{ match.home_team.name_es }}</span>
+                    {% if match.home_team.crest %}
+                    <img src="{{ match.home_team.crest }}" alt="">
+                    {% else %}
+                    <span class="flag-emoji">{{ match.home_team.flag_icon }}</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="placeholder">{{ match.home_placeholder }}</span>
+                    {% endif %}
+                </div>
+
+                <div class="score">
+                    <input type="number" min="0" step="1"
+                           data-field="home_goals"
+                           value="{{ match.predicted_home }}"
+                           {% if not can_edit %}disabled{% endif %}>
+                    <span>-</span>
+                    <input type="number" min="0" step="1"
+                           data-field="away_goals"
+                           value="{{ match.predicted_away }}"
+                           {% if not can_edit %}disabled{% endif %}>
+                </div>
+
+                <div class="team">
+                    {% if match.away_team %}
+                    {% if match.away_team.crest %}
+                    <img src="{{ match.away_team.crest }}" alt="">
+                    {% else %}
+                    <span class="flag-emoji">{{ match.away_team.flag_icon }}</span>
+                    {% endif %}
+                    <span>{{ match.away_team.name_es }}</span>
+                    {% else %}
+                    <span class="placeholder">{{ match.away_placeholder }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="meta">
+                <span>{{ match.formatted_date }}</span>
+                <span class="dot"></span>
+                <span>{{ match.stadium }}</span>
+            </div>
+        </section>
+        {% endfor %}
+
+    {% if is_group_stage %}</details>{% else %}</div>{% endif %}
+
+    {% endfor %}
+</main>
+
+<footer class="actions">
+    <div class="actions-layout">
+        {% if state == 'editing' %}
+        <button class="submit-btn" onclick="savePredictions()">Guardar</button>
+        <button class="submit-btn" onclick="sendPredictions()">Enviar</button>
+        {% elif state == 'sent' %}
+        <button class="submit-btn" onclick="savePredictions()">Guardar</button>
+        <button class="submit-btn" onclick="confirmPredictions()">Confirmar</button>
+        {% elif state == 'confirmed' %}
+        <span class="action-done">
+            <span class="done-icon">✓</span> Confirmado
+        </span>
+        {% endif %}
+    </div>
+
+    {% if deadline_iso and state != 'confirmed' %}
+    <div class="countdown" data-deadline="{{ deadline_iso }}"></div>
+    {% endif %}
+</footer>
+
+<div id="saving-overlay" hidden>
+    <div class="spinner"></div>
+    <p>Guardando predicciones...</p>
+</div>
+
+{% endblock %}

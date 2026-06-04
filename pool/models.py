@@ -44,7 +44,10 @@ class User(AbstractUser):
 
     username = models.CharField(max_length=254, unique=True)
     email = models.EmailField(unique=True)
-    did_pay = models.BooleanField(default=False)
+    authorized = models.BooleanField(
+        default=False,
+        help_text="Pagó y envió a tiempo; se marca a mano.",
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
@@ -76,6 +79,13 @@ class StageUser(models.Model):
     sent_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
+    # Estados del ciclo de vida (derivados, no almacenados).
+    UPCOMING = "upcoming"      # la fase aún no abre: inputs off, sin botón
+    EDITING = "editing"        # abierta, sin enviar: Guardar + Enviar
+    SENT = "sent"              # enviada, editable: Guardar + Confirmar
+    CONFIRMED = "confirmed"    # confirmada o vencida-tras-envío: ícono
+    LOCKED = "locked"          # venció el plazo sin haber enviado nada
+
     class Meta:
         verbose_name = "estado de fase por usuario"
         verbose_name_plural = "estados de fase por usuario"
@@ -89,16 +99,43 @@ class StageUser(models.Model):
     def __str__(self) -> str:
         return f"{self.user} · {self.stage}"
 
+    @property
+    def state(self) -> str:
+        """Estado actual del usuario en la fase (ver constantes arriba).
+
+        El vencimiento del plazo equivale a confirmación solo si ya
+        había envío; si venció sin envío, queda LOCKED (sin entrada).
+        """
+        if self.closed_at or (self.sent_at and self.stage.is_past_deadline):
+            return self.CONFIRMED
+        if not self.stage.is_open:
+            return self.UPCOMING
+        if self.stage.is_past_deadline:
+            return self.LOCKED
+        if self.sent_at:
+            return self.SENT
+        return self.EDITING
+
+    @property
+    def can_edit(self) -> bool:
+        """Puede modificar marcadores (Guardar)."""
+        return self.state in (self.EDITING, self.SENT)
+
+    @property
+    def can_send(self) -> bool:
+        return self.state == self.EDITING
+
+    @property
+    def can_confirm(self) -> bool:
+        return self.state == self.SENT
+
 
 class Prediction(models.Model):
-    """Pronóstico de un usuario para un partido."""
+    """Pronóstico de un usuario para un partido.
 
-    SAVED = "saved"
-    SUBMITTED = "submitted"
-    STATUS_CHOICES = [
-        (SAVED, "Guardada"),
-        (SUBMITTED, "Enviada"),
-    ]
+    El ciclo de vida (borrador/enviado/confirmado) vive en
+    ``StageUser``, no aquí: la predicción solo guarda los marcadores.
+    """
 
     date = models.DateTimeField()
     user = models.ForeignKey(
@@ -111,7 +148,6 @@ class Prediction(models.Model):
     )
     home_goals = models.IntegerField()
     away_goals = models.IntegerField()
-    status = models.CharField(max_length=100, choices=STATUS_CHOICES)
 
     class Meta:
         constraints = [

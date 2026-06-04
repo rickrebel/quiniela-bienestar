@@ -9,6 +9,7 @@ Convención: ``home``/``away`` en lugar de ``a``/``b`` para alinear con FD.
 """
 
 from django.db import models
+from django.utils import timezone
 
 
 class Stadium(models.Model):
@@ -72,6 +73,16 @@ class Stage(models.Model):
         max_length=7, blank=True, help_text="Color hex, p. ej. #4CAF50."
     )
     order = models.PositiveSmallIntegerField(unique=True)
+    opens_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Apertura de predicciones (UTC). Antes: inputs off.",
+    )
+    confirm_deadline = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Límite para confirmar (UTC). Al vencer: auto-confirma.",
+    )
 
     class Meta:
         verbose_name = "fase"
@@ -80,6 +91,23 @@ class Stage(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def is_open(self) -> bool:
+        """True solo si ya se fijó y alcanzó la apertura (habilitación).
+
+        ``opens_at`` nulo = fase aún no habilitada: se ve pero no se edita
+        hasta que el admin fije la fecha de apertura.
+        """
+        return self.opens_at is not None and timezone.now() >= self.opens_at
+
+    @property
+    def is_past_deadline(self) -> bool:
+        """True si ya venció el plazo de confirmación."""
+        return (
+            self.confirm_deadline is not None
+            and timezone.now() >= self.confirm_deadline
+        )
 
 
 class Team(models.Model):

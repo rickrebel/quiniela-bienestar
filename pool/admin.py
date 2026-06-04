@@ -16,8 +16,9 @@ class UserAdmin(admin.ModelAdmin):
         "username",
         "first_name",
         "is_active",
-        "did_pay",
+        "authorized",
     )
+    list_editable = ("authorized",)
     search_fields = ("email",)
 
 

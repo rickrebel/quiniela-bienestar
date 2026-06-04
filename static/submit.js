@@ -19,79 +19,97 @@ function getCookie(name) {
 
 const csrftoken = getCookie("csrftoken");
 
-function buildPredictions(){
-    const matches = document.querySelectorAll(".match");
-
+function buildPayload() {
+    const stage = document.querySelector(".content").dataset.stage;
     const predictions = [];
 
-    matches.forEach(match => {
-        const match_id = match.dataset.matchId;
-
-        const goals_a = match.querySelector('[data-field="goals_a"]').value;
-        const goals_b = match.querySelector('[data-field="goals_b"]').value;
-
+    document.querySelectorAll(".match").forEach(match => {
+        const home = match.querySelector('[data-field="home_goals"]').value;
+        const away = match.querySelector('[data-field="away_goals"]').value;
         predictions.push({
-            match_id: parseInt(match_id),
-            goals_a: goals_a === "" ? null : parseInt(goals_a),
-            goals_b: goals_b === "" ? null : parseInt(goals_b),
+            match_id: parseInt(match.dataset.matchId),
+            home_goals: home === "" ? null : parseInt(home),
+            away_goals: away === "" ? null : parseInt(away),
         });
     });
 
-    return predictions;
+    return { stage, predictions };
+}
+
+function isComplete(payload) {
+    return !payload.predictions.some(
+        p => p.home_goals === null || p.away_goals === null
+    );
+}
+
+async function postPredictions(url, payload) {
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrftoken,
+        },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || "Algo salió mal, vuelve a intentar.");
+    }
+    return data;
 }
 
 async function savePredictions() {
     savingOverlay.hidden = false;
-
-    const predictions = buildPredictions();
-
     try {
-        const response = await fetch("/save_predictions/", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": csrftoken
-            },
-            body: JSON.stringify({predictions})
-        })
-            //.then(res => res.json())
-        const data = await response.json()
-        if (!response.ok){
-            throw new Error(
-                data.error || "Error al guardar. Quién sabe qué pasó, a ver vuelve a intentar"
-            )
-        }
-        alert("Predicciones guardadas correctamente")
-    } catch(err) {
-        alert(err.message)
+        await postPredictions("/save/", buildPayload());
+        alert("Predicciones guardadas correctamente");
+    } catch (err) {
+        alert(err.message);
     } finally {
-        savingOverlay.hidden = true
+        savingOverlay.hidden = true;
     }
 }
 
-function sendPredictions() {
-    const predictions = buildPredictions();
-
-    if (predictions.some(p => p.goals_a === null || p.goals_b === null)){
-        alert('tienes que llenar todos los partidos antes de enviar');
+async function sendPredictions() {
+    const payload = buildPayload();
+    if (!isComplete(payload)) {
+        alert("Tienes que llenar todos los partidos antes de enviar.");
+        return;
+    }
+    if (!confirm(
+        "Se enviará tu Excel por correo. Aún podrás editar y luego confirmar."
+    )) {
         return;
     }
 
-    const confirmed = confirm(
-        "Recuerda que una vez enviadas las predicciones no se pueden modificar."
-    );
+    savingOverlay.hidden = false;
+    try {
+        await postPredictions("/send/", payload);
+        location.reload();
+    } catch (err) {
+        alert(err.message);
+        savingOverlay.hidden = true;
+    }
+}
 
-    if (!confirmed){
+async function confirmPredictions() {
+    const payload = buildPayload();
+    if (!isComplete(payload)) {
+        alert("Tienes que llenar todos los partidos antes de confirmar.");
+        return;
+    }
+    if (!confirm(
+        "Al confirmar ya NO podrás modificar esta fase. ¿Continuar?"
+    )) {
         return;
     }
 
-    fetch("/submit_predictions/", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrftoken
-        },
-        body: JSON.stringify({predictions})
-    })
-        .then(res => res.json())
+    savingOverlay.hidden = false;
+    try {
+        await postPredictions("/confirm/", payload);
+        location.reload();
+    } catch (err) {
+        alert(err.message);
+        savingOverlay.hidden = true;
+    }
 }

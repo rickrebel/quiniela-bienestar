@@ -18,7 +18,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
     GET: muestra el formulario de email.
     POST: valida el email; si el usuario no existe, agrega un error
     pidiendo preregistrar. Si existe, lo activa (en caso de estar
-    preregistrado), inicia sesión y redirige a 'grupos'.
+    preregistrado), inicia sesión y redirige a la fase de grupos.
     """
     if request.method == "POST":
         form = EmailAccessForm(request.POST)
@@ -35,7 +35,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
                     user.is_active = True
                     user.save()
                 login(request, user, backend=_AUTH_BACKEND)
-                return redirect("grupos")
+                return redirect("etapa", key="GROUP_STAGE")
     else:
         form = EmailAccessForm()
 

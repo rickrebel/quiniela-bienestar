@@ -289,11 +289,37 @@ red ni token, commiteando snapshots.
 
 ---
 
+## 14. Flujo de predicción por fase: Enviar → Confirmar
+
+**Contexto.** Antes el envío era único y por usuario: una sola acción que
+persistía y mandaba el Excel. Se rediseñó a un flujo por `(usuario, fase)` con
+dos pasos y estado derivado.
+
+**Decisión.**
+
+- **Tabs por fase** (rutas server-side `/etapa/<key>/`); cada página conoce su
+  `StageUser`. La raíz redirige a `/etapa/GROUP_STAGE/`.
+- Dos acciones: **Enviar** (`send`, marca `StageUser.sent_at`, manda Excel,
+  sigue editable) y **Confirmar** (`confirm`, marca `closed_at`, manda Excel
+  final y **bloquea**). `save` guarda borrador.
+- El **ciclo de vida vive en `StageUser.state`** (propiedad computada:
+  `upcoming`/`editing`/`sent`/`confirmed`/`locked`), derivado de `sent_at`,
+  `closed_at`, `Stage.opens_at` y `Stage.confirm_deadline`.
+- `Stage.opens_at` habilita los inputs; antes de esa fecha los partidos se ven
+  pero deshabilitados. `Stage.confirm_deadline` (capturado en hora de México
+  desde el admin, `TIME_ZONE` ya es `America/Mexico_City`) dispara la
+  auto-confirmación. Countdown en la UI con day.js.
+- **Al vencer el plazo se auto-confirma lo enviado** vía el comando
+  `close_expired_stages`. La UI/endpoints ya bloquean aunque el cron no corra.
+- `User.did_pay` se renombró a `User.authorized` (pagó **y** envió a tiempo;
+  marca manual). Banderas: `Team.crest` (FD) con fallback al emoji `flag_icon`.
+- `StageUser` se crea al preregistrar; `sync_stageusers` respalda a usuarios
+  previos o fases nuevas.
+
 ## Trabajo pendiente para próximas sesiones
 
-- **Realinear el frontend** a `home`/`away` y a la nueva estructura: plantillas
-  DTL, `static/submit.js` y las vistas a fondo. Implica adoptar la FK a `Stage`,
-  la FK a `Stadium` y el grupo derivado (ya no `a`/`b` ni campos planos).
+- **Programar el cron en EC2** que ejecute `python manage.py
+  close_expired_stages` periódicamente (auto-confirma fases vencidas).
 - **Ajustar los colores de `Stage`** (los hex actuales son tentativos).
 - **Decidir los números oficiales de la fase de grupos** (hoy son orden
   cronológico, no los números FIFA).
