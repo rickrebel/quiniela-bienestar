@@ -8,13 +8,13 @@ from pool.views import auth, predictions, stages
 urlpatterns = [
     path("login/", auth.login_view, name="login"),
     path("logout/", auth.logout_view, name="logout"),
-    path("etapa/<str:key>/", stages.etapa, name="etapa"),
+    path("stage/<str:key>/", stages.stage_view, name="stage"),
     path("save/", predictions.save_predictions, name="save"),
     path("send/", predictions.send_predictions, name="send"),
     path("confirm/", predictions.confirm_predictions, name="confirm"),
     path(
         "",
-        RedirectView.as_view(url="/etapa/GROUP_STAGE/"),
+        RedirectView.as_view(url="/stage/GROUP_STAGE/"),
         name="root",
     ),
 ]

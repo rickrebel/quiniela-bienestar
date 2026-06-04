@@ -7,7 +7,7 @@
 <nav class="stage-tabs" aria-label="Fases">
     {% for tab in tabs %}
     <a class="stage-tab{% if tab.stage.key == stage.key %} active{% endif %}"
-       href="{% url 'etapa' tab.stage.key %}">
+       href="{% url 'stage' tab.stage.key %}">
         {{ tab.stage.short_name }}
         {% if tab.state == 'confirmed' %}
         <span class="tab-done" title="Confirmado">✓</span>
@@ -51,11 +51,12 @@
                     <span class="flag-emoji">{{ match.home_team.flag_icon }}</span>
                     {% endif %}
                     {% else %}
-                    <span class="placeholder">{{ match.home_placeholder }}</span>
+                    <span class="team-placeholder">{{ match.home_placeholder }}</span>
                     {% endif %}
                 </div>
 
                 <div class="score">
+                    {% if match.home_team and match.away_team %}
                     <input type="number" min="0" step="1"
                            data-field="home_goals"
                            value="{{ match.predicted_home }}"
@@ -65,6 +66,9 @@
                            data-field="away_goals"
                            value="{{ match.predicted_away }}"
                            {% if not can_edit %}disabled{% endif %}>
+                    {% else %}
+                    <span>&ndash;</span>
+                    {% endif %}
                 </div>
 
                 <div class="team">
@@ -76,17 +80,16 @@
                     {% endif %}
                     <span>{{ match.away_team.name_es }}</span>
                     {% else %}
-                    <span class="placeholder">{{ match.away_placeholder }}</span>
+                    <span class="team-placeholder">{{ match.away_placeholder }}</span>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="divider"></div>
-
             <div class="meta">
-                <span>{{ match.formatted_date }}</span>
-                <span class="dot"></span>
-                <span>{{ match.stadium }}</span>
+                <span class="meta-key">{{ match.local_day }}</span>
+                <span class="meta-key">{{ match.local_time }}</span>
+                <span>{{ match.stadium.name }}</span>
+                <span>{{ match.stadium.city }}</span>
             </div>
         </section>
         {% endfor %}

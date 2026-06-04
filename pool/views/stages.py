@@ -1,13 +1,14 @@
 """Vistas de predicción por fase del torneo (una página por Stage)."""
 
 from collections import defaultdict
+from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from pool.models import Prediction, StageUser, User
-from pool.utils import convert_date
+from pool.utils import format_day, format_time
 from tournament.models import Match, Stage
 
 
@@ -18,9 +19,10 @@ def render_stage_matches(
 
     Fase de grupos: dict ``{grupo: [matches]}`` ordenado A→L. Eliminatoria:
     ``{None: [matches]}`` (lista plana, equipos aún como placeholder). En
-    cada partido adjunta en memoria la fecha formateada y, si el usuario ya
-    predijo, ``predicted_home``/``predicted_away``. ``select_related`` evita
-    N+1 en equipos y estadio.
+    cada partido adjunta en memoria día y hora **locales de la sede**
+    (``Match.datetime`` está en UTC; se aplica ``Stadium.utc_offset``) y, si
+    el usuario ya predijo, ``predicted_home``/``predicted_away``.
+    ``select_related`` evita N+1 en equipos y estadio.
     """
     matches = Match.objects.filter(stage=stage).select_related(
         "home_team", "away_team", "stadium"
@@ -35,7 +37,11 @@ def render_stage_matches(
         if prediction is not None:
             match.predicted_home = prediction.home_goals
             match.predicted_away = prediction.away_goals
-        match.formatted_date = convert_date(match.datetime)
+        local_dt = match.datetime + timedelta(
+            hours=match.stadium.utc_offset
+        )
+        match.local_day = format_day(local_dt)
+        match.local_time = format_time(local_dt)
         key = match.home_team.group_name if is_group else None
         grouped[key].append(match)
 
@@ -64,7 +70,7 @@ def _build_tabs(user: User) -> list[dict]:
 
 
 @login_required
-def etapa(request: HttpRequest, key: str) -> HttpResponse:
+def stage_view(request: HttpRequest, key: str) -> HttpResponse:
     """Renderiza la página de una fase con el estado del usuario.
 
     ``get_or_create`` del ``StageUser`` blinda el caso de usuarios sin la
@@ -87,4 +93,4 @@ def etapa(request: HttpRequest, key: str) -> HttpResponse:
             else ""
         ),
     }
-    return render(request, "etapa.html", context)
+    return render(request, "stage.html", context)

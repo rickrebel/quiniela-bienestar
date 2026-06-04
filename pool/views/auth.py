@@ -35,7 +35,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
                     user.is_active = True
                     user.save()
                 login(request, user, backend=_AUTH_BACKEND)
-                return redirect("etapa", key="GROUP_STAGE")
+                return redirect("stage", key="GROUP_STAGE")
     else:
         form = EmailAccessForm()
 

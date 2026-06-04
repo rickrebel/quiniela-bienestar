@@ -297,8 +297,8 @@ dos pasos y estado derivado.
 
 **Decisión.**
 
-- **Tabs por fase** (rutas server-side `/etapa/<key>/`); cada página conoce su
-  `StageUser`. La raíz redirige a `/etapa/GROUP_STAGE/`.
+- **Tabs por fase** (rutas server-side `/stage/<key>/`); cada página conoce su
+  `StageUser`. La raíz redirige a `/stage/GROUP_STAGE/`.
 - Dos acciones: **Enviar** (`send`, marca `StageUser.sent_at`, manda Excel,
   sigue editable) y **Confirmar** (`confirm`, marca `closed_at`, manda Excel
   final y **bloquea**). `save` guarda borrador.

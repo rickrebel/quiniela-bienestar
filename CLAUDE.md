@@ -44,7 +44,7 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 - **`home`/`away`, not `a`/`b`.** Models, templates and `static/submit.js` all
   use `home_team`/`away_team`, `home_goals`/`away_goals`, aligned with FD.
 - **Per-stage flow.** Predictions are scoped to a `Stage` (tabs at
-  `/etapa/<key>/`). `StageUser.state` is a computed lifecycle
+  `/stage/<key>/`). `StageUser.state` is a computed lifecycle
   (`upcoming`→`editing`→`sent`→`confirmed`, plus `locked`) derived from
   `sent_at`, `closed_at`, `Stage.opens_at` and `Stage.confirm_deadline`. A
   stage is editable only once `opens_at` is set and reached (null = not yet

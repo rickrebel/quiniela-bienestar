@@ -18,11 +18,11 @@ MONTHS_ES: dict[int, str] = {
 }
 
 
-def convert_date(date: datetime) -> str:
-    """Formatea una fecha como '{día} de {mes}, {HH:MM}'.
+def format_day(date: datetime) -> str:
+    """Formatea la fecha como '{día} de {mes}' (mes en español)."""
+    return f"{date.day} de {MONTHS_ES[date.month]}"
 
-    El mes se devuelve en español (enero..diciembre). La hora se
-    formatea en 24 horas con ceros a la izquierda.
-    """
-    month = MONTHS_ES[date.month]
-    return f"{date.day} de {month}, {date.strftime('%H:%M')}"
+
+def format_time(date: datetime) -> str:
+    """Formatea la hora en 24 h con ceros a la izquierda ('HH:MM')."""
+    return date.strftime("%H:%M")
