@@ -56,8 +56,7 @@ class Team(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     flag = models.CharField(
-        max_length=100, unique=True, null=True, blank=True
-    )
+        max_length=100, unique=True, null=True, blank=True)
     group_name = models.CharField(max_length=1)
     points = models.IntegerField(null=True, blank=True)
     won_games = models.IntegerField(null=True, blank=True)
@@ -79,11 +78,9 @@ class Match(models.Model):
     group_name = models.CharField(max_length=1, null=True, blank=True)
     stadium = models.CharField(max_length=100, null=True, blank=True)
     team_a = models.ForeignKey(
-        Team, on_delete=models.PROTECT, related_name="matches_as_a"
-    )
+        Team, on_delete=models.PROTECT, related_name="matches_as_a")
     team_b = models.ForeignKey(
-        Team, on_delete=models.PROTECT, related_name="matches_as_b"
-    )
+        Team, on_delete=models.PROTECT, related_name="matches_as_b")
     goals_a = models.IntegerField(null=True, blank=True)
     goals_b = models.IntegerField(null=True, blank=True)
     match_number = models.IntegerField(null=True, blank=True)
@@ -101,11 +98,9 @@ class Prediction(models.Model):
 
     date = models.DateTimeField()
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="predictions"
-    )
+        User, on_delete=models.CASCADE, related_name="predictions")
     match = models.ForeignKey(
-        "Match", on_delete=models.CASCADE, related_name="predictions"
-    )
+        "Match", on_delete=models.CASCADE, related_name="predictions")
     goals_a = models.IntegerField()
     goals_b = models.IntegerField()
     status = models.CharField(max_length=100, choices=STATUS_CHOICES)
