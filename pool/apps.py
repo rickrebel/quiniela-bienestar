@@ -7,3 +7,7 @@ class PoolConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "pool"
     verbose_name = "Quiniela"
+
+    def ready(self) -> None:
+        """Registra las señales de la app (alta de StageUser)."""
+        from . import signals  # noqa: F401

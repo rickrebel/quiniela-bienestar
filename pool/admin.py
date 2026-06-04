@@ -5,7 +5,7 @@ from django.contrib.auth.admin import UserAdmin
 
 @admin.register(StageUser)
 class StageUserAdmin(admin.ModelAdmin):
-    list_display = ("user", "stage", "sent_at", "closed_at")
+    list_display = ("user", "stage", "sent_at")
     list_filter = ("stage",)
 
 

@@ -21,6 +21,22 @@ NAMES_ES_PATH = JSONS / "manual" / "team_names_es.json"
 # Único código OF cuyo tla difiere en FD.
 FIFA_TO_TLA = {"URU": "URY"}
 
+# Fútbol separa al Reino Unido por naciones; sus banderas usan una secuencia
+# distinta (tag sequence) que no se deriva del emoji, así que van a mano.
+FLAG_OVERRIDES = {
+    "ENG": "gb-eng", "WAL": "gb-wls",
+    "SCO": "gb-sct", "NIR": "gb-nir",
+}
+
+
+def derive_flag_code(flag_icon: str) -> str:
+    """Convierte el emoji de bandera (2 regional indicators) a ISO alpha-2."""
+    base = 0x1F1E6  # 🇦
+    chars = [c for c in flag_icon if base <= ord(c) <= 0x1F1FF]
+    if len(chars) != 2:
+        return ""
+    return "".join(chr(ord(c) - base + ord("a")) for c in chars)
+
 
 class Command(BaseCommand):
     help = "Carga selecciones desde OF y las enriquece con FD."
@@ -40,11 +56,15 @@ class Command(BaseCommand):
         created = enriched = 0
         for item in of_teams:
             fifa = item["fifa_code"]
+            flag_icon = item.get("flag_icon", "")
             defaults = {
                 "name": item["name"],
                 "name_es": names_es.get(fifa, item["name"]),
-                "flag_icon": item.get("flag_icon", ""),
+                "flag_icon": flag_icon,
                 "flag_unicode": item.get("flag_unicode", ""),
+                "flag_code": FLAG_OVERRIDES.get(fifa) or derive_flag_code(
+                    flag_icon
+                ),
                 "group_name": item["group"],
                 "confederation": item["confed"],
                 "raw_of": item,

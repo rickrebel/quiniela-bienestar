@@ -28,7 +28,7 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   `StageUser`.
 - Views split by concern in `pool/views/`: `auth.py` (email login),
   `stages.py` (per-stage predictions page + tabs), `predictions.py` (JSON
-  save/send/confirm).
+  save + per-match autosave + send).
 - Excel generation + email in `pool/services/excel.py`.
 - Data seeded from two sources committed under `db/jsons/`: OF (openfootball,
   base seed) and FD (football-data.org, `fd_id` + results). Manual overrides
@@ -44,12 +44,12 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 - **`home`/`away`, not `a`/`b`.** Models, templates and `static/submit.js` all
   use `home_team`/`away_team`, `home_goals`/`away_goals`, aligned with FD.
 - **Per-stage flow.** Predictions are scoped to a `Stage` (tabs at
-  `/stage/<key>/`). `StageUser.state` is a computed lifecycle
-  (`upcoming`→`editing`→`sent`→`confirmed`, plus `locked`) derived from
-  `sent_at`, `closed_at`, `Stage.opens_at` and `Stage.confirm_deadline`. A
-  stage is editable only once `opens_at` is set and reached (null = not yet
-  enabled). `close_expired_stages` (cron, pending on EC2) auto-confirms sent
-  stages past their deadline.
+  `/stage/<key>/`). Sending is single and final. `StageUser.state` is a
+  computed lifecycle (`upcoming`→`editing`→`sent`, plus `locked`) derived from
+  `sent_at`, `Stage.opens_at` and `Stage.send_deadline`. A stage is editable
+  only once `opens_at` is set and reached (null = not yet enabled).
+  `send_expired_stages` (cron, pending on EC2) auto-sends whatever was saved
+  for stages past their deadline (skips users who saved nothing).
 - **`Match.datetime` is UTC**; local stadium time derives from
   `Stadium.utc_offset` (int). Group/`Stage` is derived on Match, not stored;
   `group_name` lives only on `Team` (CHOICES A–L).
@@ -57,9 +57,16 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   `URU`→`URY` (Uruguay). Match join is by (UTC datetime + home `tla`).
 - **`Stage` has 6 rows, not 7**: FD `THIRD_PLACE`+`FINAL` collapse into `FINAL`;
   distinguish via `Match.of_number` (103 = third place, 104 = final). Note the
-  ES false friend: `LAST_32` = "dieciseisavos", `LAST_16` = "octavos".
-- **`send`/`confirm` persist first, then build the Excel**, so the file
-  reflects what was sent. Keep that order.
+  ES false friend: `LAST_32` = "dieciseisavos", `LAST_16` = "octavos". OF omits
+  `num` for group matches **and** for third place/final, so group detection keys
+  off the round (`Matchday*`), never `num` presence.
+- **Per-match autosave.** Scores save on `change` via `save_prediction`
+  (`/prediction/<id>/`), not a bulk submit. A `Prediction` row exists only when
+  both goals are set — an incomplete match deletes its row. Completeness and
+  the `N/total` counters derive from row presence, not form state.
+- **`send` finalizes what's already in the DB**: it doesn't re-persist the
+  client payload, just sets `sent_at`, then builds the Excel. Keep that order
+  so the file matches what was sent.
 - **JSON endpoints use a trailing slash** and require the `X-CSRFToken` header
   (set in `static/submit.js`).
 

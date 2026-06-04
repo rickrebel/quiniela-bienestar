@@ -30,6 +30,7 @@ class Command(BaseCommand):
             _, was_created = Stadium.objects.update_or_create(
                 name=item["name"],
                 defaults={
+                    "name_es": item.get("name_es", ""),
                     "city": item["city"],
                     "country": item["cc"],
                     "utc_offset": parse_utc_offset(item["timezone"]),

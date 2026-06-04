@@ -19,9 +19,9 @@ class StageAdmin(admin.ModelAdmin):
         "short_name",
         "color",
         "opens_at",
-        "confirm_deadline",
+        "send_deadline",
     )
-    list_editable = ("opens_at", "confirm_deadline")
+    list_editable = ("opens_at", "send_deadline")
     ordering = ("order",)
 
 

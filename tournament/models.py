@@ -42,6 +42,11 @@ class Stadium(models.Model):
     def __str__(self) -> str:
         return self.name
 
+    @property
+    def flag_path(self) -> str:
+        """Ruta estática de la mini-bandera (20px) del país de la sede."""
+        return f"flags_20/{self.country}.webp" if self.country else ""
+
 
 class Stage(models.Model):
     """Fase del torneo, alineada a las claves de stage de FD.
@@ -68,10 +73,11 @@ class Stage(models.Model):
         blank=True,
         help_text="Apertura de predicciones (UTC). Antes: inputs off.",
     )
-    confirm_deadline = models.DateTimeField(
+    send_deadline = models.DateTimeField(
         null=True,
         blank=True,
-        help_text="Límite para confirmar (UTC). Al vencer: auto-confirma.",
+        help_text="Límite para enviar (UTC). Al vencer: auto-envía lo "
+                  "guardado.",
     )
 
     class Meta:
@@ -93,10 +99,10 @@ class Stage(models.Model):
 
     @property
     def is_past_deadline(self) -> bool:
-        """True si ya venció el plazo de confirmación."""
+        """True si ya venció el plazo de envío."""
         return (
-            self.confirm_deadline is not None
-            and timezone.now() >= self.confirm_deadline
+            self.send_deadline is not None
+            and timezone.now() >= self.send_deadline
         )
 
 
@@ -127,6 +133,10 @@ class Team(models.Model):
         max_length=16, blank=True, help_text="Bandera como emoji."
     )
     flag_unicode = models.CharField(max_length=120, blank=True)
+    flag_code = models.CharField(
+        max_length=6, blank=True,
+        help_text="ISO alpha-2 del PNG local (ej. 'mx'; 'gb-eng' para ENG)."
+    )
     group_name = models.CharField(max_length=1, choices=GROUP_CHOICES)
     confederation = models.CharField(max_length=10, choices=CONFED_CHOICES)
 
@@ -146,6 +156,11 @@ class Team(models.Model):
 
     def __str__(self) -> str:
         return self.name_es or self.name
+
+    @property
+    def flag_path(self) -> str:
+        """Ruta estática del PNG de bandera (vacía si no hay código)."""
+        return f"flags_40/{self.flag_code}.png" if self.flag_code else ""
 
 
 class Match(models.Model):
@@ -205,11 +220,17 @@ class Match(models.Model):
         blank=True,
     )
     home_placeholder = models.CharField(
-        max_length=20,
-        blank=True,
-        help_text='Origen textual del equipo local (p. ej. "2A", "W74").',
-    )
-    away_placeholder = models.CharField(max_length=20, blank=True)
+        max_length=20, blank=True,
+        help_text='Origen textual del equipo local (p. ej. "2A", "W74").',)
+    away_placeholder = models.CharField(
+        max_length=20, blank=True,
+        help_text='Origen textual del equipo visitante (p. ej. "1B", "W75").')
+
+    # Etiqueta legible del partido en eliminatoria (vacía en grupos). El
+    # identificador numérico es ``of_number``; el cruce se traza por él.
+    name = models.CharField(
+        max_length=40, blank=True,
+        help_text='Etiqueta legible (p. ej. "Cuartos 3", "Final").')
 
     home_goals = models.PositiveSmallIntegerField(null=True, blank=True)
     away_goals = models.PositiveSmallIntegerField(null=True, blank=True)

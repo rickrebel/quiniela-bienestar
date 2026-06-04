@@ -289,28 +289,30 @@ red ni token, commiteando snapshots.
 
 ---
 
-## 14. Flujo de predicción por fase: Enviar → Confirmar
+## 14. Flujo de predicción por fase: envío único
 
-**Contexto.** Antes el envío era único y por usuario: una sola acción que
-persistía y mandaba el Excel. Se rediseñó a un flujo por `(usuario, fase)` con
-dos pasos y estado derivado.
+**Contexto.** El flujo tuvo dos pasos (Enviar → Confirmar) con doble timestamp
+(`sent_at`/`closed_at`). Se simplificó a un **envío único y definitivo** por
+`(usuario, fase)`: enviar persiste, manda el Excel y bloquea. Se eliminó
+`closed_at` y el estado `confirmed`.
 
 **Decisión.**
 
 - **Tabs por fase** (rutas server-side `/stage/<key>/`); cada página conoce su
   `StageUser`. La raíz redirige a `/stage/GROUP_STAGE/`.
-- Dos acciones: **Enviar** (`send`, marca `StageUser.sent_at`, manda Excel,
-  sigue editable) y **Confirmar** (`confirm`, marca `closed_at`, manda Excel
-  final y **bloquea**). `save` guarda borrador.
+- Una sola acción definitiva: **Enviar** (`send`, marca `StageUser.sent_at`,
+  manda Excel y **bloquea**), confirmada en un `<dialog>` que resume los
+  partidos. `save` guarda borrador.
 - El **ciclo de vida vive en `StageUser.state`** (propiedad computada:
-  `upcoming`/`editing`/`sent`/`confirmed`/`locked`), derivado de `sent_at`,
-  `closed_at`, `Stage.opens_at` y `Stage.confirm_deadline`.
+  `upcoming`/`editing`/`sent`/`locked`), derivado de `sent_at`,
+  `Stage.opens_at` y `Stage.send_deadline`.
 - `Stage.opens_at` habilita los inputs; antes de esa fecha los partidos se ven
-  pero deshabilitados. `Stage.confirm_deadline` (capturado en hora de México
-  desde el admin, `TIME_ZONE` ya es `America/Mexico_City`) dispara la
-  auto-confirmación. Countdown en la UI con day.js.
-- **Al vencer el plazo se auto-confirma lo enviado** vía el comando
-  `close_expired_stages`. La UI/endpoints ya bloquean aunque el cron no corra.
+  pero deshabilitados. `Stage.send_deadline` (capturado en hora de México
+  desde el admin, `TIME_ZONE` ya es `America/Mexico_City`) marca el cierre.
+  Countdown en la UI con day.js.
+- **Al vencer el plazo se auto-envía lo guardado** vía el comando
+  `send_expired_stages` (omite a quien no guardó nada). La UI/endpoints ya
+  bloquean la edición aunque el cron no corra.
 - `User.did_pay` se renombró a `User.authorized` (pagó **y** envió a tiempo;
   marca manual). Banderas: `Team.crest` (FD) con fallback al emoji `flag_icon`.
 - `StageUser` se crea al preregistrar; `sync_stageusers` respalda a usuarios
@@ -319,7 +321,8 @@ dos pasos y estado derivado.
 ## Trabajo pendiente para próximas sesiones
 
 - **Programar el cron en EC2** que ejecute `python manage.py
-  close_expired_stages` periódicamente (auto-confirma fases vencidas).
+  send_expired_stages` periódicamente (auto-envía lo guardado en fases
+  vencidas).
 - **Ajustar los colores de `Stage`** (los hex actuales son tentativos).
 - **Decidir los números oficiales de la fase de grupos** (hoy son orden
   cronológico, no los números FIFA).

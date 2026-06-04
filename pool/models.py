@@ -61,8 +61,8 @@ class StageUser(models.Model):
     """Estado de un usuario frente a una fase del torneo.
 
     ``sent_at`` marca cuándo se envió el correo con sus pronósticos de la
-    fase; ``closed_at``, cuándo se concluyó la revisión. Se usan DateTime
-    nulables (no booleanos) para conservar también el momento del evento.
+    fase (envío único y definitivo). Se usa un DateTime nulable (no un
+    booleano) para conservar también el momento del evento.
     """
 
     user = models.ForeignKey(
@@ -70,13 +70,11 @@ class StageUser(models.Model):
     stage = models.ForeignKey(
         Stage, on_delete=models.PROTECT, related_name="user_states",)
     sent_at = models.DateTimeField(null=True, blank=True)
-    closed_at = models.DateTimeField(null=True, blank=True)
 
     # Estados del ciclo de vida (derivados, no almacenados).
     UPCOMING = "upcoming"      # la fase aún no abre: inputs off, sin botón
     EDITING = "editing"        # abierta, sin enviar: Guardar + Enviar
-    SENT = "sent"              # enviada, editable: Guardar + Confirmar
-    CONFIRMED = "confirmed"    # confirmada o vencida-tras-envío: ícono
+    SENT = "sent"              # enviada (definitivo): ícono, sin edición
     LOCKED = "locked"          # venció el plazo sin haber enviado nada
 
     class Meta:
@@ -96,31 +94,25 @@ class StageUser(models.Model):
     def state(self) -> str:
         """Estado actual del usuario en la fase (ver constantes arriba).
 
-        El vencimiento del plazo equivale a confirmación solo si ya
-        había envío; si venció sin envío, queda LOCKED (sin entrada).
+        El envío es terminal. Si el plazo venció sin envío queda LOCKED;
+        el cron ``send_expired_stages`` envía después lo que esté guardado.
         """
-        if self.closed_at or (self.sent_at and self.stage.is_past_deadline):
-            return self.CONFIRMED
+        if self.sent_at:
+            return self.SENT
         if not self.stage.is_open:
             return self.UPCOMING
         if self.stage.is_past_deadline:
             return self.LOCKED
-        if self.sent_at:
-            return self.SENT
         return self.EDITING
 
     @property
     def can_edit(self) -> bool:
         """Puede modificar marcadores (Guardar)."""
-        return self.state in (self.EDITING, self.SENT)
+        return self.state == self.EDITING
 
     @property
     def can_send(self) -> bool:
         return self.state == self.EDITING
-
-    @property
-    def can_confirm(self) -> bool:
-        return self.state == self.SENT
 
 
 class Prediction(models.Model):

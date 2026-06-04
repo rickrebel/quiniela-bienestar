@@ -10,9 +10,12 @@ urlpatterns = [
     path("logout/", auth.logout_view, name="logout"),
     path("stage/<str:key>/", stages.stage_view, name="stage"),
     path("save/", predictions.save_predictions, name="save"),
+    path(
+        "prediction/<int:match_id>/",
+        predictions.save_prediction,
+        name="save_prediction",
+    ),
     path("send/", predictions.send_predictions, name="send"),
-    # send = confirm
-    # path("confirm/", predictions.confirm_predictions, name="confirm"),
     path(
         "",
         RedirectView.as_view(url="/stage/GROUP_STAGE/"),

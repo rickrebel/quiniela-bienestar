@@ -1,4 +1,5 @@
 const savingOverlay = document.getElementById("saving-overlay");
+const snackbar = document.getElementById("snackbar");
 
 function getCookie(name) {
     let cookieValue = null;
@@ -24,8 +25,12 @@ function buildPayload() {
     const predictions = [];
 
     document.querySelectorAll(".match").forEach(match => {
-        const home = match.querySelector('[data-field="home_goals"]').value;
-        const away = match.querySelector('[data-field="away_goals"]').value;
+        const homeEl = match.querySelector('[data-field="home_goals"]');
+        const awayEl = match.querySelector('[data-field="away_goals"]');
+        // Sin inputs = equipos aún placeholder (final por definir): se omite.
+        if (!homeEl || !awayEl) return;
+        const home = homeEl.value;
+        const away = awayEl.value;
         predictions.push({
             match_id: parseInt(match.dataset.matchId),
             home_goals: home === "" ? null : parseInt(home),
@@ -58,55 +63,132 @@ async function postPredictions(url, payload) {
     return data;
 }
 
-async function savePredictions() {
-    savingOverlay.hidden = false;
+// --- Autoguardado por partido ---
+// Una predicción se guarda sola al cambiar un marcador (evento "change",
+// que dispara al desenfocar). Regla del sistema: una fila Prediction solo
+// existe si el partido tiene ambos marcadores, así que si falta cualquiera
+// se manda null y el servidor la borra.
+
+let snackTimer = null;
+function showSnack(message, isError = false) {
+    snackbar.querySelector(".snack-text").textContent = message;
+    snackbar.classList.toggle("snackbar-error", isError);
+    snackbar.classList.add("show");
+    clearTimeout(snackTimer);
+    snackTimer = setTimeout(() => snackbar.classList.remove("show"), 1600);
+}
+
+function isMatchFilled(matchEl) {
+    const home = matchEl.querySelector('[data-field="home_goals"]');
+    const away = matchEl.querySelector('[data-field="away_goals"]');
+    // Sin inputs (equipos por definir) no cuenta como lleno.
+    if (!home || !away) return false;
+    return home.value !== "" && away.value !== "";
+}
+
+// Recuenta los partidos completos de la sección y actualiza su "N/total".
+function updateCounter(container) {
+    const matches = container.querySelectorAll(".match");
+    let filled = 0;
+    matches.forEach(m => { if (isMatchFilled(m)) filled += 1; });
+    const counter = container.querySelector(".section-count");
+    if (counter) counter.textContent = `${filled}/${matches.length}`;
+}
+
+async function saveMatch(matchEl) {
+    const home = matchEl.querySelector('[data-field="home_goals"]').value;
+    const away = matchEl.querySelector('[data-field="away_goals"]').value;
+    const payload = {
+        home_goals: home === "" ? null : parseInt(home),
+        away_goals: away === "" ? null : parseInt(away),
+    };
     try {
-        await postPredictions("/save/", buildPayload());
-        alert("Predicciones guardadas correctamente");
+        const data = await postPredictions(
+            `/prediction/${matchEl.dataset.matchId}/`, payload
+        );
+        // Solo se avisa cuando el partido quedó completo (guardado real);
+        // un input suelto al salir del campo no debe gritar "Guardado".
+        if (data.complete) showSnack("Guardado");
     } catch (err) {
-        alert(err.message);
-    } finally {
-        savingOverlay.hidden = true;
+        showSnack(err.message, true);
     }
 }
 
-async function sendPredictions() {
-    const payload = buildPayload();
-    if (!isComplete(payload)) {
+function initAutosave() {
+    const content = document.querySelector(".content");
+    if (!content || content.dataset.state !== "editing") return;
+
+    document.querySelectorAll(".match").forEach(matchEl => {
+        const container = matchEl.closest(".group, .knockout");
+        matchEl.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener("change", () => {
+                updateCounter(container);
+                void saveMatch(matchEl);
+            });
+        });
+    });
+}
+
+document.addEventListener("DOMContentLoaded", initAutosave);
+
+const sendDialog = document.getElementById("send-dialog");
+
+function sendPredictions() {
+    if (!isComplete(buildPayload())) {
         alert("Tienes que llenar todos los partidos antes de enviar.");
         return;
     }
-    if (!confirm(
-        "Una vez enviadas tus predicciones ya no podrás editar esta fase, ¿confirmar?"
-    )) {
-        return;
-    }
-
-    savingOverlay.hidden = false;
-    try {
-        await postPredictions("/send/", payload);
-        location.reload();
-    } catch (err) {
-        alert(err.message);
-        savingOverlay.hidden = true;
-    }
+    buildSummary();
+    sendDialog.showModal();
 }
 
-async function confirmPredictions() {
-    const payload = buildPayload();
-    if (!isComplete(payload)) {
-        alert("Tienes que llenar todos los partidos antes de confirmar.");
-        return;
-    }
-    if (!confirm(
-        "Al confirmar ya NO podrás modificar esta fase. ¿Continuar?"
-    )) {
-        return;
-    }
+function closeSendDialog() {
+    sendDialog.close();
+}
 
+// Llena el diálogo clonando las .match-card ya pintadas (mismo componente):
+// congela los marcadores actuales, los deshabilita y quita la meta de
+// fecha/sede. Los grupos van como encabezado plano (sin desplegable).
+function buildSummary() {
+    const body = document.getElementById("send-dialog-body");
+    body.innerHTML = "";
+    const blocks = document.querySelectorAll(
+        ".content > details.group, .content > .knockout"
+    );
+    blocks.forEach(block => {
+        // Grupos: el título es .group-summary ("Grupo A"). Finales: no hay
+        // summary, así que se usa el .chip-title de la sección (p. ej.
+        // "OCTAVOS"). Se clona el que exista.
+        const header =
+            block.querySelector(".group-summary") ||
+            block.querySelector(".chip-title");
+        if (header) {
+            const head = header.cloneNode(true);
+            head.querySelector(".chevron")?.remove();
+            body.appendChild(head);
+        }
+        block.querySelectorAll(".match-card").forEach(card => {
+            body.appendChild(freezeCard(card));
+        });
+    });
+}
+
+function freezeCard(card) {
+    const clone = card.cloneNode(true);
+    clone.querySelector(".meta")?.remove();
+    // cloneNode no copia el value en vivo de los inputs; lo sincronizo.
+    const liveInputs = card.querySelectorAll(".score input");
+    clone.querySelectorAll(".score input").forEach((input, i) => {
+        input.value = liveInputs[i].value;
+        input.disabled = true;
+    });
+    return clone;
+}
+
+async function confirmSend() {
     savingOverlay.hidden = false;
     try {
-        await postPredictions("/confirm/", payload);
+        await postPredictions("/send/", buildPayload());
         location.reload();
     } catch (err) {
         alert(err.message);

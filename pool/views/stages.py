@@ -9,20 +9,21 @@ from django.shortcuts import get_object_or_404, render
 
 from pool.models import Prediction, StageUser, User
 from pool.utils import format_day, format_time
-from tournament.models import Match, Stage
+from tournament.models import Match, Stage, Team
 
 
-def render_stage_matches(
-    user: User, stage: Stage
-) -> dict[str | None, list[Match]]:
-    """Devuelve los partidos de una fase listos para presentar.
+def render_stage_sections(user: User, stage: Stage) -> list[dict]:
+    """Devuelve las secciones de una fase listas para presentar.
 
-    Fase de grupos: dict ``{grupo: [matches]}`` ordenado A→L. Eliminatoria:
-    ``{None: [matches]}`` (lista plana, equipos aún como placeholder). En
-    cada partido adjunta en memoria día y hora **locales de la sede**
-    (``Match.datetime`` está en UTC; se aplica ``Stadium.utc_offset``) y, si
-    el usuario ya predijo, ``predicted_home``/``predicted_away``.
-    ``select_related`` evita N+1 en equipos y estadio.
+    Fase de grupos: una sección por grupo (A→L). Eliminatoria: una sola
+    sección (lista plana, equipos aún como placeholder). Cada sección es
+    ``{"key", "matches", "filled", "total", "teams"}`` (``teams`` solo en
+    grupos, para las banderas del encabezado), donde ``filled`` cuenta los
+    partidos con predicción completa (una fila ``Prediction`` ya implica
+    ambos marcadores). En cada partido adjunta en memoria día y hora
+    **locales de la sede** (``Match.datetime`` está en UTC; se aplica
+    ``Stadium.utc_offset``) y, si el usuario ya predijo,
+    ``predicted_home``/``predicted_away``. ``select_related`` evita N+1.
     """
     matches = Match.objects.filter(stage=stage).select_related(
         "home_team", "away_team", "stadium"
@@ -32,22 +33,37 @@ def render_stage_matches(
 
     is_group = stage.key == Stage.GROUP_STAGE
     grouped: dict[str | None, list[Match]] = defaultdict(list)
+    filled: dict[str | None, int] = defaultdict(int)
+    teams: dict[str | None, dict[int, Team]] = defaultdict(dict)
     for match in matches:
+        key = match.home_team.group_name if is_group else None
         prediction = preds_by_match.get(match.id)
         if prediction is not None:
             match.predicted_home = prediction.home_goals
             match.predicted_away = prediction.away_goals
+            filled[key] += 1
         local_dt = match.datetime + timedelta(
             hours=match.stadium.utc_offset
         )
         match.local_day = format_day(local_dt)
         match.local_time = format_time(local_dt)
-        key = match.home_team.group_name if is_group else None
         grouped[key].append(match)
+        if is_group:  # equipos del grupo para el encabezado (sin query extra)
+            for team in (match.home_team, match.away_team):
+                if team is not None:
+                    teams[key][team.id] = team
 
-    if is_group:
-        return dict(sorted(grouped.items()))
-    return dict(grouped)
+    keys = sorted(grouped) if is_group else list(grouped)
+    return [
+        {
+            "key": key,
+            "matches": grouped[key],
+            "filled": filled[key],
+            "total": len(grouped[key]),
+            "teams": sorted(teams[key].values(), key=lambda t: t.name_es),
+        }
+        for key in keys
+    ]
 
 
 def _build_tabs(user: User) -> list[dict]:
@@ -84,12 +100,12 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
         "stage": stage,
         "state": stage_user.state,
         "can_edit": stage_user.can_edit,
-        "grouped": render_stage_matches(request.user, stage),
+        "sections": render_stage_sections(request.user, stage),
         "is_group_stage": stage.key == Stage.GROUP_STAGE,
         "tabs": _build_tabs(request.user),
         "deadline_iso": (
-            stage.confirm_deadline.isoformat()
-            if stage.confirm_deadline
+            stage.send_deadline.isoformat()
+            if stage.send_deadline
             else ""
         ),
     }

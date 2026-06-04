@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 
@@ -9,21 +10,21 @@
     <a class="stage-tab{% if tab.stage.key == stage.key %} active{% endif %}"
        href="{% url 'stage' tab.stage.key %}">
         {{ tab.stage.short_name }}
-        {% if tab.state == 'confirmed' %}
-        <span class="tab-done" title="Confirmado">✓</span>
+        {% if tab.state == 'sent' %}
+        <span class="tab-done" title="Enviado">✓</span>
         {% endif %}
     </a>
     {% endfor %}
 </nav>
 
-<main class="content" data-stage="{{ stage.key }}">
+<main class="content" data-stage="{{ stage.key }}" data-state="{{ state }}">
     {% if state == 'upcoming' %}
     <p class="stage-note">Esta fase todavía no abre para predecir.</p>
     {% elif state == 'locked' %}
     <p class="stage-note">El plazo de esta fase terminó.</p>
     {% endif %}
 
-    {% for group, matches in grouped.items %}
+    {% for section in sections %}
 
     {% if is_group_stage %}
     <details class="group">
@@ -31,22 +32,39 @@
             <span class="chevron">
                 <svg viewBox="0 0 24 24"><path d="M9 7 L17 12 L9 17"/></svg>
             </span>
-            Grupo {{ group }}
+            Grupo {{ section.key }}
+            <span class="group-flags">{% for team in section.teams %}{% if team.flag_path %}<img src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}">{% endif %}{% endfor %}</span>
+            <span class="section-count">{% if state == 'sent' %}0 pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
         </summary>
     {% else %}
     <div class="knockout">
     {% endif %}
 
-        {% for match in matches %}
-        <section class="match-card mx-2">
+        {% if not is_group_stage %}
+        <h6 class="chip-title">
+            {{ stage.name|upper }}
+            <span class="section-count">{% if state == 'sent' %}0 pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
+        </h6>
+        {% endif %}
+
+        {% for match in section.matches %}
+        <section class="match-card mx-2{% if not is_group_stage and stage.key != 'FINAL' %} has-side-code{% endif %}">
+            {% if stage.key == 'FINAL' %}
+            <div class="match-code">
+                <span class="match-name">{{ match.name }}</span>
+            </div>
+            {% elif not is_group_stage %}
+            <span class="match-side-code">{{ match.of_number }}</span>
+            {% endif %}
             <div class="match" data-match-id="{{ match.id }}">
                 <div class="team">
                     {% if match.home_team %}
                     <span>{{ match.home_team.name_es }}</span>
-                    {% if match.home_team.crest %}
+                    {% if match.home_team.flag_path %}
+                    <img src="{% static match.home_team.flag_path %}"
+                         alt="{{ match.home_team.name_es }}">
+                    {% elif match.home_team.crest %}
                     <img src="{{ match.home_team.crest }}" alt="">
-                    {% else %}
-                    <span class="flag-emoji">{{ match.home_team.flag_icon }}</span>
                     {% endif %}
                     {% else %}
                     <span class="team-placeholder">{{ match.home_placeholder }}</span>
@@ -71,10 +89,11 @@
 
                 <div class="team">
                     {% if match.away_team %}
-                    {% if match.away_team.crest %}
+                    {% if match.away_team.flag_path %}
+                    <img src="{% static match.away_team.flag_path %}"
+                         alt="{{ match.away_team.name_es }}">
+                    {% elif match.away_team.crest %}
                     <img src="{{ match.away_team.crest }}" alt="">
-                    {% else %}
-                    <span class="flag-emoji">{{ match.away_team.flag_icon }}</span>
                     {% endif %}
                     <span>{{ match.away_team.name_es }}</span>
                     {% else %}
@@ -86,8 +105,7 @@
             <div class="meta">
                 <span class="meta-key">{{ match.local_day }}</span>
                 <span class="meta-key">{{ match.local_time }}</span>
-                <span>{{ match.stadium.name }}</span>
-                <span>{{ match.stadium.city }}</span>
+                <span>{{ match.stadium.name_es|default:match.stadium.city }}{% if match.stadium.flag_path %}<img class="meta-flag" src="{% static match.stadium.flag_path %}" alt="{{ match.stadium.get_country_display }}">{% endif %}</span>
             </div>
         </section>
         {% endfor %}
@@ -100,23 +118,39 @@
 <footer class="actions">
     <div class="actions-layout">
         {% if state == 'editing' %}
-        <button class="submit-btn" onclick="savePredictions()">Guardar</button>
         <button class="submit-btn" onclick="sendPredictions()">Enviar</button>
-        {% elif state == 'confirmed' %}
+        {% elif state == 'sent' %}
         <span class="action-done">
             <span class="done-icon">✓</span> Predicciones Enviadas
         </span>
         {% endif %}
     </div>
 
-    {% if deadline_iso and state != 'confirmed' %}
+    {% if deadline_iso and state != 'sent' %}
     <div class="countdown" data-deadline="{{ deadline_iso }}"></div>
     {% endif %}
 </footer>
+
+<div id="snackbar">
+    <span class="snack-icon">✓</span>
+    <span class="snack-text"></span>
+</div>
 
 <div id="saving-overlay" hidden>
     <div class="spinner"></div>
     <p>Guardando predicciones...</p>
 </div>
+
+{# Resumen previo al envío; el cuerpo lo llena submit.js clonando .match-card. #}
+<dialog id="send-dialog" class="send-dialog">
+    <div class="send-dialog-head">Revisa tus predicciones antes de enviar</div>
+    <div id="send-dialog-body" class="send-dialog-body"></div>
+    <footer class="actions">
+        <div class="actions-layout">
+            <button class="submit-btn" onclick="closeSendDialog()">Cerrar</button>
+            <button class="submit-btn" onclick="confirmSend()">Confirmar envío</button>
+        </div>
+    </footer>
+</dialog>
 
 {% endblock %}

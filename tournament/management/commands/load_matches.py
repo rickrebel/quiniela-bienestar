@@ -7,6 +7,7 @@ grupos OF no trae número, así que se asignan 1..72 por orden cronológico.
 """
 
 import json
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -30,6 +31,15 @@ STAGE_BY_ROUND = {
     "Semi-final": Stage.SEMI_FINALS,
     "Match for third place": Stage.FINAL,
     "Final": Stage.FINAL,
+}
+
+# Etiqueta legible por ronda; se numera por posición (p. ej. "Cuartos 3").
+# OJO falso amigo: Round of 32 = dieciseisavos, Round of 16 = octavos.
+ROUND_NAME_ES = {
+    "Round of 32": "Dieciseisavos",
+    "Round of 16": "Octavos",
+    "Quarter-final": "Cuartos",
+    "Semi-final": "Semifinal",
 }
 
 
@@ -64,11 +74,14 @@ class Command(BaseCommand):
         stadiums = {s.city: s for s in Stadium.objects.all()}
 
         self._assign_of_numbers(of_matches)
+        self._assign_names(of_matches)
 
         created = mapped = 0
         for item in of_matches:
             dt = of_utc(item["date"], item["time"])
-            is_group = "num" not in item
+            # No por "num": tercer lugar y final tampoco lo traen y NO son
+            # grupos; se distinguen por la ronda.
+            is_group = item["round"].startswith("Matchday")
             home_name, away_name = item["team1"], item["team2"]
 
             home_tla = FIFA_TO_TLA.get(
@@ -84,6 +97,7 @@ class Command(BaseCommand):
                 "away_team": teams.get(away_name) if is_group else None,
                 "home_placeholder": "" if is_group else home_name,
                 "away_placeholder": "" if is_group else away_name,
+                "name": item["name"],
                 "status": fd["status"] if fd else "SCHEDULED",
                 "fd_id": fd["id"] if fd else None,
             }
@@ -142,3 +156,26 @@ class Command(BaseCommand):
                 item["of_number"] = Match.THIRD_PLACE_NUMBER
             elif item["round"] == "Final":
                 item["of_number"] = Match.FINAL_NUMBER
+
+    @staticmethod
+    def _assign_names(of_matches: list[dict]) -> None:
+        """Fija ``name`` legible en cada item (in-place).
+
+        Se numera por posición cronológica dentro de la ronda ("Cuartos
+        3"). El identificador numérico del partido es ``of_number``; el
+        cruce se traza por él (los placeholders de OF lo referencian, p.
+        ej. "W101"). Los grupos quedan con ``name`` vacío.
+        """
+        round_count: dict[str, int] = defaultdict(int)
+        for item in sorted(of_matches, key=lambda m: m["of_number"]):
+            rnd = item["round"]
+            if rnd.startswith("Matchday"):
+                item["name"] = ""
+                continue
+            if rnd == "Match for third place":
+                item["name"] = "Tercer lugar"
+            elif rnd == "Final":
+                item["name"] = "Final"
+            else:
+                round_count[rnd] += 1
+                item["name"] = f"{ROUND_NAME_ES[rnd]} {round_count[rnd]}"
