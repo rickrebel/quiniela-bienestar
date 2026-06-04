@@ -77,7 +77,7 @@ async function sendPredictions() {
         return;
     }
     if (!confirm(
-        "Se enviará tu Excel por correo. Aún podrás editar y luego confirmar."
+        "Una vez enviadas tus predicciones ya no podrás editar esta fase, ¿confirmar?"
     )) {
         return;
     }

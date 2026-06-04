@@ -104,12 +104,9 @@
         {% if state == 'editing' %}
         <button class="submit-btn" onclick="savePredictions()">Guardar</button>
         <button class="submit-btn" onclick="sendPredictions()">Enviar</button>
-        {% elif state == 'sent' %}
-        <button class="submit-btn" onclick="savePredictions()">Guardar</button>
-        <button class="submit-btn" onclick="confirmPredictions()">Confirmar</button>
         {% elif state == 'confirmed' %}
         <span class="action-done">
-            <span class="done-icon">✓</span> Confirmado
+            <span class="done-icon">✓</span> Predicciones Enviadas
         </span>
         {% endif %}
     </div>

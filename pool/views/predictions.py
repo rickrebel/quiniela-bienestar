@@ -92,43 +92,19 @@ def save_predictions(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"status": "ok"})
 
 
+
+
+
 @login_required
 @require_POST
 def send_predictions(request: HttpRequest) -> JsonResponse:
-    """Envía la fase (estado 'submitted'); editable hasta confirmar.
-
-    Persiste primero y luego construye el Excel, para que el archivo
-    refleje exactamente lo enviado.
-    """
-    data = json.loads(request.body)
-    stage_user = _get_stage_user(request.user, data["stage"])
-    if stage_user is None:
-        return JsonResponse({"error": STAGE_NOT_FOUND}, status=404)
-    if not stage_user.can_send:
-        return JsonResponse({"error": LOCKED}, status=403)
-
-    valid_ids = _valid_match_ids(data["stage"])
-    if _missing_ids(data["predictions"], valid_ids):
-        return JsonResponse({"error": INCOMPLETE}, status=400)
-
-    with transaction.atomic():
-        _upsert(request.user, data["predictions"], valid_ids)
-        stage_user.sent_at = timezone.now()
-        stage_user.save(update_fields=["sent_at"])
-    generate_excel(request.user, stage_user.stage)
-    return JsonResponse({"status": "ok"})
-
-
-@login_required
-@require_POST
-def confirm_predictions(request: HttpRequest) -> JsonResponse:
     """Confirma la fase (estado definitivo): bloquea y manda Excel final."""
     data = json.loads(request.body)
     stage_user = _get_stage_user(request.user, data["stage"])
     if stage_user is None:
         return JsonResponse({"error": STAGE_NOT_FOUND}, status=404)
-    if not stage_user.can_confirm:
-        return JsonResponse({"error": LOCKED}, status=403)
+    # if not stage_user.can_confirm:
+    #     return JsonResponse({"error": LOCKED}, status=403)
 
     valid_ids = _valid_match_ids(data["stage"])
     if _missing_ids(data["predictions"], valid_ids):
