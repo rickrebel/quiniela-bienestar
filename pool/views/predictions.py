@@ -8,8 +8,8 @@ from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from quiniela.models import Prediction, User
-from quiniela.services.excel import generate_excel
+from pool.models import Prediction, User
+from pool.services.excel import generate_excel
 
 ALREADY_SUBMITTED = (
     "Ya enviaste tus predicciones y no puedes modificarlas"
@@ -35,8 +35,8 @@ def _process_predictions(
         if prediction is not None:
             if prediction.status == "submitted":
                 return {"error": ALREADY_SUBMITTED}
-            prediction.goals_a = p["goals_a"]
-            prediction.goals_b = p["goals_b"]
+            prediction.home_goals = p["goals_a"]
+            prediction.away_goals = p["goals_b"]
             prediction.status = status
             prediction.date = now
             prediction.save()
@@ -45,8 +45,8 @@ def _process_predictions(
                 date=now,
                 user=user,
                 match_id=p["match_id"],
-                goals_a=p["goals_a"],
-                goals_b=p["goals_b"],
+                home_goals=p["goals_a"],
+                away_goals=p["goals_b"],
                 status=status,
             )
     return None

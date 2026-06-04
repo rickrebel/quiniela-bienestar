@@ -27,7 +27,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "quiniela",
+    "tournament",
+    "pool",
 ]
 
 MIDDLEWARE = [
@@ -80,8 +81,12 @@ else:
         }
     }
 
-AUTH_USER_MODEL = "quiniela.User"
+AUTH_USER_MODEL = "pool.User"
 LOGIN_URL = "login"
+
+# football-data.org (API v4) — fuente de resultados.
+FOOTBALL_DATA_API_TOKEN = os.environ.get("FOOTBALL_DATA_API_TOKEN", "")
+FOOTBALL_DATA_BASE_URL = "https://api.football-data.org/v4"
 
 AUTH_PASSWORD_VALIDATORS = [
     {

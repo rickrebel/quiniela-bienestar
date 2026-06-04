@@ -5,7 +5,7 @@ from io import BytesIO
 from django.core.mail import EmailMessage
 from openpyxl import Workbook
 
-from quiniela.views.groups import render_matches_by_group
+from pool.views.groups import render_matches_by_group
 
 XLSX_MIMETYPE = (
     "application/vnd.openxmlformats-officedocument"
@@ -45,15 +45,15 @@ def generate_excel(user) -> None:
         sheet = workbook.create_sheet(title=f"Grupo {group_name}")
         sheet.append(HEADER_ROW)
         for match in matches:
-            predicted_a = getattr(match, "predicted_a", 0)
-            predicted_b = getattr(match, "predicted_b", 0)
+            predicted_home = getattr(match, "predicted_home", 0)
+            predicted_away = getattr(match, "predicted_away", 0)
             sheet.append([
-                match.team_a.name,
-                predicted_a,
-                predicted_b,
-                match.team_b.name,
+                match.home_team.name,
+                predicted_home,
+                predicted_away,
+                match.away_team.name,
                 match.formatted_date,
-                match.stadium,
+                match.stadium.name,
             ])
 
     buffer = BytesIO()

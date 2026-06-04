@@ -1,9 +1,9 @@
-"""Rutas de la app quiniela."""
+"""Rutas de la app pool (quiniela)."""
 
 from django.urls import path
 from django.views.generic import RedirectView
 
-from quiniela.views import auth, groups, predictions
+from pool.views import auth, groups, predictions
 
 urlpatterns = [
     path("login/", auth.login_view, name="login"),

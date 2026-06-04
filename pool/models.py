@@ -1,3 +1,9 @@
+"""Modelos de la quiniela: usuarios y sus pronósticos.
+
+Depende de la app ``tournament`` (Match, Stage) en una sola dirección:
+``pool`` importa de ``tournament``, nunca al revés.
+"""
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models import UniqueConstraint
@@ -51,39 +57,37 @@ class User(AbstractUser):
         super().save(*args, **kwargs)
 
 
-class Team(models.Model):
-    """Selección participante en el torneo."""
+class StageUser(models.Model):
+    """Estado de un usuario frente a una fase del torneo.
 
-    name = models.CharField(max_length=100, unique=True)
-    flag = models.CharField(
-        max_length=100, unique=True, null=True, blank=True)
-    group_name = models.CharField(max_length=1)
-    points = models.IntegerField(null=True, blank=True)
-    won_games = models.IntegerField(null=True, blank=True)
-    draws = models.IntegerField(null=True, blank=True)
-    out_goals = models.IntegerField(null=True, blank=True)
-    in_goals = models.IntegerField(null=True, blank=True)
-    red_cards = models.IntegerField(null=True, blank=True)
-    yellow_cards = models.IntegerField(null=True, blank=True)
+    ``sent_at`` marca cuándo se envió el correo con sus pronósticos de la
+    fase; ``closed_at``, cuándo se concluyó la revisión. Se usan DateTime
+    nulables (no booleanos) para conservar también el momento del evento.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="stage_states"
+    )
+    stage = models.ForeignKey(
+        "tournament.Stage",
+        on_delete=models.PROTECT,
+        related_name="user_states",
+    )
+    sent_at = models.DateTimeField(null=True, blank=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "estado de fase por usuario"
+        verbose_name_plural = "estados de fase por usuario"
+        constraints = [
+            UniqueConstraint(
+                fields=["user", "stage"],
+                name="uq_stageuser_user_stage",
+            ),
+        ]
 
     def __str__(self) -> str:
-        return self.name
-
-
-class Match(models.Model):
-    """Partido del torneo entre dos selecciones."""
-
-    date = models.DateTimeField()
-    phase = models.CharField(max_length=100)
-    group_name = models.CharField(max_length=1, null=True, blank=True)
-    stadium = models.CharField(max_length=100, null=True, blank=True)
-    team_a = models.ForeignKey(
-        Team, on_delete=models.PROTECT, related_name="matches_as_a")
-    team_b = models.ForeignKey(
-        Team, on_delete=models.PROTECT, related_name="matches_as_b")
-    goals_a = models.IntegerField(null=True, blank=True)
-    goals_b = models.IntegerField(null=True, blank=True)
-    match_number = models.IntegerField(null=True, blank=True)
+        return f"{self.user} · {self.stage}"
 
 
 class Prediction(models.Model):
@@ -98,11 +102,15 @@ class Prediction(models.Model):
 
     date = models.DateTimeField()
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="predictions")
+        User, on_delete=models.CASCADE, related_name="predictions"
+    )
     match = models.ForeignKey(
-        "Match", on_delete=models.CASCADE, related_name="predictions")
-    goals_a = models.IntegerField()
-    goals_b = models.IntegerField()
+        "tournament.Match",
+        on_delete=models.CASCADE,
+        related_name="predictions",
+    )
+    home_goals = models.IntegerField()
+    away_goals = models.IntegerField()
     status = models.CharField(max_length=100, choices=STATUS_CHOICES)
 
     class Meta:
@@ -112,3 +120,6 @@ class Prediction(models.Model):
                 name="uq_prediction_user_match",
             ),
         ]
+
+    def __str__(self) -> str:
+        return f"{self.user} · {self.match}"

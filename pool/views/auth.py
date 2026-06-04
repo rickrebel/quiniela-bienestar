@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model, login, logout
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
-from quiniela.forms import EmailAccessForm
+from pool.forms import EmailAccessForm
 
 User = get_user_model()
 

@@ -9,6 +9,11 @@ Construida con **Django** (server-rendered, sin DRF), plantillas DTL y JS
 vanilla. PostgreSQL en producción, con respaldo en SQLite para desarrollo
 local.
 
+El código se reparte en dos apps: `tournament` (datos deportivos: estadios,
+fases, equipos y partidos) y `pool` (usuarios y pronósticos). Los datos
+deportivos se siembran desde dos fuentes externas —openfootball (OF) y
+football-data.org (FD)— cuyos snapshots viven en `db/jsons/`.
+
 ## Pasos iniciales
 
 - Tener instalado Python 3, mínimo 3.13
@@ -81,15 +86,19 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-Cargar los equipos y los partidos de la fase de grupos (desde los JSON en
-`db/jsons/`):
+Cargar los datos deportivos (desde los JSON en `db/jsons/`). Los comandos de
+seed viven en la app `tournament` y se ejecutan en este orden, porque cada uno
+depende del anterior (los partidos referencian estadios, fases y equipos):
 
 ```bash
+python manage.py load_stadiums
+python manage.py load_stages
 python manage.py load_teams
 python manage.py load_matches
 ```
 
-Preregistrar un participante (entra después solo con su correo):
+Preregistrar un participante (comando de la app `pool`; entra después solo con
+su correo):
 
 ```bash
 python manage.py preregister correo@ejemplo.com "Nombre del Jugador"

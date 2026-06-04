@@ -5,12 +5,18 @@
 __pycache__/
 *.py[cod]
 
+# Directorio temporal de trabajo
+.scratch/
+
 # Base de datos SQLite
 db/app.db
 db/*.sqlite3
 
 # Archivos estáticos recolectados (collectstatic)
 staticfiles/
+
+# Capturas y snapshots generados por Playwright (MCP)
+.playwright-mcp/
 
 # Entornos virtuales (si tienes uno)
 venv/

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Match, Prediction, Team, User
+from .models import Prediction, StageUser, User
 
 
 @admin.register(User)
@@ -21,6 +21,10 @@ class UserAdmin(admin.ModelAdmin):
     search_fields = ("email",)
 
 
-admin.site.register(Team)
-admin.site.register(Match)
+@admin.register(StageUser)
+class StageUserAdmin(admin.ModelAdmin):
+    list_display = ("user", "stage", "sent_at", "closed_at")
+    list_filter = ("stage",)
+
+
 admin.site.register(Prediction)
