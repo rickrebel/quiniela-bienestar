@@ -6,6 +6,7 @@
       "timezone": "UTC-7",
       "cc": "ca",
       "name": "BC Place",
+      "name_es": "Vancouver",
       "capacity": 54000,
       "coords": "49°16'36\"N 123°6'43\"W"
     },
@@ -14,6 +15,7 @@
       "timezone": "UTC-7",
       "cc": "us",
       "name": "Lumen Field",
+      "name_es": "Seattle",
       "capacity": 69000,
       "coords": "47°35'43\"N 122°19'54\"W"
     },
@@ -22,6 +24,7 @@
       "timezone": "UTC-7",
       "cc": "us",
       "name": "Levi's Stadium",
+      "name_es": "San Francisco",
       "capacity": 71000,
       "coords": "37.403°N 121.970°W"
     },
@@ -30,6 +33,7 @@
       "timezone": "UTC-7",
       "cc": "us",
       "name": "SoFi Stadium",
+      "name_es": "Los Ángeles",
       "capacity": 70000,
       "coords": "33.953°N 118.339°W"
     },
@@ -38,6 +42,7 @@
       "timezone": "UTC-6",
       "cc": "mx",
       "name": "Estadio Akron",
+      "name_es": "Guadalajara",
       "capacity": 48000,
       "coords": "20°40'54\"N 103°27'46\"W"
     },
@@ -46,6 +51,7 @@
       "timezone": "UTC-6",
       "cc": "mx",
       "name": "Estadio Azteca",
+      "name_es": "CDMX",
       "capacity": 83000,
       "coords": "19°18'11\"N 99°09'02\"W"
     },
@@ -54,6 +60,7 @@
       "timezone": "UTC-6",
       "cc": "mx",
       "name": "Estadio BBVA",
+      "name_es": "Monterrey",
       "capacity": 53500,
       "coords": "25°40'9\"N 100°14'40\"W"
     },
@@ -62,6 +69,7 @@
       "timezone": "UTC-5",
       "cc": "us",
       "name": "NRG Stadium",
+      "name_es": "Houston",
       "capacity": 72000,
       "coords": "29°41'5\"N 95°24'39\"W"
     },
@@ -70,6 +78,7 @@
       "timezone": "UTC-5",
       "cc": "us",
       "name": "AT&T Stadium",
+      "name_es": "Dallas",
       "capacity": 94000,
       "coords": "32°44'52\"N 97°5'34\"W"
     },
@@ -78,6 +87,7 @@
       "timezone": "UTC-5",
       "cc": "us",
       "name": "Arrowhead Stadium",
+      "name_es": "Kansas City",
       "capacity": 73000,
       "coords": "39°2'56\"N 94°29'2\"W"
     },
@@ -86,6 +96,7 @@
       "timezone": "UTC-4",
       "cc": "us",
       "name": "Mercedes-Benz Stadium",
+      "name_es": "Atlanta",
       "capacity": 75000,
       "coords": "33°45'20\"N 84°24'00\"W"
     },
@@ -94,6 +105,7 @@
       "timezone": "UTC-4",
       "cc": "us",
       "name": "Hard Rock Stadium",
+      "name_es": "Miami",
       "capacity": 65000,
       "coords": "25°57'29\"N 80°14'20\"W"
     },
@@ -102,6 +114,7 @@
       "timezone": "UTC-4",
       "cc": "ca",
       "name": "BMO Field",
+      "name_es": "Toronto",
       "capacity": 45000,
       "coords": "43°38'0\"N 79°25'07\"W"
     },
@@ -110,6 +123,7 @@
       "timezone": "UTC-4",
       "cc": "us",
       "name": "Gillette Stadium",
+      "name_es": "Boston",
       "capacity": 65000,
       "coords": "42.091°N 71.264°W"
     },
@@ -118,6 +132,7 @@
       "timezone": "UTC-4",
       "cc": "us",
       "name": "Lincoln Financial Field",
+      "name_es": "Philadelphia",
       "capacity": 69000,
       "coords": "39°54'3\"N 75°10'3\"W"
     },
@@ -126,6 +141,7 @@
       "timezone": "UTC-4",
       "cc": "us",
       "name": "MetLife Stadium",
+      "name_es": "New York",
       "capacity": 82500,
       "coords": "40°48'48.7\"N 74°4'27.7\"W"
     }

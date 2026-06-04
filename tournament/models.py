@@ -22,17 +22,17 @@ class Stadium(models.Model):
     ]
 
     name = models.CharField(max_length=100, unique=True)
+    name_es = models.CharField(
+        max_length=100, help_text="Nombre para mostrar, en español.",
+        blank=True, null=True)
     city = models.CharField(max_length=100, unique=True)
     country = models.CharField(max_length=2, choices=COUNTRY_CHOICES)
     utc_offset = models.SmallIntegerField(
-        help_text="Offset UTC del estadio durante el torneo (p. ej. -6)."
-    )
+        help_text="Offset UTC del estadio durante el torneo (p. ej. -6).")
     capacity = models.PositiveIntegerField(null=True, blank=True)
     coords = models.CharField(
-        max_length=50,
-        blank=True,
-        help_text="Coordenadas crudas de OF, en grados (string).",
-    )
+        max_length=50, blank=True,
+        help_text="Coordenadas crudas de OF, en grados (string).",)
 
     class Meta:
         verbose_name = "estadio"
@@ -50,23 +50,13 @@ class Stage(models.Model):
     fase ``FINAL`` agrupa el partido por el tercer lugar y la final; se
     distinguen por ``Match.of_number`` (103 = tercer lugar, 104 = final).
     """
-
     GROUP_STAGE = "GROUP_STAGE"
     LAST_32 = "LAST_32"
     LAST_16 = "LAST_16"
     QUARTER_FINALS = "QUARTER_FINALS"
     SEMI_FINALS = "SEMI_FINALS"
     FINAL = "FINAL"
-    KEY_CHOICES = [
-        (GROUP_STAGE, "Fase de grupos"),
-        (LAST_32, "Dieciseisavos de final"),
-        (LAST_16, "Octavos de final"),
-        (QUARTER_FINALS, "Cuartos de final"),
-        (SEMI_FINALS, "Semifinales"),
-        (FINAL, "Finales"),
-    ]
-
-    key = models.CharField(max_length=20, choices=KEY_CHOICES, unique=True)
+    key = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=50)
     short_name = models.CharField(max_length=20)
     color = models.CharField(
@@ -122,9 +112,9 @@ class Team(models.Model):
         ("UEFA", "UEFA"),
         ("CONMEBOL", "CONMEBOL"),
         ("CONCACAF", "CONCACAF"),
-        ("CAF", "CAF"),
-        ("AFC", "AFC"),
-        ("OFC", "OFC"),
+        ("CAF", "África"),
+        ("AFC", "Asía"),
+        ("OFC", "Oceanía"),
     ]
 
     # --- OF (seed inicial) ---
@@ -225,8 +215,7 @@ class Match(models.Model):
     away_goals = models.PositiveSmallIntegerField(null=True, blank=True)
 
     decided_by = models.CharField(
-        max_length=20, choices=DECIDED_BY_CHOICES, blank=True
-    )
+        max_length=20, choices=DECIDED_BY_CHOICES, blank=True)
     home_penalties = models.PositiveSmallIntegerField(null=True, blank=True)
     away_penalties = models.PositiveSmallIntegerField(null=True, blank=True)
 
