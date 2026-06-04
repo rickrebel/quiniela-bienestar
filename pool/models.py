@@ -1,12 +1,9 @@
-"""Modelos de la quiniela: usuarios y sus pronósticos.
-
-Depende de la app ``tournament`` (Match, Stage) en una sola dirección:
-``pool`` importa de ``tournament``, nunca al revés.
-"""
+"""Modelos de la quiniela: usuarios y sus pronósticos."""
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models import UniqueConstraint
+from tournament.models import Stage, Match
 
 
 class UserManager(BaseUserManager):
@@ -69,13 +66,9 @@ class StageUser(models.Model):
     """
 
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="stage_states"
-    )
+        User, on_delete=models.CASCADE, related_name="stage_states")
     stage = models.ForeignKey(
-        "tournament.Stage",
-        on_delete=models.PROTECT,
-        related_name="user_states",
-    )
+        Stage, on_delete=models.PROTECT, related_name="user_states",)
     sent_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)
 
@@ -139,13 +132,9 @@ class Prediction(models.Model):
 
     date = models.DateTimeField()
     user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="predictions"
-    )
+        User, on_delete=models.CASCADE, related_name="predictions")
     match = models.ForeignKey(
-        "tournament.Match",
-        on_delete=models.CASCADE,
-        related_name="predictions",
-    )
+        Match, on_delete=models.CASCADE, related_name="predictions",)
     home_goals = models.IntegerField()
     away_goals = models.IntegerField()
 

@@ -110,8 +110,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Email SMTP configuration (Gmail) from environment.
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.environ.get("SMTP_SERVER", "")
-EMAIL_PORT = int(os.environ.get("SMTP_PORT", "465"))
-EMAIL_USE_SSL = True
+EMAIL_PORT = int(os.environ.get("SMTP_PORT", "587"))
+EMAIL_USE_SSL = EMAIL_PORT == 465
+EMAIL_USE_TLS = EMAIL_PORT == 587
 EMAIL_HOST_USER = os.environ.get("GMAIL_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.environ.get("GMAIL_USER", "")
