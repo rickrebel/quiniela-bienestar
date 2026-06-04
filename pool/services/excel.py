@@ -44,12 +44,13 @@ def generate_excel(user, stage: Stage) -> None:
         sheet = workbook.create_sheet(title=title[:31])
         sheet.append(HEADER_ROW)
         for match in matches:
+            datetime = match.datetime.date()
             sheet.append([
                 _team_name(match.home_team, match.home_placeholder),
                 getattr(match, "predicted_home", 0),
                 getattr(match, "predicted_away", 0),
                 _team_name(match.away_team, match.away_placeholder),
-                match.formatted_date,
+                datetime,
                 match.stadium.name,
             ])
 

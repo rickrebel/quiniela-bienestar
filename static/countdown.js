@@ -11,7 +11,7 @@
     function render() {
         let secs = Math.floor(deadline.diff(dayjs()) / 1000);
         if (secs <= 0) {
-            el.textContent = "El plazo para confirmar terminó.";
+            el.textContent = "El plazo para enviar terminó.";
             return;
         }
         const days = Math.floor(secs / 86400);
@@ -20,7 +20,7 @@
         secs -= hours * 3600;
         const mins = Math.floor(secs / 60);
         el.textContent =
-            `Te quedan ${days}d ${hours}h ${mins}m para confirmar.`;
+            `Te quedan ${days}d ${hours}h ${mins}m para enviar.`;
     }
 
     render();
