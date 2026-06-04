@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+{% include 'header.html' %}
+
+<nav class="stage-tabs" aria-label="Fases">
+    <a class="stage-tab active" href="/reglas">
+        reglas
+    </a>
+    {% for tab in tabs %}
+    <a class="stage-tab"
+       href="{% url 'stage' tab.stage.key %}">
+        {{ tab.stage.short_name }}
+    </a>
+    {% if tab.state == 'sent' %}
+        <span class="tab-done" title="Enviado">✓</span>
+        {% endif %}
+    {% endfor %}
+</nav>
+
+<main class="content">
+    <br/>
+    <p class="stage-note">
+      - Si atinas ganador o empate: 3 puntos
+    </p>
+    <br/>
+    <p class="stage-note">
+      - Si atinas diferencia de goles: 1 punto extra (excepto en empates)
+    </p>
+    <br/>
+    <p class="stage-note">
+      - Resultado exacto: 5 puntos totales si hay ganador y 4 puntos totales si es empate
+    </p>
+    <br/>
+    <p class="stage-note">
+      - En play offs se considerará el marcador sin penales (goles en tiempos extras sí cuentan)
+    </p>
+
+</main>
+
+{% endblock %}

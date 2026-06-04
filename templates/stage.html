@@ -6,6 +6,9 @@
 {% include 'header.html' %}
 
 <nav class="stage-tabs" aria-label="Fases">
+    <a class="stage-tab" href="/reglas">
+        reglas
+    </a>
     {% for tab in tabs %}
     <a class="stage-tab{% if tab.stage.key == stage.key %} active{% endif %}"
        href="{% url 'stage' tab.stage.key %}">

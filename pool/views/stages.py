@@ -110,3 +110,6 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
         ),
     }
     return render(request, "stage.html", context)
+
+def reglas(request: HttpRequest) -> HttpResponse:
+    return render(request, "reglas.html", {"tabs": _build_tabs(request.user)})
