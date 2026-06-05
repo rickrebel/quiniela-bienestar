@@ -41,6 +41,7 @@ class User(AbstractUser):
 
     username = models.CharField(max_length=254, unique=True)
     email = models.EmailField(unique=True)
+    is_active = models.BooleanField(default=False)
     authorized = models.BooleanField(
         default=False,
         help_text="Pagó y envió a tiempo; se marca a mano.",

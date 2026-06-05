@@ -31,11 +31,18 @@ def login_view(request: HttpRequest) -> HttpResponse:
                     "Es necesario preregistrar el email",
                 )
             else:
-                if not user.is_active:
+                if user.is_active:
+                    if user.check_password(form.cleaned_data["password"]):
+                        login(request, user, backend=_AUTH_BACKEND)
+                        return redirect("stage", key="GROUP_STAGE")
+                    else:
+                        form.add_error("password", "Contraseña incorrecta")
+                else:
+                    user.set_password(form.cleaned_data["password"])
                     user.is_active = True
                     user.save()
-                login(request, user, backend=_AUTH_BACKEND)
-                return redirect("stage", key="GROUP_STAGE")
+                    login(request, user, backend=_AUTH_BACKEND)
+                    return redirect("stage", key="GROUP_STAGE")
     else:
         form = EmailAccessForm()
 
