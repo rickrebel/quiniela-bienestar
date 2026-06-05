@@ -290,6 +290,20 @@
   font-weight: 500;
   opacity: 0.7;
 }
+/* Subraya el país que ganaría según el marcador previsto; empate marca
+   ambos con un trazo más delgado. submit.js pone/quita estas clases. */
+.team span.pick-win {
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+.team span.pick-tie {
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
 
 .score {
   gap: 4px;

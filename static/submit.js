@@ -95,6 +95,50 @@ function updateCounter(container) {
     if (counter) counter.textContent = `${filled}/${matches.length}`;
 }
 
+// Subraya el nombre del país que ganaría según el marcador previsto.
+// Empate: subraya ambos con un trazo más delgado. Predicción incompleta
+// (algún marcador vacío) o equipos por definir: sin estilo.
+function markWinner(matchEl) {
+    const homeEl = matchEl.querySelector('[data-field="home_goals"]');
+    const awayEl = matchEl.querySelector('[data-field="away_goals"]');
+    if (!homeEl || !awayEl) return;
+    const teams = matchEl.querySelectorAll(".team");
+    const homeName = teams[0]?.querySelector("span:not(.team-placeholder)");
+    const awayName = teams[1]?.querySelector("span:not(.team-placeholder)");
+    if (!homeName || !awayName) return;
+
+    homeName.classList.remove("pick-win", "pick-tie");
+    awayName.classList.remove("pick-win", "pick-tie");
+    if (homeEl.value === "" || awayEl.value === "") return;
+
+    const home = parseInt(homeEl.value);
+    const away = parseInt(awayEl.value);
+    if (home > away) {
+        homeName.classList.add("pick-win");
+    } else if (away > home) {
+        awayName.classList.add("pick-win");
+    } else {
+        homeName.classList.add("pick-tie");
+        awayName.classList.add("pick-tie");
+    }
+}
+
+// Pinta el subrayado al cargar (refleja predicciones ya guardadas en
+// cualquier estado) y, si se está editando, lo actualiza en vivo al teclear.
+function initWinnerMarks() {
+    const content = document.querySelector(".content");
+    const editing = content && content.dataset.state === "editing";
+    document.querySelectorAll(".match").forEach(matchEl => {
+        markWinner(matchEl);
+        if (!editing) return;
+        matchEl.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener("input", () => markWinner(matchEl));
+        });
+    });
+}
+
+document.addEventListener("DOMContentLoaded", initWinnerMarks);
+
 async function saveMatch(matchEl) {
     const home = matchEl.querySelector('[data-field="home_goals"]').value;
     const away = matchEl.querySelector('[data-field="away_goals"]').value;
