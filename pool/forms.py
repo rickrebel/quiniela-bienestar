@@ -17,3 +17,10 @@ class EmailAccessForm(forms.Form):
             "invalid": "Ingresa un correo válido",
         },
     )
+
+    password = forms.CharField(
+        label="Contraseña",
+        error_messages={
+            "required": "La contraseña es requerida"
+        }
+    )
