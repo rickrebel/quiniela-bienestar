@@ -42,12 +42,11 @@ class User(AbstractUser):
     username = models.CharField(max_length=254, unique=True)
     email = models.EmailField(unique=True)
     authorized = models.BooleanField(
-        default=True,
+        default=False,
         help_text="Pagó y envió a tiempo; se marca a mano.",
     )
 
     USERNAME_FIELD = "email"
-    PASSWORD_FIELD = "password"
     REQUIRED_FIELDS = []
 
     objects = UserManager()
