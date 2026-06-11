@@ -12,6 +12,9 @@ class EmailAccessForm(forms.Form):
 
     email = forms.EmailField(
         label="Email",
+        # autocomplete="username" (no "email") es el valor que los
+        # gestores de contraseñas emparejan con current-password.
+        widget=forms.EmailInput(attrs={"autocomplete": "username"}),
         error_messages={
             "required": "El email es requerido",
             "invalid": "Ingresa un correo válido",
@@ -20,6 +23,9 @@ class EmailAccessForm(forms.Form):
 
     password = forms.CharField(
         label="Contraseña",
+        widget=forms.PasswordInput(
+            attrs={"autocomplete": "current-password"}
+        ),
         error_messages={
             "required": "La contraseña es requerida"
         }

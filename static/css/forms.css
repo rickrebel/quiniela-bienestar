@@ -73,6 +73,42 @@
     0 0 0 3px rgba(212, 175, 55, .15);
 }
 
+.password-field {
+  position: relative;
+  display: block;
+}
+
+/* Hueco a la derecha para que el texto no quede bajo el botón. */
+.password-field input {
+  padding-right: 3rem;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: .5rem;
+  transform: translateY(-50%);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.password-toggle:hover,
+.password-toggle:focus-visible {
+  color: var(--gold);
+  outline: none;
+}
+
 .login-submit input{
     height: 44px;
     border: 1px solid #cdb36f;
