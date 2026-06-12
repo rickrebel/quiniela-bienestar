@@ -1,8 +1,8 @@
 # sanginiela
 
-Family World Cup pool. Pre-registered players log in with just their email
-(no password), predict group-stage scores, and on submit receive an Excel of
-their picks by email. Django server-rendered (no DRF), DTL templates + vanilla
+Family World Cup pool. Pre-registered players log in with their email and a
+password they set on first access, predict group-stage scores, and on submit
+receive an Excel of their picks by email. Django server-rendered (no DRF), DTL templates + vanilla
 JS. See `README.md` for full setup.
 
 ## Commands
@@ -16,6 +16,14 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   `load_stadiums` → `load_stages` → `load_teams` → `load_matches`,
   reading from `db/jsons/{of,fd,manual}/`.
 - `python manage.py preregister <email> "<name>"` — add a player (`pool` app)
+- `python manage.py fetch_sim_source` — one-time download of real finished
+  matches (current Champions season; free FD tier has no historic seasons)
+  to `db/jsons/sim/cl2025.json`, committed (`tournament` app).
+- `python manage.py simulate [--day N]` — leave the local DB as if today were
+  day N of the World Cup: shifts the calendar, applies real disguised results
+  from `cl2025.json`, fills predictions and marks sends (`pool` app).
+  Local-only: refuses to run with `DEBUG=False` unless `--force`. No reset:
+  re-seed or restore a backup to undo.
 - DB selection is env-driven: set `POSTGRES_DB` for Postgres, leave it empty
   to fall back to SQLite at `db/app.sqlite3`.
 
@@ -36,9 +44,12 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 
 ## Gotchas
 
-- **No passwords.** Login is email-only (`views/auth.py`); `is_active=False`
-  means pre-registered but not yet entered. The custom `UserManager` calls
-  `set_unusable_password()`.
+- **Password is set on first login, not at preregistration.** The custom
+  `UserManager` creates players with `set_unusable_password()` and
+  `is_active=False` (model default). On first login (`views/auth.py`) whatever
+  password the user types becomes theirs and `is_active` flips to `True`;
+  later logins verify it. So `is_active=False` = pre-registered, never
+  entered.
 - **`username` always equals `email`** (forced in `User.save()`). The player's
   display name lives in `first_name`, not `username`.
 - **`home`/`away`, not `a`/`b`.** Models, templates and `static/submit.js` all
@@ -72,6 +83,8 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 
 ## Deploy
 
-Targets AWS (EC2 + RDS Postgres). Production reads `POSTGRES_*` from the
-environment; local dev with no `POSTGRES_DB` uses SQLite. Run
-`collectstatic` before serving in production.
+Targets AWS (EC2 + RDS Postgres), nginx terminating TLS in front of gunicorn
+(`SECURE_PROXY_SSL_HEADER` is set; prod also needs `CSRF_TRUSTED_ORIGINS` or
+POSTs get 403). Env vars are parsed via `config/get_env.py`; production reads
+`POSTGRES_*`, local dev with no `POSTGRES_DB` uses SQLite. Run `collectstatic`
+before serving in production.

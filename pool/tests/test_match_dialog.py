@@ -1,0 +1,160 @@
+"""Tests del payload del dialog de partido (agrupación y privacidad)."""
+
+from datetime import timedelta
+
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
+
+from pool.models import Prediction, User
+from pool.services.match_dialog import (
+    build_match_dialog_payload,
+    diff_label,
+    group_predictions,
+    points_display,
+)
+from pool.services.scoring import score_detail
+from tournament.models import Match, Stadium, Stage, Team
+
+
+def _row(name: str, home: int, away: int) -> dict:
+    return {"name": name, "home": home, "away": away,
+            "is_self": False, "points": None}
+
+
+class GroupPredictionsTests(SimpleTestCase):
+    def test_groups_ordered_by_diff_descending(self):
+        rows = [_row("a", 0, 2), _row("b", 3, 0), _row("c", 1, 1),
+                _row("d", 2, 1)]
+        groups = group_predictions(rows)
+        self.assertEqual([g["diff"] for g in groups], [3, 1, 0, -2])
+
+    def test_within_group_total_goals_descending(self):
+        rows = [_row("a", 1, 0), _row("b", 3, 2), _row("c", 2, 1)]
+        groups = group_predictions(rows)
+        self.assertEqual(len(groups), 1)
+        names = [p["name"] for p in groups[0]["predictions"]]
+        self.assertEqual(names, ["b", "c", "a"])
+
+    def test_equal_total_keeps_input_order(self):
+        rows = [_row("ana", 2, 1), _row("beto", 2, 1), _row("caro", 2, 1)]
+        groups = group_predictions(rows)
+        names = [p["name"] for p in groups[0]["predictions"]]
+        self.assertEqual(names, ["ana", "beto", "caro"])
+
+    def test_empty_input(self):
+        self.assertEqual(group_predictions([]), [])
+
+
+class DiffLabelTests(SimpleTestCase):
+    def test_home_wins(self):
+        self.assertEqual(diff_label(2, "México", "Canadá"), "México por 2")
+
+    def test_away_wins(self):
+        self.assertEqual(diff_label(-1, "México", "Canadá"), "Canadá por 1")
+
+    def test_draw(self):
+        self.assertEqual(diff_label(0, "México", "Canadá"), "Empate")
+
+
+class PointsDisplayTests(SimpleTestCase):
+    def test_none_without_result(self):
+        self.assertIsNone(points_display(None))
+
+    def test_miss(self):
+        display = points_display(score_detail(2, 0, 0, 2))
+        self.assertEqual(display, {"total": 0, "base": 0, "bonus": False,
+                                   "kind": "miss"})
+
+    def test_hit_with_diff_bonus_splits_base(self):
+        display = points_display(score_detail(3, 2, 2, 1))
+        self.assertEqual(display, {"total": 4, "base": 3, "bonus": True,
+                                   "kind": "hit"})
+
+    def test_exact(self):
+        display = points_display(score_detail(2, 1, 2, 1))
+        self.assertEqual(display, {"total": 5, "base": 5, "bonus": False,
+                                   "kind": "exact"})
+
+
+class DialogPayloadPrivacyTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        now = timezone.now()
+        cls.open_stage = Stage.objects.create(
+            key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
+            color="#4CAF50", order=1, send_deadline=now + timedelta(days=1),
+        )
+        cls.closed_stage = Stage.objects.create(
+            key="LAST_32", name="Dieciseisavos", short_name="16avos",
+            color="#2196F3", order=2, send_deadline=now - timedelta(days=1),
+        )
+        cls.stadium = Stadium.objects.create(
+            name="Estadio Azteca", city="CDMX", country="mx", utc_offset=-6,
+        )
+        cls.team_a = Team.objects.create(
+            name="Mexico", name_es="México", fifa_code="MEX", group_name="A",
+            confederation="concacaf",
+        )
+        cls.team_b = Team.objects.create(
+            name="Canada", name_es="Canadá", fifa_code="CAN", group_name="A",
+            confederation="concacaf",
+        )
+        cls.open_match = Match.objects.create(
+            datetime=now, stage=cls.open_stage, stadium=cls.stadium,
+            home_team=cls.team_a, away_team=cls.team_b, of_number=1,
+        )
+        cls.closed_match = Match.objects.create(
+            datetime=now, stage=cls.closed_stage, stadium=cls.stadium,
+            home_team=cls.team_a, away_team=cls.team_b, of_number=73,
+            status="FINISHED", home_goals=2, away_goals=1,
+        )
+        cls.ana = User.objects.create_user("ana@x.com", first_name="Ana",
+                                           is_active=True)
+        cls.beto = User.objects.create_user("beto@x.com", first_name="Beto",
+                                            is_active=True)
+        for user, match, home, away in (
+            (cls.ana, cls.open_match, 1, 0),
+            (cls.beto, cls.open_match, 0, 0),
+            (cls.ana, cls.closed_match, 2, 1),
+            (cls.beto, cls.closed_match, 0, 1),
+        ):
+            Prediction.objects.create(user=user, match=match,
+                                      home_goals=home, away_goals=away,
+                                      date=now)
+
+    def _payload_for(self, match):
+        matches = list(
+            Match.objects.filter(id=match.id).select_related(
+                "stage", "stadium", "home_team", "away_team"
+            )
+        )
+        return build_match_dialog_payload(matches, self.ana)[0]
+
+    def test_open_stage_hides_predictions(self):
+        payload = self._payload_for(self.open_match)
+        self.assertFalse(payload["revealed"])
+        self.assertNotIn("groups", payload)
+
+    def test_closed_stage_includes_everyone(self):
+        payload = self._payload_for(self.closed_match)
+        self.assertTrue(payload["revealed"])
+        rows = [p for g in payload["groups"] for p in g["predictions"]]
+        self.assertEqual({r["name"] for r in rows}, {"Ana", "Beto"})
+
+    def test_is_self_flags_requesting_user(self):
+        payload = self._payload_for(self.closed_match)
+        rows = [p for g in payload["groups"] for p in g["predictions"]]
+        self_flags = {r["name"]: r["is_self"] for r in rows}
+        self.assertEqual(self_flags, {"Ana": True, "Beto": False})
+
+    def test_finished_match_scores_predictions(self):
+        payload = self._payload_for(self.closed_match)
+        rows = [p for g in payload["groups"] for p in g["predictions"]]
+        by_name = {r["name"]: r for r in rows}
+        self.assertEqual(by_name["Ana"]["points"]["total"], 5)  # exacto
+        self.assertEqual(by_name["Beto"]["points"]["total"], 0)
+
+    def test_group_labels_use_team_names(self):
+        payload = self._payload_for(self.closed_match)
+        labels = [g["label"] for g in payload["groups"]]
+        self.assertEqual(labels, ["México por 1", "Canadá por 1"])

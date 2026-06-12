@@ -16,23 +16,76 @@
     {% endfor %}
 </nav>
 
-<main class="content">
-    <br/>
-    <p class="stage-note">
-      - Si atinas ganador o empate: 3 puntos
-    </p>
-    <br/>
-    <p class="stage-note">
-      - Si atinas diferencia de goles: 1 punto extra (excepto en empates)
-    </p>
-    <br/>
-    <p class="stage-note">
-      - Resultado exacto: 5 puntos totales si hay ganador y 4 puntos totales si es empate
-    </p>
-    <br/>
-    <p class="stage-note">
-      - En play offs se considerará el marcador sin penales (goles en tiempos extras sí cuentan)
-    </p>
+<main class="content rules">
+
+    <section class="rules-block">
+        <h6 class="rules-title">Puntaje por partido</h6>
+        <ul class="rules-list">
+            <li class="rule-row">
+                <span class="chip-pt chip-on rule-chip">R&nbsp;+3</span>
+                <span>Si atinas al resultado del partido (ganador o
+                empate): <b>3 puntos</b>.</span>
+            </li>
+            <li class="rule-row">
+                <span class="chip-pt chip-on rule-chip">Dif&nbsp;+1</span>
+                <span>Si atinas la diferencia de goles: <b>1 punto
+                extra</b> (excepto en empates). Este punto extra solo te
+                lo puedes llevar si le atinaste al resultado del
+                partido.</span>
+            </li>
+            <li class="rule-row">
+                <span class="chip-pt chip-on rule-chip">{% include 'icons/mira.html' %}&nbsp;+1</span>
+                <span>Resultado exacto: <b>1 punto extra</b>.</span>
+            </li>
+        </ul>
+        <p class="rules-note">
+            Es decir, por un resultado exacto te llevas <b>5 puntos</b>
+            totales si hay ganador o <b>4 puntos</b> totales si es
+            empate.
+        </p>
+        <p class="rules-note">
+            En play offs se considerará el marcador <b>sin penales</b>:
+            calcula tu resultado pensando en que el partido puede durar
+            hasta 120 minutos (los goles en tiempos extras sí cuentan).
+        </p>
+    </section>
+
+    <section class="rules-block">
+        <h6 class="rules-title">Cierre de cada fase</h6>
+        <p class="rules-note">
+            Para todas las fases, si su quiniela no está llena a las
+            <b>11:59 pm del día previo</b> a que empiecen los partidos,
+            quedan fuera.
+        </p>
+    </section>
+
+    <section class="rules-block">
+        <h6 class="rules-title">Entrada y premios</h6>
+        <p class="rules-note">Entrada: <b>$200 pesos</b>.</p>
+        <ul class="prizes">
+            <li class="prize-row">
+                <span class="prize-place">1er lugar</span>
+                <span>Todo lo que se junte, menos 3 entradas.</span>
+            </li>
+            <li class="prize-row">
+                <span class="prize-place">2do lugar</span>
+                <span>Tu entrada y una extra ($400).</span>
+            </li>
+            <li class="prize-row">
+                <span class="prize-place">3er lugar</span>
+                <span>Reintegro ($200).</span>
+            </li>
+            <li class="prize-row">
+                <span class="prize-place">Último</span>
+                <span>Bello diploma digital para el recuerdo 😅</span>
+            </li>
+        </ul>
+        <p class="rules-note">
+            Si hay empate, se divide el premio del lugar en el que
+            empataron: por ejemplo, dos terceros lugares se llevan $100
+            cada uno.
+        </p>
+    </section>
 
 </main>
 

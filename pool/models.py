@@ -46,6 +46,13 @@ class User(AbstractUser):
         default=False,
         help_text="Pagó y envió a tiempo; se marca a mano.",
     )
+    is_virtual = models.BooleanField(
+        default=False,
+        help_text=(
+            "Perfil agregado (Ignorancia colectiva): visible, sin "
+            "login y fuera de premios."
+        ),
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

@@ -16,6 +16,42 @@
     z-index: 2;
 }
 
+/* Posición y puntos del usuario; mismo lenguaje de pill que .user-chip.
+   Sustituye al 🏆 suelto cuando hay sesión. */
+.rank-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    padding: 6px 10px;
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text);
+    text-decoration: none;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    transition: background 180ms ease;
+}
+.rank-chip:hover {
+    background: var(--gold-soft);
+    color: var(--text);
+}
+.rank-icon {
+    font-size: 12px;
+}
+.rank-pos {
+    color: rgba(195, 167, 100, 0.85);
+    font-weight: 700;
+}
+.rank-pts {
+    color: var(--muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
 .menu-btn {
     background: none;
     border: none;

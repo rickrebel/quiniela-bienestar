@@ -30,6 +30,11 @@ def login_view(request: HttpRequest) -> HttpResponse:
                     "email",
                     "Es necesario preregistrar el email",
                 )
+            elif user.is_virtual:
+                # Sin esta guarda, el flujo de primer login de abajo
+                # dejaría "secuestrar" al perfil agregado adoptando
+                # cualquier contraseña tecleada.
+                form.add_error("email", "Este perfil no tiene acceso")
             else:
                 if user.is_active:
                     if user.check_password(form.cleaned_data["password"]):

@@ -12,6 +12,9 @@ __pycache__/
 db/app.db
 db/*.sqlite3
 
+# Respaldos de BD (traen datos personales de los jugadores)
+db/*.bak.sql
+
 # Archivos estáticos recolectados (collectstatic)
 staticfiles/
 

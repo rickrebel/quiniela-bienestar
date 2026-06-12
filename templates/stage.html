@@ -24,6 +24,15 @@
     <p class="stage-note">El plazo de esta fase terminó.</p>
     {% endif %}
 
+    {% if is_group_stage %}
+    <nav class="view-switch" aria-label="Agrupar partidos">
+        <a class="view-opt{% if not by_date %} active{% endif %}"
+           href="{% url 'stage' stage.key %}">Por grupo</a>
+        <a class="view-opt{% if by_date %} active{% endif %}"
+           href="{% url 'stage' stage.key %}?view=fecha">Por fecha</a>
+    </nav>
+    {% endif %}
+
     {% for section in sections %}
 
     {% if is_group_stage %}
@@ -32,9 +41,9 @@
             <span class="chevron">
                 <svg viewBox="0 0 24 24"><path d="M9 7 L17 12 L9 17"/></svg>
             </span>
-            Grupo {{ section.key }}
-            <span class="group-flags">{% for team in section.teams %}{% if team.flag_path %}<img src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}">{% endif %}{% endfor %}</span>
-            <span class="section-count">{% if state == 'sent' %}0 pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
+            {{ section.label }}
+            {% if section.teams %}<span class="group-flags">{% for team in section.teams %}{% if team.flag_path %}<img src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}">{% endif %}{% endfor %}</span>{% endif %}
+            <span class="section-count">{% if state == 'sent' %}{{ section.points }} pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
         </summary>
     {% else %}
     <div class="knockout">
@@ -43,23 +52,26 @@
         {% if not is_group_stage %}
         <h6 class="chip-title">
             {{ stage.name|upper }}
-            <span class="section-count">{% if state == 'sent' %}0 pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
+            <span class="section-count">{% if state == 'sent' %}{{ section.points }} pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
         </h6>
         {% endif %}
 
         {% for match in section.matches %}
-        <section class="match-card mx-2{% if not is_group_stage and stage.key != 'FINAL' %} has-side-code{% endif %}">
+        <section class="match-card mx-2{% if match.is_finished %} has-points{% endif %}{% if by_date or not is_group_stage and stage.key != 'FINAL' %} has-side-code{% endif %}"
+                 data-dialog-match="{{ match.id }}">
             {% if stage.key == 'FINAL' %}
             <div class="match-code">
                 <span class="match-name">{{ match.name }}</span>
             </div>
             {% elif not is_group_stage %}
             <span class="match-side-code">{{ match.of_number }}</span>
+            {% elif by_date %}
+            <span class="match-side-code">{{ match.home_team.group_name }}</span>
             {% endif %}
             <div class="match" data-match-id="{{ match.id }}">
                 <div class="team">
                     {% if match.home_team %}
-                    <span>{{ match.home_team.name_es }}</span>
+                    <span class="{{ match.home_mark }}">{{ match.home_team.name_es }}</span>
                     {% if match.home_team.flag_path %}
                     <img src="{% static match.home_team.flag_path %}"
                          alt="{{ match.home_team.name_es }}">
@@ -72,7 +84,18 @@
                 </div>
 
                 <div class="score">
-                    {% if match.home_team and match.away_team %}
+                    {% if match.is_finished %}
+                    {# Orden FIFA con penales: 3 (4) - (2) 3 #}
+                    <span class="score-final">{{ match.home_goals }}</span>
+                    {% if match.decided_by == 'PENALTY_SHOOTOUT' %}
+                    <span class="score-pens">({{ match.home_penalties }})</span>
+                    {% endif %}
+                    <span>-</span>
+                    {% if match.decided_by == 'PENALTY_SHOOTOUT' %}
+                    <span class="score-pens">({{ match.away_penalties }})</span>
+                    {% endif %}
+                    <span class="score-final">{{ match.away_goals }}</span>
+                    {% elif match.home_team and match.away_team %}
                     <input type="number" min="0" step="1"
                            data-field="home_goals"
                            value="{{ match.predicted_home }}"
@@ -95,18 +118,36 @@
                     {% elif match.away_team.crest %}
                     <img src="{{ match.away_team.crest }}" alt="">
                     {% endif %}
-                    <span>{{ match.away_team.name_es }}</span>
+                    <span class="{{ match.away_mark }}">{{ match.away_team.name_es }}</span>
                     {% else %}
                     <span class="team-placeholder">{{ match.away_placeholder }}</span>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="meta">
-                <span class="meta-key">{{ match.local_day }}</span>
-                <span class="meta-key">{{ match.local_time }}</span>
-                <span>{{ match.stadium.name_es|default:match.stadium.city }}{% if match.stadium.flag_path %}<img class="meta-flag" src="{% static match.stadium.flag_path %}" alt="{{ match.stadium.get_country_display }}">{% endif %}</span>
+            {% if match.is_finished %}
+            <div class="result-sub">
+                <span class="your-pick">
+                    <span class="pick-label">TÚ:</span>{% if match.chips %}<span class="score-mini">{{ match.predicted_home }}</span><span class="pick-dash">-</span><span class="score-mini">{{ match.predicted_away }}</span>{% else %}&mdash;{% endif %}
+                </span>
+                {% if match.chips %}
+                <span class="chips">
+                    {% for chip in match.chips %}
+                    <span class="chip-pt chip-{{ chip.state }}"><span class="chip-ind">{% if chip.icon %}{% include 'icons/mira.html' %}{% else %}{{ chip.label }}{% endif %}:</span>{{ chip.text }}</span>
+                    {% endfor %}
+                </span>
+                {% endif %}
             </div>
+            <span class="match-points points-{{ match.points_kind }}">
+                {% if match.points_kind == 'none' %}&mdash;{% else %}<span class="points-num">{{ match.user_points }}</span><span class="points-unit">pts</span>{% endif %}
+            </span>
+            {% else %}
+            <div class="meta">
+                <span class="meta-time">{% if match.is_live %}<span class="live-tag">En juego</span>{% else %}{{ match.local_time }}{% endif %}</span>
+                <span class="meta-date">{{ match.local_day }}</span>
+                <span class="meta-place">{{ match.stadium.name_es|default:match.stadium.city }}{% if match.stadium.flag_path %}<img class="meta-flag" src="{% static match.stadium.flag_path %}" alt="{{ match.stadium.get_country_display }}">{% endif %}</span>
+            </div>
+            {% endif %}
         </section>
         {% endfor %}
 
@@ -152,5 +193,7 @@
         </div>
     </footer>
 </dialog>
+
+{% include 'match_dialog.html' %}
 
 {% endblock %}

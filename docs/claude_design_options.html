@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiniela · 2 alternativas para mostrar resultados y puntos</title>
+<style>
+  :root{
+    --bg:#242834;
+    --bg-soft:#20243a;
+    --chip:#1e2536;
+    --chip-2:#272c3c;
+    --white:#f2f2f2;
+    --gold:#ba903c;
+    --gold-soft:#8c8155;
+    --gray:#919398;
+    --gray-dim:#5a6072;
+    --divider:#2e3342;
+    --win:#2e8f6e; /* solo para tick de acierto, tomado discreto */
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:#171a22;
+    color:var(--white);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    padding:48px 40px 72px;
+  }
+  .intro{max-width:1180px;margin:0 auto 40px;}
+  .intro h1{font-size:26px;font-weight:700;margin:0 0 8px;letter-spacing:-.01em;}
+  .intro p{font-size:15px;color:var(--gray);margin:0;max-width:760px;line-height:1.55;}
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin-top:18px;font-size:12.5px;color:var(--gray);}
+  .legend b{color:var(--white);font-weight:600;}
+  .legend .sw{display:inline-flex;align-items:center;gap:7px;}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .dot.on{background:var(--gold);}
+  .dot.off{background:var(--gray-dim);}
+
+  .grid{
+    max-width:1180px;margin:0 auto;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:34px;
+  }
+  .panel{}
+  .panel-tag{display:flex;align-items:baseline;gap:10px;margin:0 4px 12px;}
+  .panel-tag .n{font-size:12px;font-weight:700;color:var(--gold);letter-spacing:.14em;text-transform:uppercase;}
+  .panel-tag .d{font-size:13px;color:var(--gray);}
+
+  /* device card mimicking the app */
+  .device{
+    background:var(--bg);
+    border-radius:14px;
+    padding:6px 18px 14px;
+    box-shadow:0 18px 40px rgba(0,0,0,.45);
+  }
+  .grp{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 4px 14px;
+  }
+  .grp .left{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;white-space:nowrap;}
+  .grp .chev{color:var(--gray);font-size:13px;}
+  .grp .pts{color:var(--gold);font-weight:700;font-size:15px;white-space:nowrap;}
+
+  .match{border-top:1px solid var(--divider);padding:16px 2px;}
+  .match:first-child{border-top:none;}
+
+  /* score line shared bits */
+  .teams{display:flex;align-items:center;justify-content:center;gap:12px;}
+  .tname{font-size:16px;font-weight:600;white-space:nowrap;}
+  .tname.win{ -webkit-text-decoration:underline 2px var(--gold); text-decoration:underline 2px var(--gold);text-underline-offset:4px;}
+  .tname.home{text-align:right;}
+  .sbox{
+    min-width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+    background:var(--chip);border-radius:8px;font-size:17px;font-weight:700;
+    font-variant-numeric:tabular-nums;
+  }
+  .dash{color:var(--gray);font-weight:700;}
+  .meta{margin-top:9px;text-align:center;font-size:12px;color:var(--gray);}
+  .meta b{color:#c3c6cd;font-weight:700;}
+
+  /* breakdown chips */
+  .bk{display:flex;gap:6px;}
+  .bk .seg{
+    display:flex;align-items:center;gap:5px;
+    font-size:11px;font-weight:600;padding:4px 8px;border-radius:6px;
+    background:var(--chip);color:var(--gray-dim);
+  }
+  .bk .seg.on{color:var(--gold);background:#2b2719;}
+  .bk .seg .v{font-variant-numeric:tabular-nums;}
+  .bk .seg.na{color:var(--gray-dim);opacity:.55;}
+
+  .pill{
+    display:inline-flex;align-items:baseline;gap:4px;
+    border:1.5px solid var(--gold);color:var(--gold);
+    border-radius:999px;padding:5px 12px;font-weight:700;font-size:15px;
+    font-variant-numeric:tabular-nums;
+  }
+  .pill .u{font-size:10px;font-weight:600;}
+  .pill.zero{border-color:var(--gray-dim);color:var(--gray);}
+
+  .muted-pred{font-size:12px;color:var(--gray);}
+  .muted-pred b{color:#c3c6cd;font-weight:700;}
+</style>
+</head>
+<body>
+  <div class="intro">
+    <h1>Resultados reales + puntos por partido — 2 reacomodos</h1>
+    <p>Mismos partidos de ejemplo en las 2 opciones. Cada uno desglosa los puntos por regla: <b style="color:#c3c6cd">Resultado</b> (+3), <b style="color:#c3c6cd">Diferencia</b> (+1) y <b style="color:#c3c6cd">Exacto</b> (+1). En empates no aplica «Diferencia».</p>
+    <div class="legend">
+      <span class="sw"><span class="dot on"></span> punto obtenido</span>
+      <span class="sw"><span class="dot off"></span> no obtenido</span>
+      <span class="sw"><b>R</b> Resultado · <b>Dif</b> Diferencia · <b>=</b> Exacto</span>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+<script>
+/* ---- data ---- */
+const MATCHES = [
+  { home:"México", away:"Sudáfrica",   real:[3,1], pred:[3,1], info:"11 jun · 13:00 · CDMX" },        // 5 pts
+  { home:"Corea del Sur", away:"Chequia", real:[2,2], pred:[2,2], info:"11 jun · 20:00 · Guadalajara" },// 4 pts (empate)
+  { home:"Chequia", away:"Sudáfrica",   real:[1,0], pred:[2,0], info:"18 jun · 12:00 · Atlanta" },      // 3 pts
+  { home:"Corea del Sur", away:"México", real:[1,0], pred:[0,1], info:"24 jun · 19:00 · Monterrey" },   // 0 pts
+];
+
+/* ---- engine ---- */
+function score(real, pred){
+  const [rh,ra]=real,[ph,pa]=pred;
+  const sign=(a,b)=>a>b?1:a<b?-1:0;
+  const draw = rh===ra;
+  const resultOk = sign(rh,ra)===sign(ph,pa);
+  const exactOk = rh===ph && ra===pa;
+
+  const diffApplies = !draw;
+  const diffOk = !draw && resultOk && Math.abs(rh-ra)===Math.abs(ph-pa);
+
+  let total=0;
+  if(resultOk) total+=3;
+  if(diffOk) total+=1;
+  if(exactOk) total+=1;
+  return {resultOk, diffOk, exactOk, diffApplies, total, draw};
+}
+function winnerIdx(h,a){return h>a?0:h<a?1:-1;}
+
+/* segments builder */
+function segs(s){
+  const out=[];
+  out.push({k:'R', label:'R', val:3, on:s.resultOk});
+  if(s.diffApplies) out.push({k:'D', label:'Dif', val:1, on:s.diffOk});
+  else out.push({k:'D', label:'Dif', val:0, na:true});
+  out.push({k:'E', label:'=', val:1, on:s.exactOk});
+  return out;
+}
+const tick=on=>on?'✓':'·';
+
+/* ============ OPCIÓN 1: Real grande + pronóstico debajo + pill ============ */
+function opt1(m){
+  const s=score(m.real,m.pred);
+  const w=winnerIdx(...m.real);
+  const sg=segs(s);
+  return `<div class="match">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="flex:1;">
+        <div class="teams">
+          <span class="tname home ${w===0?'win':''}">${m.home}</span>
+          <span class="sbox">${m.real[0]}</span><span class="dash">–</span><span class="sbox">${m.real[1]}</span>
+          <span class="tname ${w===1?'win':''}">${m.away}</span>
+        </div>
+      </div>
+      <span class="pill ${s.total===0?'zero':''}">${s.total}<span class="u">pts</span></span>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:11px;">
+      <span class="muted-pred">Pronosticaste <b>${m.pred[0]}–${m.pred[1]}</b></span>
+      <div class="bk">
+        ${sg.map(x=>`<span class="seg ${x.na?'na':(x.on?'on':'')}">${x.label} <span class="v">${x.na?'—':'+'+x.val*(x.on?1:0)}</span></span>`).join('')}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ============ OPCIÓN 2: Marcadores apilados Real / Tú + puntos a la derecha ============ */
+function opt2(m){
+  const s=score(m.real,m.pred);
+  const w=winnerIdx(...m.real);
+  const dots=segs(s).map(x=>x.na?'<span class="dot off" style="opacity:.4"></span>':`<span class="dot ${x.on?'on':'off'}"></span>`).join('');
+  return `<div class="match">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div style="flex:1;">
+        <div class="teams" style="gap:10px;">
+          <span class="tname home ${w===0?'win':''}" style="flex:1;">${m.home}</span>
+          <div style="display:flex;flex-direction:column;gap:5px;align-items:center;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:9px;letter-spacing:.12em;color:var(--gold);width:26px;text-align:right;font-weight:700;">REAL</span>
+              <span class="sbox" style="height:30px;min-width:30px;font-size:16px;">${m.real[0]}</span><span class="dash">–</span><span class="sbox" style="height:30px;min-width:30px;font-size:16px;">${m.real[1]}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;opacity:.72;">
+              <span style="font-size:9px;letter-spacing:.12em;color:var(--gray);width:26px;text-align:right;font-weight:700;">TÚ</span>
+              <span class="sbox" style="height:26px;min-width:26px;font-size:13px;background:var(--bg-soft);">${m.pred[0]}</span><span class="dash" style="font-size:12px;">–</span><span class="sbox" style="height:26px;min-width:26px;font-size:13px;background:var(--bg-soft);">${m.pred[1]}</span>
+            </div>
+          </div>
+          <span class="tname ${w===1?'win':''}" style="flex:1;">${m.away}</span>
+        </div>
+      </div>
+      <div style="text-align:center;min-width:54px;border-left:1px solid var(--divider);padding-left:14px;">
+        <div style="font-size:26px;font-weight:800;line-height:1;color:${s.total?'var(--gold)':'var(--gray)'};font-variant-numeric:tabular-nums;">${s.total}</div>
+        <div style="font-size:10px;color:var(--gray);margin:3px 0 7px;">pts</div>
+        <div style="display:flex;gap:5px;justify-content:center;">${dots}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+const OPTIONS=[
+  {n:'Opción 1', d:'Resultado real grande + pronóstico y desglose debajo', fn:opt1},
+  {n:'Opción 2', d:'Marcadores apilados Real / Tú, puntos a la derecha', fn:opt2},
+];
+
+const grid=document.getElementById('grid');
+grid.innerHTML=OPTIONS.map(o=>{
+  const total=MATCHES.reduce((t,m)=>t+score(m.real,m.pred).total,0);
+  return `<div class="panel">
+    <div class="panel-tag"><span class="n">${o.n}</span><span class="d">${o.d}</span></div>
+    <div class="device">
+      <div class="grp">
+        <span class="left"><span class="chev">▾</span> Grupo A</span>
+        <span class="pts">${total} pts</span>
+      </div>
+      ${MATCHES.map(o.fn).join('')}
+    </div>
+  </div>`;
+}).join('');
+</script>
+</body>
+</html>

@@ -23,7 +23,7 @@ class Command(BaseCommand):
             sent_at__isnull=True,
             stage__send_deadline__isnull=False,
             stage__send_deadline__lte=now,
-        )
+        ).exclude(user__is_virtual=True)
 
         count = 0
         for stage_user in pending:

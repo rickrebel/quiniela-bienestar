@@ -50,7 +50,16 @@
             <rect class="line line-red" y="16" width="20" height="2.5" rx="1"/>
         </svg>
     </button>-->
+    {% if my_standing %}
+    <a class="rank-chip" href="{% url 'standings' %}"
+       title="Tabla de posiciones">
+        <span class="rank-icon">🏆</span>
+        <span class="rank-pos">{{ my_standing.position }}°</span>
+        <span class="rank-pts">{{ my_standing.points }}/{{ board_max }}</span>
+    </a>
+    {% else %}
     <span>🏆</span>
+    {% endif %}
 
     <h1 class="title"><span>⚽</span>sanginiela</h1>
 
