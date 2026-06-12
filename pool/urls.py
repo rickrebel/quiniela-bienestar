@@ -8,6 +8,16 @@ from pool.views import auth, leaderboard, predictions, stages
 urlpatterns = [
     path("login/", auth.login_view, name="login"),
     path("logout/", auth.logout_view, name="logout"),
+    path(
+        "recuperar/",
+        auth.forgot_password_view,
+        name="forgot_password",
+    ),
+    path(
+        "recuperar/<uuid:key>/",
+        auth.reset_password_view,
+        name="reset_password",
+    ),
     path("reglas/", stages.reglas, name="reglas"),
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
     path("stage/<str:key>/", stages.stage_view, name="stage"),

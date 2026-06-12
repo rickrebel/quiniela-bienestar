@@ -1,12 +1,24 @@
 """Vistas de autenticación sin contraseña (acceso por correo)."""
 
+import logging
+
 from django.contrib.auth import get_user_model, login, logout
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
-from pool.forms import EmailAccessForm
+from pool.forms import (
+    EmailAccessForm, RecoveryConfirmForm, RecoveryRequestForm)
+from pool.models import PasswordRecoveryToken
+from pool.services.recovery import (
+    create_recovery_token, recovery_url, send_recovery_email)
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+# Mensaje único pase lo que pase: no revela si el correo existe.
+RECOVERY_SENT_MSG = (
+    "Si el correo está registrado, recibirás un enlace en breve."
+)
 
 # Backend explícito para login() (evita ambigüedad si hay varios).
 _AUTH_BACKEND = "django.contrib.auth.backends.ModelBackend"
@@ -58,3 +70,72 @@ def logout_view(request: HttpRequest) -> HttpResponse:
     """Cierra la sesión y redirige a la pantalla de acceso."""
     logout(request)
     return redirect("login")
+
+
+def forgot_password_view(request: HttpRequest) -> HttpResponse:
+    """Pide el correo y manda el link de recuperación.
+
+    La respuesta es siempre la misma (anti-enumeración). Sin link
+    para preregistrados (su contraseña se define en el primer login)
+    ni para el perfil virtual.
+    """
+    sent = False
+    if request.method == "POST":
+        form = RecoveryRequestForm(request.POST)
+        if form.is_valid():
+            user = User.objects.filter(
+                email__iexact=form.cleaned_data["email"],
+                is_active=True,
+                is_virtual=False,
+            ).first()
+            if user:
+                token = create_recovery_token(user)
+                try:
+                    url = recovery_url(token, request)
+                    send_recovery_email(user, url)
+                except Exception:
+                    # El error de SMTP se loguea pero no se filtra al
+                    # usuario: la respuesta debe seguir siendo genérica.
+                    logger.exception(
+                        "Error enviando correo de recuperación a %s",
+                        user.email,
+                    )
+            sent = True
+    else:
+        form = RecoveryRequestForm()
+
+    context = {
+        "form": form,
+        "sent_message": RECOVERY_SENT_MSG if sent else "",
+    }
+    return render(request, "auth/forgot_password.html", context)
+
+
+def reset_password_view(request: HttpRequest, key) -> HttpResponse:
+    """Formulario de nueva contraseña para un token vigente.
+
+    Token inexistente, usado o expirado → misma pantalla con aviso y
+    link para pedir otro. Al confirmar: contraseña nueva, token
+    consumido y auto-login (igual que el primer login).
+    """
+    token = PasswordRecoveryToken.objects.select_related("user").filter(
+        key=key).first()
+    if token is None or not token.is_valid():
+        return render(
+            request, "auth/reset_password.html", {"invalid": True})
+
+    if request.method == "POST":
+        form = RecoveryConfirmForm(request.POST)
+        if form.is_valid():
+            user = token.user
+            user.set_password(form.cleaned_data["password"])
+            user.is_active = True
+            user.save()
+            token.mark_used()
+            login(request, user, backend=_AUTH_BACKEND)
+            return redirect("stage", key="GROUP_STAGE")
+    else:
+        form = RecoveryConfirmForm()
+
+    context = {"form": form, "email": token.user.email}
+    return render(request, "auth/reset_password.html", context)

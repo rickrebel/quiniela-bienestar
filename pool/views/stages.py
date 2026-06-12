@@ -11,6 +11,7 @@ from django.utils import timezone
 from pool.models import Prediction, StageUser, User
 from pool.services.match_dialog import build_match_dialog_payload
 from pool.services.scoring import score_detail
+from pool.services.standings import build_group_standings
 from pool.utils import format_day, format_time
 from tournament.models import Match, Stage, Team
 
@@ -93,10 +94,12 @@ def render_stage_sections(
     modelo es ``of_number``, por eso se fuerza cronológico). Eliminatoria:
     una sola sección (lista plana, equipos aún como placeholder). Cada
     sección es ``{"key", "label", "matches", "filled", "total", "points",
-    "teams"}`` (``teams`` solo agrupando por grupo, para las banderas del
-    encabezado), donde ``filled`` cuenta los partidos con predicción
-    completa (una fila ``Prediction`` ya implica ambos marcadores) y
-    ``points`` suma los puntos ya ganados en la sección. En cada partido
+    "teams", "standings"}`` (``teams`` y ``standings`` solo agrupando por
+    grupo: banderas del encabezado en el orden de la variante mix y
+    tablas de posiciones en tres variantes), donde ``filled`` cuenta los
+    partidos con predicción completa (una fila ``Prediction`` ya implica
+    ambos marcadores) y ``points`` suma los puntos ya ganados en la
+    sección. En cada partido
     adjunta en memoria día y hora **locales de la sede**
     (``Match.datetime`` está en UTC; se aplica ``Stadium.utc_offset``) y,
     si el usuario ya predijo, ``predicted_home``/``predicted_away``.
@@ -107,6 +110,9 @@ def render_stage_sections(
     )
     if by_date:
         matches = matches.order_by("datetime", "of_number")
+    # Materializado: el loop y build_group_standings deben compartir
+    # instancias (y evita re-ejecutar el queryset).
+    matches = list(matches)
     predictions = Prediction.objects.filter(user=user, match__stage=stage)
     preds_by_match = {p.match_id: p for p in predictions}
 
@@ -142,6 +148,10 @@ def render_stage_sections(
                 if team is not None:
                     teams[key][team.id] = team
 
+    standings = (
+        build_group_standings(matches, preds_by_match)
+        if is_group and not by_date else {}
+    )
     keys = sorted(grouped) if is_group else list(grouped)
     return [
         {
@@ -153,7 +163,11 @@ def render_stage_sections(
             "filled": filled[key],
             "total": len(grouped[key]),
             "points": points[key],
-            "teams": sorted(teams[key].values(), key=lambda t: t.name_es),
+            "standings": standings.get(key),
+            "teams": (
+                standings[key].teams if key in standings
+                else sorted(teams[key].values(), key=lambda t: t.name_es)
+            ),
         }
         for key in keys
     ]

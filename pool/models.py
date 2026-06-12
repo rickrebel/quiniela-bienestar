@@ -1,8 +1,12 @@
 """Modelos de la quiniela: usuarios y sus pronósticos."""
 
+import uuid
+from datetime import timedelta
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models import UniqueConstraint
+from django.utils import timezone
 from tournament.models import Stage, Match
 
 
@@ -63,6 +67,46 @@ class User(AbstractUser):
         """Fuerza que el username siga siempre al email."""
         self.username = self.email
         super().save(*args, **kwargs)
+
+
+class PasswordRecoveryToken(models.Model):
+    """Token de un solo uso para restablecer la contraseña.
+
+    Diseño tomado de onigies: UUID propio en BD en lugar del
+    ``PasswordResetTokenGenerator`` de Django, para tener expiración
+    explícita, un solo uso (``used_at``) y poder invalidar los tokens
+    previos del usuario al emitir uno nuevo.
+    """
+
+    EXPIRY_HOURS = 24
+
+    key = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="recovery_tokens")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "token de recuperación"
+        verbose_name_plural = "tokens de recuperación"
+
+    def __str__(self) -> str:
+        return f"{self.user} · {self.key}"
+
+    def save(self, *args, **kwargs) -> None:
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(
+                hours=self.EXPIRY_HOURS)
+        super().save(*args, **kwargs)
+
+    def is_valid(self) -> bool:
+        return self.used_at is None and timezone.now() < self.expires_at
+
+    def mark_used(self) -> None:
+        self.used_at = timezone.now()
+        self.save(update_fields=["used_at"])
 
 
 class StageUser(models.Model):

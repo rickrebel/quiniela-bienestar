@@ -65,8 +65,12 @@
             wrap.append(el("p", "day-note",
                 `Penales: ${data.penalties.home} - ${data.penalties.away}`));
         }
-        wrap.append(el("p", "match-dialog-meta",
-            `${data.day} · ${data.time} hora local · ${data.stadium}`));
+        const local = window.localMatchTime && data.utc
+            ? window.localMatchTime(data.utc) : null;
+        const when = local
+            ? `${local.day} · ${local.time} · ${data.stadium}`
+            : `${data.day} · ${data.time} hora local · ${data.stadium}`;
+        wrap.append(el("p", "match-dialog-meta", when));
         return wrap;
     }
 

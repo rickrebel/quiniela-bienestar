@@ -25,26 +25,45 @@
     {% endif %}
 
     {% if is_group_stage %}
-    <nav class="view-switch" aria-label="Agrupar partidos">
-        <a class="view-opt{% if not by_date %} active{% endif %}"
-           href="{% url 'stage' stage.key %}">Por grupo</a>
-        <a class="view-opt{% if by_date %} active{% endif %}"
-           href="{% url 'stage' stage.key %}?view=fecha">Por fecha</a>
-    </nav>
+    <div class="switch-row">
+        <nav class="view-switch" aria-label="Agrupar partidos">
+            <a class="view-opt{% if not by_date %} active{% endif %}"
+               href="{% url 'stage' stage.key %}">Por grupo</a>
+            <a class="view-opt{% if by_date %} active{% endif %}"
+               href="{% url 'stage' stage.key %}?view=fecha">Por fecha</a>
+        </nav>
+        {% if not by_date %}
+        <nav class="view-switch standings-switch" data-standings-switch
+             aria-label="Variante de posiciones">
+            <button type="button" class="view-opt" data-variant="est">Estimado</button>
+            <button type="button" class="view-opt active" data-variant="mix">Est. + Real</button>
+            <button type="button" class="view-opt" data-variant="real">Real</button>
+        </nav>
+        {% endif %}
+    </div>
     {% endif %}
 
     {% for section in sections %}
 
-    {% if is_group_stage %}
+    {% if is_group_stage and not by_date %}
     <details class="group">
         <summary class="group-summary">
             <span class="chevron">
                 <svg viewBox="0 0 24 24"><path d="M9 7 L17 12 L9 17"/></svg>
             </span>
             {{ section.label }}
-            {% if section.teams %}<span class="group-flags">{% for team in section.teams %}{% if team.flag_path %}<img src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}">{% endif %}{% endfor %}</span>{% endif %}
+            {% if section.teams %}<span class="group-flags">{% for team in section.teams %}{% if team.flag_path %}<img src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}" data-order-est="{{ team.order_est }}" data-order-mix="{{ team.order_mix }}" data-order-real="{{ team.order_real }}">{% endif %}{% endfor %}</span>{% endif %}
             <span class="section-count">{% if state == 'sent' %}{{ section.points }} pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
         </summary>
+    {% elif by_date %}
+    {# Por fecha no hay desplegable: fila de fecha + partidos visibles. #}
+    {# Conserva .group (submit.js agrupa por ella) y .group-summary #}
+    {# (buildSummary la clona como título del dialog de envío). #}
+    <section class="group">
+        <div class="group-summary date-header">
+            {{ section.label }}
+            <span class="section-count">{% if state == 'sent' %}{{ section.points }} pts{% else %}{{ section.filled }}/{{ section.total }}{% endif %}</span>
+        </div>
     {% else %}
     <div class="knockout">
     {% endif %}
@@ -57,7 +76,7 @@
         {% endif %}
 
         {% for match in section.matches %}
-        <section class="match-card mx-2{% if match.is_finished %} has-points{% endif %}{% if by_date or not is_group_stage and stage.key != 'FINAL' %} has-side-code{% endif %}"
+        <section class="match-card mx-2"
                  data-dialog-match="{{ match.id }}">
             {% if stage.key == 'FINAL' %}
             <div class="match-code">
@@ -142,7 +161,7 @@
                 {% if match.points_kind == 'none' %}&mdash;{% else %}<span class="points-num">{{ match.user_points }}</span><span class="points-unit">pts</span>{% endif %}
             </span>
             {% else %}
-            <div class="meta">
+            <div class="meta" data-utc="{{ match.datetime.isoformat }}">
                 <span class="meta-time">{% if match.is_live %}<span class="live-tag">En juego</span>{% else %}{{ match.local_time }}{% endif %}</span>
                 <span class="meta-date">{{ match.local_day }}</span>
                 <span class="meta-place">{{ match.stadium.name_es|default:match.stadium.city }}{% if match.stadium.flag_path %}<img class="meta-flag" src="{% static match.stadium.flag_path %}" alt="{{ match.stadium.get_country_display }}">{% endif %}</span>
@@ -151,7 +170,15 @@
         </section>
         {% endfor %}
 
-    {% if is_group_stage %}</details>{% else %}</div>{% endif %}
+        {% if section.standings %}
+        <div class="standings">
+            {% for table in section.standings.tables %}
+            {% include 'standings_table.html' with table=table %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    {% if is_group_stage and not by_date %}</details>{% elif by_date %}</section>{% else %}</div>{% endif %}
 
     {% endfor %}
 </main>
@@ -195,5 +222,9 @@
 </dialog>
 
 {% include 'match_dialog.html' %}
+
+{% if is_group_stage and not by_date %}
+<script src="{% static 'standings.js' %}" defer></script>
+{% endif %}
 
 {% endblock %}

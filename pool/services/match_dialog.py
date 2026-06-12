@@ -113,6 +113,9 @@ def _match_payload(match: Match, finished: bool) -> dict:
         "phase": phase_label(match),
         "home": _team_payload(match.home_team, match.home_placeholder),
         "away": _team_payload(match.away_team, match.away_placeholder),
+        # day/time son hora de la sede (fallback); el cliente muestra la
+        # zona del espectador a partir de utc (local_time.js).
+        "utc": match.datetime.isoformat(),
         "day": format_day(local_dt),
         "time": format_time(local_dt),
         "stadium": match.stadium.name_es or match.stadium.city,

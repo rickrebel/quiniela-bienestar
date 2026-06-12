@@ -1,7 +1,7 @@
 {% load static %}
-{# Dialog de detalle de partido + predicciones de todos. Datos embebidos
-   por la vista (build_match_dialog_payload); match_dialog.js lo llena al
-   hacer clic en cualquier [data-dialog-match]. #}
+{# Dialog de detalle de partido + predicciones de todos. #}
+{# Datos embebidos por la vista (build_match_dialog_payload); #}
+{# match_dialog.js lo llena al clic en cualquier [data-dialog-match]. #}
 {{ match_dialog_data|json_script:"match-dialog-data" }}
 <dialog id="match-dialog" class="send-dialog match-dialog">
     <div class="send-dialog-head" id="match-dialog-title"></div>

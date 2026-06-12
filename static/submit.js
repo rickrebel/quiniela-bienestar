@@ -196,8 +196,9 @@ function closeSendDialog() {
 function buildSummary() {
     const body = document.getElementById("send-dialog-body");
     body.innerHTML = "";
+    // .group cubre ambas vistas: details (por grupo) y section (fecha).
     const blocks = document.querySelectorAll(
-        ".content > details.group, .content > .knockout"
+        ".content > .group, .content > .knockout"
     );
     blocks.forEach(block => {
         // Grupos: el título es .group-summary ("Grupo A"). Finales: no hay

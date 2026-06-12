@@ -1,0 +1,33 @@
+{% load static %}
+{# Una variante de la tabla de posiciones del grupo. #}
+{# standings.js conmuta `hidden`; sin JS queda visible la mix. #}
+<table class="standings-table" data-variant="{{ table.variant }}"
+       {% if table.variant != 'mix' %}hidden{% endif %}>
+    <thead>
+        <tr>
+            <th class="st-team">Equipo</th>
+            <th>Pts</th><th>PJ</th><th>PG</th><th>PE</th><th>PP</th>
+            <th>GF</th><th>GC</th><th>🟨</th><th>🟥</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in table.rows %}
+        <tr>
+            <td class="st-team">
+                <span class="st-pos">{{ forloop.counter }}</span>
+                {% if row.team.flag_path %}<img src="{% static row.team.flag_path %}" alt="">{% endif %}
+                <span class="st-name">{{ row.team.name_es }}</span>
+            </td>
+            <td class="st-pts">{{ row.points }}</td>
+            <td>{{ row.played }}</td>
+            <td>{{ row.won }}</td>
+            <td>{{ row.drawn }}</td>
+            <td>{{ row.lost }}</td>
+            <td>{{ row.goals_for }}</td>
+            <td>{{ row.goals_against }}</td>
+            <td>{{ row.yellow }}</td>
+            <td>{{ row.red }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

@@ -24,6 +24,11 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 CSRF_TRUSTED_ORIGINS = getenv_list("CSRF_TRUSTED_ORIGINS", [])
 
+# Base para links absolutos en correos (recuperación). Necesaria
+# detrás de ngrok, donde el Host llega reescrito a localhost; si está
+# vacía se usa build_absolute_uri del request.
+SITE_URL = os.environ.get("SITE_URL", "")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
