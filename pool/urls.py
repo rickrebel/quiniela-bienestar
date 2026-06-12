@@ -3,7 +3,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from pool.views import auth, leaderboard, predictions, stages
+from pool.views import auth, leaderboard, predictions, results, stages
 
 urlpatterns = [
     path("login/", auth.login_view, name="login"),
@@ -28,6 +28,11 @@ urlpatterns = [
         name="save_prediction",
     ),
     path("send/", predictions.send_predictions, name="send"),
+    path(
+        "match/<int:match_id>/result/",
+        results.record_result,
+        name="record_result",
+    ),
     path(
         "",
         RedirectView.as_view(url="/stage/GROUP_STAGE/"),

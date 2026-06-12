@@ -39,11 +39,13 @@ def group_predictions(rows: list[dict]) -> list[dict]:
 
 
 def diff_label(diff: int, home: str, away: str) -> str:
-    """Encabezado de grupo: '{equipo} por {n}' o 'Empate'."""
+    """Encabezado de grupo: '{equipo} gana por {n} goles' o 'Empate'."""
     if diff == 0:
         return "Empate"
     team = home if diff > 0 else away
-    return f"{team} por {abs(diff)}"
+    n = abs(diff)
+    unit = "gol" if n == 1 else "goles"
+    return f"{team} gana por {n} {unit}"
 
 
 def points_display(detail: ScoreDetail | None) -> dict | None:
@@ -106,7 +108,7 @@ def _team_payload(team, placeholder: str) -> dict:
     }
 
 
-def _match_payload(match: Match, finished: bool) -> dict:
+def _match_payload(match: Match, finished: bool, can_record: bool) -> dict:
     local_dt = match.datetime + timedelta(hours=match.stadium.utc_offset)
     payload = {
         "id": match.id,
@@ -124,6 +126,11 @@ def _match_payload(match: Match, finished: bool) -> dict:
             if match.stadium.flag_path else None
         ),
         "finished": finished,
+        "is_knockout": match.stage.key != Stage.GROUP_STAGE,
+        # Permiso + estado; el gate de 105 min lo calcula el JS al abrir
+        # (un timing horneado al render se vuelve obsoleto) y el endpoint
+        # revalida todo de cualquier forma.
+        "can_record": can_record and not finished,
         "score": None,
         "penalties": None,
         "cards": None,
@@ -188,6 +195,7 @@ def build_match_dialog_payload(
                 "points": points_display(detail),
             })
 
+    records = user.can_record_results or user.is_superuser
     result = []
     for match in matches:
         finished = (
@@ -195,7 +203,7 @@ def build_match_dialog_payload(
             and match.home_goals is not None
             and match.away_goals is not None
         )
-        payload = _match_payload(match, finished)
+        payload = _match_payload(match, finished, records)
         if payload["revealed"]:
             groups = group_predictions(rows_by_match.get(match.id, []))
             for group in groups:

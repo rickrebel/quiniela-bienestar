@@ -57,6 +57,13 @@ class User(AbstractUser):
             "login y fuera de premios."
         ),
     )
+    can_record_results = models.BooleanField(
+        default=False,
+        help_text=(
+            "Puede capturar a mano el resultado oficial de un "
+            "partido terminado."
+        ),
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []

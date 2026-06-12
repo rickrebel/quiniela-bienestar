@@ -2,8 +2,10 @@
 
 Family World Cup pool. Pre-registered players log in with their email and a
 password they set on first access, predict group-stage scores, and on submit
-receive an Excel of their picks by email. Django server-rendered (no DRF), DTL templates + vanilla
-JS. See `README.md` for full setup.
+receive an Excel of their picks by email. As real results come in, the site
+shows points per match, group standings and a leaderboard. Django
+server-rendered (no DRF), DTL templates + vanilla JS. See `README.md` for
+full setup.
 
 ## Commands
 
@@ -12,10 +14,13 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 
 - `python manage.py runserver` — local dev server (http://localhost:8000/)
 - `python manage.py check` — validate models/URLs/imports without a DB
+- `python manage.py test pool` — run the test suite (`pool/tests/`)
 - Seed (in order; each depends on the prior — `tournament` app):
   `load_stadiums` → `load_stages` → `load_teams` → `load_matches`,
   reading from `db/jsons/{of,fd,manual}/`.
 - `python manage.py preregister <email> "<name>"` — add a player (`pool` app)
+- `python manage.py build_collective_profile <stage_key>` — freeze the
+  virtual profile's aggregated predictions for a closed stage (`pool` app)
 - `python manage.py fetch_sim_source` — one-time download of real finished
   matches (current Champions season; free FD tier has no historic seasons)
   to `db/jsons/sim/cl2025.json`, committed (`tournament` app).
@@ -33,11 +38,13 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   from `tournament`, never the reverse.
 - `tournament/`: sports data models (`Stadium`, `Stage`, `Team`, `Match`).
 - `pool/`: `User` (custom, `AUTH_USER_MODEL = "pool.User"`), `Prediction`,
-  `StageUser`.
-- Views split by concern in `pool/views/`: `auth.py` (email login),
-  `stages.py` (per-stage predictions page + tabs), `predictions.py` (JSON
-  save + per-match autosave + send).
-- Excel generation + email in `pool/services/excel.py`.
+  `StageUser`, `PasswordRecoveryToken`.
+- Views split by concern in `pool/views/`: `auth.py` (login + password
+  recovery), `stages.py` (per-stage predictions page + tabs + result cards),
+  `predictions.py` (JSON save + per-match autosave + send), `leaderboard.py`
+  (standings page).
+- Business logic in `pool/services/`, one module per concern: excel,
+  scoring, standings, leaderboard, aggregation, match_dialog, recovery.
 - Data seeded from two sources committed under `db/jsons/`: OF (openfootball,
   base seed) and FD (football-data.org, `fd_id` + results). Manual overrides
   (e.g. Spanish names) in `db/jsons/manual/`; old files in `db/jsons/legacy/`.
@@ -80,11 +87,26 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   so the file matches what was sent.
 - **JSON endpoints use a trailing slash** and require the `X-CSRFToken` header
   (set in `static/submit.js`).
+- **Scoring** (`pool/services/scoring.py`): 3 pts for the match result, +1
+  for goal difference (never on draws), +1 for exact score (max 5, 4 on
+  draws). Knockouts compare regular/extra-time goals, never penalties.
+- **Virtual profile** ("Ignorancia colectiva", `User.is_virtual`): shows in
+  standings, can't log in, out of prizes, excluded from
+  `send_expired_stages`. `build_collective_profile` only runs after the
+  stage's `send_deadline` — aggregating earlier would leak the crowd's pick.
+- **Password recovery uses its own `PasswordRecoveryToken`** (UUID PK, 24 h,
+  single-use), not Django's token generator. When building the email link,
+  `SITE_URL` overrides `request.build_absolute_uri` (needed behind ngrok).
+- **Real results sync is NOT implemented yet** (`sync_results` pending; see
+  the `football-data-matches` skill). A match renders as "live" via a 2-hour
+  window in `views/stages.py`, not real-time data. The `standing` context
+  processor runs on every template and must degrade to `{}` on any error.
 
 ## Deploy
 
 Targets AWS (EC2 + RDS Postgres), nginx terminating TLS in front of gunicorn
 (`SECURE_PROXY_SSL_HEADER` is set; prod also needs `CSRF_TRUSTED_ORIGINS` or
-POSTs get 403). Env vars are parsed via `config/get_env.py`; production reads
-`POSTGRES_*`, local dev with no `POSTGRES_DB` uses SQLite. Run `collectstatic`
-before serving in production.
+POSTs get 403, and `SITE_URL` so recovery emails link to the real domain).
+Env vars are parsed via `config/get_env.py`; production reads `POSTGRES_*`,
+local dev with no `POSTGRES_DB` uses SQLite. Run `collectstatic` before
+serving in production.

@@ -29,6 +29,7 @@ class CustomUserAdmin(UserAdmin):
         (None, {'fields': ('username',)}),
         ('Información personal', {'fields': (
             'first_name', 'last_name', 'email')}),
+        ('Permisos de quiniela', {'fields': ('can_record_results',)}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
     list_display = (
@@ -37,6 +38,7 @@ class CustomUserAdmin(UserAdmin):
         "first_name",
         "is_active",
         "authorized",
+        "can_record_results",
     )
     search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering = ('-is_active', 'email')

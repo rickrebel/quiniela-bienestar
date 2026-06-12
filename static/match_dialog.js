@@ -16,6 +16,13 @@
     const title = document.getElementById("match-dialog-title");
     const body = document.getElementById("match-dialog-body");
 
+    /* Espejos de constantes del server: LIVE_WINDOW (2 h) en
+       pool/views/stages.py y RECORD_DELAY (105 min) en
+       pool/views/results.py. Un desfase solo degrada UX: el endpoint
+       revalida el timing de todos modos. */
+    const LIVE_WINDOW_MS = 2 * 60 * 60 * 1000;
+    const RECORD_DELAY_MS = 105 * 60 * 1000;
+
     /* el(tag, className, text): atajo para nodos hoja y contenedores. */
     function el(tag, className, text) {
         const node = document.createElement(tag);
@@ -54,10 +61,10 @@
         teams.append(teamLine(data.home, "home"));
         teams.append(el("span", "day-vs", "vs"));
         teams.append(teamLine(data.away, "away"));
-        teams.append(el("span", "day-goals",
+        teams.append(el("span", "day-goals day-goals--home",
             data.finished ? String(data.score.home) : "–"));
         teams.append(el("span"));
-        teams.append(el("span", "day-goals",
+        teams.append(el("span", "day-goals day-goals--away",
             data.finished ? String(data.score.away) : "–"));
         wrap.append(teams);
 
@@ -65,13 +72,43 @@
             wrap.append(el("p", "day-note",
                 `Penales: ${data.penalties.home} - ${data.penalties.away}`));
         }
+        wrap.append(metaSection(data));
+        return wrap;
+    }
+
+    /* Mismo markup .meta de las tarjetas (reusa su CSS); fijo sin
+       importar el status del partido. */
+    function metaSection(data) {
+        const meta = el("div", "meta");
         const local = window.localMatchTime && data.utc
             ? window.localMatchTime(data.utc) : null;
-        const when = local
-            ? `${local.day} · ${local.time} · ${data.stadium}`
-            : `${data.day} · ${data.time} hora local · ${data.stadium}`;
-        wrap.append(el("p", "match-dialog-meta", when));
-        return wrap;
+        meta.append(el("span", "meta-time",
+            local ? local.time : `${data.time} hora local`));
+        meta.append(el("span", "meta-date", local ? local.day : data.day));
+        const place = el("span", "meta-place", data.stadium);
+        if (data.stadium_flag) {
+            const flag = document.createElement("img");
+            flag.className = "meta-flag";
+            flag.src = data.stadium_flag;
+            flag.alt = "";
+            place.append(flag);
+        }
+        meta.append(place);
+        return meta;
+    }
+
+    /* Status al extremo derecho del header, mismo criterio que las
+       tarjetas: FINISHED del server; "en juego" por ventana de 2 h. */
+    function statusTag(data) {
+        const start = Date.parse(data.utc);
+        const now = Date.now();
+        const live = !data.finished
+            && now >= start && now < start + LIVE_WINDOW_MS;
+        const label = data.finished
+            ? "Finalizado" : (live ? "En juego" : "Por jugar");
+        const tag = el("span", "dialog-status", label);
+        if (live) tag.classList.add("live-tag");
+        return tag;
     }
 
     function finishedSection(data) {
@@ -111,6 +148,199 @@
         return li;
     }
 
+    /* --- Captura manual de resultado (can_record del payload) --- */
+
+    function numInput(value) {
+        const input = document.createElement("input");
+        input.type = "number";
+        input.min = "0";
+        input.step = "1";
+        input.value = value;
+        return input;
+    }
+
+    function recordRow(label, home, away) {
+        const row = el("div", "record-row");
+        row.append(home, el("span", "record-label", label), away);
+        return row;
+    }
+
+    function recordSection(data) {
+        const wrap = el("div", "record-form");
+        const toggle = el("button", "submit-btn record-toggle",
+            "Capturar resultado");
+        toggle.type = "button";
+        // Sin <form>: un submit dentro de <dialog> lo cerraría.
+        const form = el("div", "record-body");
+        form.hidden = true;
+        toggle.addEventListener("click", () => {
+            form.hidden = !form.hidden;
+        });
+
+        const inputs = {
+            home_goals: numInput(""), away_goals: numInput(""),
+            home_yellow: numInput("0"), away_yellow: numInput("0"),
+            home_red: numInput("0"), away_red: numInput("0"),
+            home_penalties: numInput(""), away_penalties: numInput(""),
+        };
+        const pensRow = recordRow("Penales",
+            inputs.home_penalties, inputs.away_penalties);
+        pensRow.hidden = true;
+        const grid = el("div", "record-grid");
+        grid.append(
+            recordRow("Goles", inputs.home_goals, inputs.away_goals),
+            recordRow("Amarillas", inputs.home_yellow, inputs.away_yellow),
+            recordRow("Rojas", inputs.home_red, inputs.away_red),
+            pensRow,
+        );
+
+        // Penales solo en eliminatoria con empate; al salir del caso se
+        // vacían para que nunca viajen penales de un marcador anterior.
+        // De paso, subrayado en vivo del ganador en el marcador de
+        // arriba (helper compartido de submit.js).
+        const names = body.querySelectorAll(".day-team-name");
+        function onGoals() {
+            const home = inputs.home_goals.value;
+            const away = inputs.away_goals.value;
+            const filled = home !== "" && away !== "";
+            const tied = filled && parseInt(home) === parseInt(away);
+            const needsPens = data.is_knockout && tied;
+            pensRow.hidden = !needsPens;
+            if (!needsPens) {
+                inputs.home_penalties.value = "";
+                inputs.away_penalties.value = "";
+            }
+            if (window.applyWinnerMarks && names.length === 2) {
+                window.applyWinnerMarks(names[0], names[1], home, away);
+            }
+        }
+        inputs.home_goals.addEventListener("input", onGoals);
+        inputs.away_goals.addEventListener("input", onGoals);
+
+        const error = el("p", "record-error", "");
+        error.hidden = true;
+        function showError(message) {
+            error.textContent = message;
+            error.hidden = false;
+        }
+
+        const confirmBox = el("div", "record-confirm");
+        confirmBox.hidden = true;
+        const saveBtn = el("button", "submit-btn", "Guardar resultado");
+        saveBtn.type = "button";
+        const actions = el("div", "record-actions");
+        actions.append(saveBtn);
+
+        function readValues() {
+            const required = ["home_goals", "away_goals", "home_yellow",
+                "away_yellow", "home_red", "away_red"];
+            const v = {};
+            for (const field of required) {
+                const raw = inputs[field].value;
+                const num = parseInt(raw);
+                if (raw === "" || !(num >= 0)) {
+                    showError("Llena todos los campos (0 si no hubo).");
+                    return null;
+                }
+                v[field] = num;
+            }
+            v.home_penalties = null;
+            v.away_penalties = null;
+            if (!pensRow.hidden) {
+                const hp = parseInt(inputs.home_penalties.value);
+                const ap = parseInt(inputs.away_penalties.value);
+                if (!(hp >= 0) || !(ap >= 0)) {
+                    showError("Faltan los penales (hubo empate).");
+                    return null;
+                }
+                if (hp === ap) {
+                    showError("Los penales no pueden quedar empatados.");
+                    return null;
+                }
+                v.home_penalties = hp;
+                v.away_penalties = ap;
+            }
+            return v;
+        }
+
+        function backToForm() {
+            confirmBox.hidden = true;
+            grid.hidden = false;
+            actions.hidden = false;
+        }
+
+        // Confirmación en el mismo dialog (no se anidan dialogs): se
+        // sustituye el form por los mismos números capturados.
+        function buildConfirm(v) {
+            const score =
+                `${data.home.name} ${v.home_goals} - ` +
+                `${v.away_goals} ${data.away.name}`;
+            const cards =
+                `🟨 ${v.home_yellow} - ${v.away_yellow} · ` +
+                `🟥 ${v.home_red} - ${v.away_red}`;
+            confirmBox.replaceChildren(
+                el("p", "record-summary", score),
+                el("p", "record-summary", cards),
+            );
+            if (v.home_penalties !== null) {
+                confirmBox.append(el("p", "record-summary",
+                    `Penales: ${v.home_penalties} - ${v.away_penalties}`));
+            }
+            confirmBox.append(el("p", "day-note",
+                "El resultado no se podrá cambiar después."));
+            const fix = el("button", "submit-btn", "Corregir");
+            fix.type = "button";
+            fix.addEventListener("click", backToForm);
+            const send = el("button", "submit-btn", "Confirmar");
+            send.type = "button";
+            send.addEventListener("click", () => submitResult(v, send));
+            const btns = el("div", "record-actions");
+            btns.append(fix, send);
+            confirmBox.append(btns);
+        }
+
+        async function submitResult(v, btn) {
+            btn.disabled = true;
+            try {
+                const response = await fetch(`/match/${data.id}/result/`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        // csrftoken: global de submit.js; submit.js carga
+                        // después de este archivo, pero esto corre al clic.
+                        "X-CSRFToken": csrftoken,
+                    },
+                    body: JSON.stringify(v),
+                });
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.error || "Algo salió mal.");
+                }
+                // El resultado afecta tarjetas, standings y puntos:
+                // recargar es lo único honesto.
+                location.reload();
+            } catch (err) {
+                btn.disabled = false;
+                backToForm();
+                showError(err.message);
+            }
+        }
+
+        saveBtn.addEventListener("click", () => {
+            error.hidden = true;
+            const v = readValues();
+            if (!v) return;
+            buildConfirm(v);
+            grid.hidden = true;
+            actions.hidden = true;
+            confirmBox.hidden = false;
+        });
+
+        form.append(grid, error, confirmBox, actions);
+        wrap.append(toggle, form);
+        return wrap;
+    }
+
     function predictionsSection(data) {
         const wrap = el("div", "match-dialog-preds");
         if (!data.revealed) {
@@ -124,7 +354,17 @@
             return wrap;
         }
         for (const group of data.groups) {
-            wrap.append(el("h6", "pred-group-head", group.label));
+            const head = el("h6", "pred-group-head", group.label);
+            // Banderita del que gana en este grupo; en empate no hay.
+            const flag = group.diff > 0 ? data.home.flag
+                : group.diff < 0 ? data.away.flag : null;
+            if (flag) {
+                const img = document.createElement("img");
+                img.src = flag;
+                img.alt = "";
+                head.append(img);
+            }
+            wrap.append(head);
             const list = el("ul", "rivals-list");
             for (const pred of group.predictions) {
                 list.append(predictionRow(pred));
@@ -135,10 +375,16 @@
     }
 
     function open(data) {
-        title.textContent =
-            `${data.home.name} vs ${data.away.name}`;
+        title.replaceChildren(
+            el("span", null, `${data.home.name} vs ${data.away.name}`),
+            statusTag(data)
+        );
         body.replaceChildren(detailsSection(data));
         if (data.finished) body.append(finishedSection(data));
+        if (data.can_record
+                && Date.now() >= Date.parse(data.utc) + RECORD_DELAY_MS) {
+            body.append(recordSection(data));
+        }
         body.append(predictionsSection(data));
         dialog.showModal();
     }

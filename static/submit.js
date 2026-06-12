@@ -95,9 +95,29 @@ function updateCounter(container) {
     if (counter) counter.textContent = `${filled}/${matches.length}`;
 }
 
-// Subraya el nombre del país que ganaría según el marcador previsto.
-// Empate: subraya ambos con un trazo más delgado. Predicción incompleta
-// (algún marcador vacío) o equipos por definir: sin estilo.
+// Subraya al ganador según un marcador: pick-win al que va arriba,
+// pick-tie a ambos en empate, nada si falta algún valor (strings; ""
+// = sin dato). Compartida con match_dialog.js (form de captura), por
+// eso vive en window como localMatchTime.
+window.applyWinnerMarks = function (homeNameEl, awayNameEl, homeVal, awayVal) {
+    homeNameEl.classList.remove("pick-win", "pick-tie");
+    awayNameEl.classList.remove("pick-win", "pick-tie");
+    if (homeVal === "" || awayVal === "") return;
+
+    const home = parseInt(homeVal);
+    const away = parseInt(awayVal);
+    if (home > away) {
+        homeNameEl.classList.add("pick-win");
+    } else if (away > home) {
+        awayNameEl.classList.add("pick-win");
+    } else {
+        homeNameEl.classList.add("pick-tie");
+        awayNameEl.classList.add("pick-tie");
+    }
+};
+
+// Subraya el nombre del país que ganaría según el marcador previsto en
+// una tarjeta de partido. Equipos por definir: sin estilo.
 function markWinner(matchEl) {
     const homeEl = matchEl.querySelector('[data-field="home_goals"]');
     const awayEl = matchEl.querySelector('[data-field="away_goals"]');
@@ -106,21 +126,7 @@ function markWinner(matchEl) {
     const homeName = teams[0]?.querySelector("span:not(.team-placeholder)");
     const awayName = teams[1]?.querySelector("span:not(.team-placeholder)");
     if (!homeName || !awayName) return;
-
-    homeName.classList.remove("pick-win", "pick-tie");
-    awayName.classList.remove("pick-win", "pick-tie");
-    if (homeEl.value === "" || awayEl.value === "") return;
-
-    const home = parseInt(homeEl.value);
-    const away = parseInt(awayEl.value);
-    if (home > away) {
-        homeName.classList.add("pick-win");
-    } else if (away > home) {
-        awayName.classList.add("pick-win");
-    } else {
-        homeName.classList.add("pick-tie");
-        awayName.classList.add("pick-tie");
-    }
+    window.applyWinnerMarks(homeName, awayName, homeEl.value, awayEl.value);
 }
 
 // Pinta el subrayado al cargar (refleja predicciones ya guardadas en

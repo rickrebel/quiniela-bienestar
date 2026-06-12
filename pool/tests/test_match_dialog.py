@@ -47,10 +47,12 @@ class GroupPredictionsTests(SimpleTestCase):
 
 class DiffLabelTests(SimpleTestCase):
     def test_home_wins(self):
-        self.assertEqual(diff_label(2, "México", "Canadá"), "México por 2")
+        self.assertEqual(diff_label(2, "México", "Canadá"),
+                         "México gana por 2 goles")
 
-    def test_away_wins(self):
-        self.assertEqual(diff_label(-1, "México", "Canadá"), "Canadá por 1")
+    def test_away_wins_singular(self):
+        self.assertEqual(diff_label(-1, "México", "Canadá"),
+                         "Canadá gana por 1 gol")
 
     def test_draw(self):
         self.assertEqual(diff_label(0, "México", "Canadá"), "Empate")
@@ -157,4 +159,24 @@ class DialogPayloadPrivacyTests(TestCase):
     def test_group_labels_use_team_names(self):
         payload = self._payload_for(self.closed_match)
         labels = [g["label"] for g in payload["groups"]]
-        self.assertEqual(labels, ["México por 1", "Canadá por 1"])
+        self.assertEqual(labels, ["México gana por 1 gol",
+                                  "Canadá gana por 1 gol"])
+
+    def test_is_knockout_follows_stage(self):
+        self.assertFalse(self._payload_for(self.open_match)["is_knockout"])
+        self.assertTrue(self._payload_for(self.closed_match)["is_knockout"])
+
+    def test_can_record_requires_permission(self):
+        self.assertFalse(self._payload_for(self.open_match)["can_record"])
+
+    def test_can_record_with_flag_only_if_not_finished(self):
+        self.ana.can_record_results = True
+        self.ana.save()
+        self.assertTrue(self._payload_for(self.open_match)["can_record"])
+        # Terminado: ya no se ofrece la captura.
+        self.assertFalse(self._payload_for(self.closed_match)["can_record"])
+
+    def test_superuser_can_record_without_flag(self):
+        self.ana.is_superuser = True
+        self.ana.save()
+        self.assertTrue(self._payload_for(self.open_match)["can_record"])
