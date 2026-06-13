@@ -1,7 +1,9 @@
 // Pinta el tiempo restante para confirmar, a partir de data-deadline
 // (ISO en UTC). Refresca cada minuto. Usa day.js para parsear.
+// .deadline-note y no "countdown": daisyUI define un componente
+// .countdown que chocaría con la clase.
 (function () {
-    const el = document.querySelector(".countdown");
+    const el = document.querySelector(".deadline-note");
     if (!el || typeof dayjs === "undefined") {
         return;
     }

@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django_tailwind_cli",
+    "django_cotton",
     "tournament",
     "pool",
 ]
@@ -126,5 +128,15 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Tailwind v4 vía binario standalone (sin Node). USE_DAISY_UI hace que
+# se descargue tailwindcss-extra, una build del CLI con daisyUI dentro.
+# El dist (static/css/tailwind.css) es artefacto de build: va en
+# .gitignore y en deploy se genera con `manage.py tailwind build`
+# antes de collectstatic.
+TAILWIND_CLI_USE_DAISY_UI = True
+TAILWIND_CLI_VERSION = "2.8.3"
+TAILWIND_CLI_SRC_CSS = BASE_DIR / "static" / "css" / "source.css"
+TAILWIND_CLI_DIST_CSS = "css/tailwind.css"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

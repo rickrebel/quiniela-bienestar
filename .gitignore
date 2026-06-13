@@ -14,9 +14,19 @@ db/*.sqlite3
 
 # Respaldos de BD (traen datos personales de los jugadores)
 db/*.bak.sql
+db/dump_full.json
 
 # Archivos estáticos recolectados (collectstatic)
 staticfiles/
+
+# Tailwind: binario descargado y CSS compilado (artefactos de build;
+# en deploy: `manage.py tailwind build` antes de collectstatic)
+.django_tailwind_cli/
+static/css/tailwind.css
+
+# Capturas before/after de migraciones visuales
+before*.png
+after*.png
 
 # Capturas y snapshots generados por Playwright (MCP)
 .playwright-mcp/

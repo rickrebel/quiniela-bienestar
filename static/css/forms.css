@@ -6,8 +6,16 @@
 
 .login-title {
     font-family: sans-serif;
+    /* El preflight de Tailwind resetea h1 a font-size inherit (antes
+       el tamaño lo regalaba Bootstrap). */
+    font-size: 1.75rem;
     letter-spacing: 2px;
     margin: 12px 0 25px 0;
+}
+
+/* El preflight también deja <a> en color inherit. */
+.form-body a {
+    color: #8fa8c7;
 }
 .login-title::after {
     content: "";

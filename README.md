@@ -6,8 +6,10 @@ los guardan como borrador y, al enviarlos, reciben por correo un Excel con
 sus predicciones.
 
 Construida con **Django** (server-rendered, sin DRF), plantillas DTL y JS
-vanilla. PostgreSQL en producción, con respaldo en SQLite para desarrollo
-local.
+vanilla. Los estilos usan **Tailwind CSS v4 + daisyUI** (compilados con un
+binario standalone, sin Node) y los componentes de template reusables usan
+**django-cotton** (`templates/cotton/`). PostgreSQL en producción, con
+respaldo en SQLite para desarrollo local.
 
 El código se reparte en dos apps: `tournament` (datos deportivos: estadios,
 fases, equipos y partidos) y `pool` (usuarios y pronósticos). Los datos
@@ -110,11 +112,28 @@ python manage.py preregister correo@ejemplo.com "Nombre del Jugador"
 python manage.py createsuperuser
 ```
 
-## Correr el servidor localmente
+## CSS (Tailwind + daisyUI)
 
-- Antes de correr el servicio en producción, genera los archivos estáticos:
+No se necesita Node ni npm: `django-tailwind-cli` descarga solo el binario
+de Tailwind (variante `tailwindcss-extra`, que ya incluye daisyUI) en la
+versión fijada en `settings.py`. La fuente es `static/css/source.css` (tema
+y tokens) y el compilado `static/css/tailwind.css` **no se versiona**.
 
 ```bash
+# desarrollo: Django + watcher de Tailwind en un solo comando
+python manage.py tailwind runserver
+
+# o solo recompilar el CSS una vez
+python manage.py tailwind build
+```
+
+## Correr el servidor localmente
+
+- Antes de correr el servicio en producción, genera el CSS y los archivos
+  estáticos:
+
+```bash
+python manage.py tailwind build
 python manage.py collectstatic
 ```
 

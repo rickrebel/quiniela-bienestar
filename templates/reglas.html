@@ -4,17 +4,7 @@
 
 {% include 'header.html' %}
 
-<nav class="stage-tabs" aria-label="Fases">
-    <a class="stage-tab active" href="/reglas">
-        reglas
-    </a>
-    {% for tab in tabs %}
-    <a class="stage-tab"
-       href="{% url 'stage' tab.stage.key %}">
-        {{ tab.stage.short_name }}
-    </a>
-    {% endfor %}
-</nav>
+<c-stage-tabs :tabs="tabs" active="reglas" />
 
 <main class="content rules">
 
@@ -22,19 +12,19 @@
         <h6 class="rules-title">Puntaje por partido</h6>
         <ul class="rules-list">
             <li class="rule-row">
-                <span class="chip-pt chip-on rule-chip">R&nbsp;+3</span>
+                <c-chip state="on" class="mt-0.5 shrink-0 self-start">R&nbsp;+3</c-chip>
                 <span>Si atinas al resultado del partido (ganador o
                 empate): <b>3 puntos</b>.</span>
             </li>
             <li class="rule-row">
-                <span class="chip-pt chip-on rule-chip">Dif&nbsp;+1</span>
+                <c-chip state="on" class="mt-0.5 shrink-0 self-start">Dif&nbsp;+1</c-chip>
                 <span>Si atinas la diferencia de goles: <b>1 punto
                 extra</b> (excepto en empates). Este punto extra solo te
                 lo puedes llevar si le atinaste al resultado del
                 partido.</span>
             </li>
             <li class="rule-row">
-                <span class="chip-pt chip-on rule-chip">{% include 'icons/mira.html' %}&nbsp;+1</span>
+                <c-chip state="on" class="mt-0.5 shrink-0 self-start"><c-icon name="location_searching" class="text-xs" />&nbsp;+1</c-chip>
                 <span>Resultado exacto: <b>1 punto extra</b>.</span>
             </li>
         </ul>

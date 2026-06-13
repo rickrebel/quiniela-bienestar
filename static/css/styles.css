@@ -1,87 +1,7 @@
-.chip-title {
-  width: 100%;
-
-  display: flex;
-  align-items: center;
-
-  color: rgba(195, 167, 100, 0.7);
-  padding: 10px 12px;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-}
-
-/* Contador de la sección: "N/total" mientras se edita, "N pts" al enviar.
-   Empujado a la derecha tanto en el header de grupo como en el chip-title. */
-.section-count {
-  margin-left: auto;
-
-  color: rgba(195, 167, 100, 0.7);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-
-/* --- Tabs de fase y estados --- */
-/* Heredan los patrones de los chips del prototipo (sticky bajo el header,
-   scroll horizontal en móvil, acento dorado al activar). */
-.stage-tabs {
-  position: sticky;
-  top: 52px;
-
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-
-  padding: 8px 10px;
-
-  background: rgba(15, 17, 21, 0.92);
-  backdrop-filter: blur(10px);
-
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  z-index: 2;
-}
-
-.stage-tab {
-  flex: 0 0 auto;
-
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-
-  padding: 6px 12px;
-
-  border-radius: 7px;
-  border: 1px solid rgba(255,255,255,0.3);
-
-  background: var(--surface);
-  color: var(--muted);
-
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-
-  text-transform: uppercase;
-  text-decoration: none;
-  white-space: nowrap;
-
-  transition: all 180ms ease;
-}
-.stage-tab.active {
-  color: rgba(195, 167, 100, 0.8);
-
-  background: var(--gold-soft);
-  border-color: rgba(212, 175, 55, 0.5);
-
-  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.25);
-}
-
-/* "✓" de fase confirmada; no debe ensanchar el tab. */
-.tab-done {
-  color: var(--gold);
-  font-size: 11px;
-  line-height: 1;
-}
+/* CSS legacy en retirada: cada vista que migra a Tailwind/cotton borra
+   aquí sus bloques. Quedan (a) estilos de vistas aún no migradas
+   (board, rules) y (b) clases que JS crea o togglea en runtime
+   (match_dialog.js, submit.js, snackbar). */
 
 .content {
   padding: 12px 8px;
@@ -89,167 +9,10 @@
   margin: 0 auto;
 }
 
-/* Aviso informativo (fase no abierta / plazo terminado). */
-.stage-note {
-  margin: 4px auto 12px;
-  text-align: center;
-
-  color: var(--secundary);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Fila de conmutadores: grupo/fecha + variante de posiciones. */
-.switch-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-
-  margin: 6px auto 10px;
-}
-/* Conmutador grupo/fecha (solo fase de grupos): links segmentados que
-   recargan con ?view=fecha — el reagrupado es server-side, sin JS. */
-.view-switch {
-  display: flex;
-  gap: 2px;
-
-  width: fit-content;
-  padding: 3px;
-  border-radius: 10px;
-
-  background: var(--surface-2);
-}
-.view-opt {
-  padding: 4px 14px;
-  border-radius: 8px;
-
-  color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 600;
-  text-decoration: none;
-}
-/* El switch de posiciones usa botones (no recarga); mismo look que
-   los links del patrón. */
-button.view-opt {
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.view-opt.active {
-  background: var(--gold-soft);
-  color: var(--gold);
-}
-
-.group {
-  background: var(--surface);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 14px;
-
-  margin-bottom: 8px;
-  overflow: hidden;
-}
-
-/* Contenedor plano de eliminatorias: mismo marco que un grupo abierto,
-   pero sin el desplegable. Comparte caja con .group. */
-.knockout {
-  background: var(--surface);
-  border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 14px;
-
-  margin-bottom: 8px;
-  overflow: hidden;
-
-  padding-top: 12px;
-}
-.group-summary {
-  list-style: none;
-  cursor: pointer;
-
-  padding: 12px 14px;
-
-  display: flex;
-  position: relative;
-
-  align-items: center;
-
-  font-weight: 500;
-  font-size: 15.8px;
-  /* bottom: 2px;*/
-}
-
-.group-summary::-webkit-details-marker {
-  display: none;
-}
-.chevron {
-  width: 16px;
-  height: 16px;
-
-  display: grid;
-  place-items: center;
-
-  color: var(--gold);
-  opacity: 0.8;
-
-  transition:
-    transform .28s ease,
-    color .28s ease,
-    filter .28s ease;
-
-  margin: 0 5px;
-}
-
-.chevron svg {
-  width: 100%;
-  height: 100%;
-
-  stroke: currentColor;
-  stroke-width: 2.4;
-
-  fill: none;
-
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.group[open] .chevron {
-  transform: rotate(90deg);
-}
-/* Banderas de las 4 selecciones del grupo, en el encabezado. Algo más
-   pequeñas que las de los partidos; se atenúan al abrir el grupo para no
-   competir con su contenido. */
-.group-flags {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 40px;
-
-  transition: opacity .28s ease;
-}
-.group-flags img {
-  height: 18px;
-  width: auto;
-  max-width: 26px;
-  border-radius: 2px;
-}
-.group[open] .group-flags {
-  opacity: 0.4;
-}
-/* Fila de fecha en la vista por fecha: mismo armazón que el summary
-   del grupo pero sin desplegable. */
-.date-header {
-  cursor: default;
-}
-
 /* --- Tabla de posiciones del grupo: 3 variantes server-rendered,
-   standings.js conmuta `hidden`; sin JS queda visible la mix. --- */
-.standings {
-  border-top: 2.5px solid rgba(255,255,255,.2);
-  padding: 8px 14px 12px;
-}
+   standings.js conmuta `hidden`; sin JS queda visible la mix.
+   CSS conservado a propósito (chico y autocontenido); el markup vive
+   en cotton/standings_table.html. --- */
 .standings-table {
   width: 100%;
   border-collapse: collapse;
@@ -304,104 +67,6 @@ button.view-opt {
   font-weight: 700;
 }
 
-/* Gutters fijos a ambos lados (estén o no el código de grupo y los
-   puntos): así la columna del marcador queda alineada entre cards
-   terminadas y por jugar, en ambas vistas. */
-.match-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  border-top: 2.5px solid rgba(255,255,255,.2);
-  padding-top: 10px;
-  padding-bottom: 10px;
-  padding-left: 2.5rem;
-  padding-right: 2rem;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-/* Solo en la fase FINAL: nombre del partido (Final / Tercer lugar). */
-.match-code {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 0.82rem;
-}
-.match-code .match-name {
-  font-weight: 700;
-  color: rgba(195, 167, 100, 0.85);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-/* Resto de eliminatoria: token del bracket al margen izquierdo. */
-.match-side-code {
-  position: absolute;
-  left: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 0.8rem;
-  color: rgba(195, 167, 100, 0.85);
-  font-variant-numeric: tabular-nums;
-}
-.match {
-  align-items: center;
-  display: grid;
-  grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr);
-  /* colors */
-  background: #1e2536;
-  color: var(--text);
-  /* sizes */
-  gap: 7px;
-  width: 100%;
-}
-.match div {
-  align-items: center;
-  display: flex;
-}
-
-.team {
-  gap: 6px;
-}
-.team:first-child {
-  justify-content: flex-end;
-  text-align: end;
-}
-/* Banderas completas (sin recorte): width/height son solo límites y cada
-   bandera conserva su proporción real. Relaciones de aspecto distintas
-   (Suiza ~1:1, Catar ~28:11) topan unas en el ancho y otras en el alto, así
-   que el ancho efectivo varía entre selecciones. Sin object-fit: al no fijar
-   ambas dimensiones, la imagen ya mantiene su proporción sola. */
-.team img {
-  max-width: 30px;
-  max-height: 24px;
-  border-radius: 3px;
-}
-.team span {
-  line-height: 1.1;
-  font-size: 15px;
-  font-weight: 600;
-}
-/* Bandera como emoji cuando el equipo no tiene escudo; ocupa el mismo
-   hueco que .team img para no descuadrar la fila. */
-.flag-emoji {
-  display: inline-grid;
-  place-items: center;
-
-  width: 30px;
-  height: 20px;
-
-  font-size: 18px;
-  line-height: 1;
-}
-/* Equipo aún no definido en eliminatorias ("2A", "W74"). Clase propia
-   (no "placeholder") para evitar el skeleton .placeholder de Bootstrap. */
-.team .team-placeholder {
-  color: var(--muted);
-  font-style: italic;
-  font-weight: 500;
-  opacity: 0.7;
-}
 /* Subraya el país que ganaría según el marcador previsto; empate marca
    ambos con un trazo más delgado. submit.js pone/quita estas clases. */
 .team span.pick-win,
@@ -419,191 +84,8 @@ button.view-opt {
   text-underline-offset: 3px;
 }
 
-.score {
-  gap: 4px;
-}
-.score span {
-  font-size: 14px;
-  font-weight: 700;
-  opacity: .7;
-}
-.score input {
-  border: none;
-  border-radius: 6px;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
-  text-align: center;
-  outline: none;
-  /* colors */
-  background:#4b5563;
-  color: white;
-  /* fonts */
-  font-size: 18px;
-  font-weight: 700;
-  /* sizes */
-  height: 26px;
-  padding: 0;
-  width: 30px;
-}
-/* Deshabilitado: estilo fantasma (sin relleno gris sólido). Vacío se ve
-   como hueco; con predicción conserva el número visible. */
-.score input:disabled {
-  background: transparent;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
-  color: var(--text);
-  cursor: default;
-}
-.score input::-webkit-inner-spin-button,
-.score input::-webkit-outer-spin-button {
-  -webkit-appearance:none;
-  margin:0;
-}
-
-/* --- Partido terminado: marcador real, fila TÚ y puntos --- */
-/* Marcador real: número dorado translúcido sin caja, más grande que
-   los inputs para destacar. Conserva el ancho/alto de la caja para no
-   mover el centrado respecto a la fila TÚ. Doble clase: sin ella
-   perdería contra ".score span" (0-1-1) en font-size y opacity. */
-.score .score-final {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 26px;
-
-  color: var(--gold);
-  opacity: 0.75;
-  font-size: 24px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-/* Tanda de penales, orden FIFA: 3 (4) - (2) 3. */
-.score-pens {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-/* Total del partido al borde derecho: número grande y "pts" debajo. */
-.match-points {
-  position: absolute;
-  right: 0.2rem;
-  top: 50%;
-  transform: translateY(-50%);
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
-}
-.points-num {
-  color: var(--gold);
-  font-size: 22px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.points-unit {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.match-points.points-zero .points-num {
-  color: var(--muted);
-}
-.match-points.points-none {
-  color: var(--muted);
-}
-
-/* Fila TÚ: predicción centrada para quedar justo debajo del marcador
-   real (ambos al 100% del mismo content box, así comparten eje); chips
-   de desglose absolutos al borde derecho. Sustituye a .meta en partidos
-   terminados (misma altura de tarjeta). */
-.result-sub {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 100%;
-
-  font-size: 12px;
-  color: var(--muted);
-}
-.your-pick {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-}
-/* "TÚ:" fuera del flujo: el centrado de la fila lo definen solo las
-   cajitas y el guion, y así queda en el mismo eje que el marcador
-   real de arriba. */
-.pick-label {
-  position: absolute;
-  right: calc(100% + 4px);
-}
-/* Caja de la predicción: misma receta que el input deshabilitado
-   (fantasma) pero algo más baja y con letra menor, para subordinarla
-   al marcador real dorado. */
-.score-mini {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 20px;
-  border-radius: 6px;
-
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.15);
-
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-.pick-dash {
-  font-weight: 700;
-  opacity: .7;
-}
-.chips {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-
-  display: inline-flex;
-  gap: 5px;
-}
-.chip-pt {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 2px 6px;
-  border-radius: 6px;
-
-  background: var(--surface-2);
-
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-/* Indicador (letra/ícono + ":") tenue; el valor hereda opacidad
-   plena del chip. */
-.chip-ind {
-  display: inline-flex;
-  align-items: center;
-  opacity: 0.6;
-}
-.chip-on {
-  background: var(--gold-soft);
-  color: var(--gold);
-}
-.chip-na {
-  opacity: 0.5;
-}
+/* Mira del marcador exacto (SVG inline icons/mira.html); la usa el
+   leaderboard. En vistas migradas la sustituye <c-icon>. */
 .icon-mira {
   width: 12px;
   height: 12px;
@@ -743,12 +225,6 @@ button.view-opt {
   color: var(--text);
   font-weight: 700;
 }
-/* El chip no se encoge ni se desalinea con textos de varias líneas. */
-.rule-chip {
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 2px;
-}
 .rules-note {
   margin: 10px 0 0;
 
@@ -801,8 +277,11 @@ button.view-opt {
 @keyframes live-pulse {
   50% { opacity: 0.45; }
 }
-/* Mini-bandera del país de la sede: mismo criterio de límites, completa. */
+/* Mini-bandera del país de la sede: mismo criterio de límites, completa.
+   inline-block explícito: el preflight de Tailwind hace block toda img
+   y rompería la línea de la sede. */
 .meta-flag {
+  display: inline-block;
   max-width: 20px;
   max-height: 14px;
   margin-left: 6px;
@@ -831,102 +310,8 @@ button.view-opt {
   cursor: pointer;
 }
 
-.actions {
-  position: sticky;
-  bottom: 0;
-  padding:
-    10px
-    8px
-    calc(10px + env(safe-area-inset-bottom))
-    8px;
-  border-top: 1px solid rgba(212,175,55,.4);;
-  z-index: 1000;
-  background-color: rgba(15, 17, 21, 0.92);
-}
-.actions-layout {
-  display:flex;
-  max-width: 900px;
-  margin: 0 auto;
-  gap: 8px;
-  /* justify-content:space-around;*/
-}
-/* Estado cerrado de éxito: reemplaza a los botones, no es clicable. */
-.action-done {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-
-  margin: 0 auto;
-  padding: 0 16px;
-  height: 44px;
-
-  color: #6bbf8a;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .04em;
-  text-transform: uppercase;
-}
-.done-icon {
-  display: inline-grid;
-  place-items: center;
-
-  width: 20px;
-  height: 20px;
-
-  border-radius: 999px;
-  background: rgba(107, 191, 138, 0.16);
-
-  font-size: 12px;
-}
-
-/* Aviso discreto del plazo restante, bajo los botones. */
-.countdown {
-  margin: 6px auto 0;
-  text-align: center;
-
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-#saving-overlay {
-    position: fixed;
-    inset: 0;
-
-    background: rgba(18, 18, 18, 0.85);
-
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-
-    gap: 1rem;
-
-    z-index: 9999;
-}
-
-#saving-overlay[hidden] {
-    display: none;
-}
-
-.spinner {
-    width: 48px;
-    height: 48px;
-
-    border: 4px solid #444;
-    border-top-color: #d4af37;
-
-    border-radius: 50%;
-
-    animation: spin 1s linear infinite;
-}
-
-#saving-overlay p {
-    color: #e8dcc0;
-}
-
-/* Diálogo de confirmación de envío. Reusa .match-card, .group-summary,
-   .actions y .submit-btn; aquí solo va el armazón del modal. */
+/* Diálogo de confirmación de envío. Reusa .match-card, .group-summary
+   y .submit-btn; aquí solo va el armazón del modal. */
 .send-dialog {
   width: min(440px, 92vw);
   max-height: 85vh;
@@ -977,15 +362,6 @@ button.view-opt {
   margin-top: 0;
   padding-top: 6px;
   border-top: none;
-}
-.send-dialog .actions {
-  position: static;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
 }
 
 /* Aviso de autoguardado: discreto, asoma desde abajo (sobre el footer). */
@@ -1045,14 +421,6 @@ button.view-opt {
 /* --- Dialog de detalle de partido + predicciones de todos ---
    Autocontenido: las clases day-*/rivals-* vienen del módulo
    match_dialog.js; aquí se definen solo dentro del dialog. */
-.match-card[data-dialog-match] {
-  cursor: pointer;
-}
-/* Con la fase cerrada los inputs deshabilitados se tragarían el tap;
-   dejarlos pasar hace que toda la tarjeta abra el dialog. */
-.match-card[data-dialog-match] input:disabled {
-  pointer-events: none;
-}
 .match-dialog .send-dialog-body {
   padding: 12px 16px;
 }
@@ -1191,8 +559,10 @@ button.view-opt {
   text-align: center;
   text-transform: uppercase;
 }
-/* Banderita del equipo que gana en el grupo, tras la frase. */
+/* Banderita del equipo que gana en el grupo, tras la frase.
+   inline-block: el preflight de Tailwind vuelve block toda img. */
 .pred-group-head img {
+  display: inline-block;
   max-width: 18px;
   max-height: 13px;
   margin-left: 6px;

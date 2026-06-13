@@ -1,6 +1,9 @@
 {% load static %}
 {# Una variante de la tabla de posiciones del grupo. #}
-{# standings.js conmuta `hidden`; sin JS queda visible la mix. #}
+{# standings.js conmuta `hidden` por data-variant; sin JS queda #}
+{# visible la mix. Su CSS (.standings-table) sigue en styles.css: es #}
+{# chico, autocontenido y de baja duplicación. #}
+{# Uso: <c-standings-table :table="table" /> #}
 <table class="standings-table" data-variant="{{ table.variant }}"
        {% if table.variant != 'mix' %}hidden{% endif %}>
     <thead>

@@ -1,0 +1,147 @@
+{% load static %}
+{# Tarjeta de partido: cabecera (nombre/código según fase y vista), #}
+{# fila equipos-marcador y pie (meta de fecha/sede por jugar, o #}
+{# resultado: fila TÚ + chips + puntos). #}
+{# Hooks que JS espera y no deben renombrarse: [data-dialog-match] #}
+{# (match_dialog.js), .match[data-match-id] + [data-field] + .score + #}
+{# .team + .team-placeholder (submit.js), .meta (match_dialog.js la #}
+{# reconstruye con el mismo markup y usa su CSS), pick-win/pick-tie #}
+{# (las pone JS; su CSS vive en styles.css). #}
+{# Uso: <c-match-card :match="match" :stage="stage" state="{{ state }}" #}
+{#        :can_edit="can_edit" :is_group_stage="is_group_stage" #}
+{#        :by_date="by_date" /> #}
+<section class="match-card relative mx-2 flex cursor-pointer flex-col
+                items-center justify-center gap-2 border-t-[2.5px]
+                border-white/20 py-2.5 pl-10 pr-8"
+         data-dialog-match="{{ match.id }}">
+    {% if stage.key == 'FINAL' %}
+    <div class="flex items-baseline gap-2 text-[0.82rem]">
+        <span class="font-bold uppercase tracking-[0.04em]
+                     text-[#c3a764]/85">{{ match.name }}</span>
+    </div>
+    {% elif not is_group_stage %}
+    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[0.8rem]
+                 tabular-nums text-[#c3a764]/85">{{ match.of_number }}</span>
+    {% elif by_date %}
+    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[0.8rem]
+                 tabular-nums text-[#c3a764]/85">{{ match.home_team.group_name }}</span>
+    {% endif %}
+
+    <div class="match grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]
+                items-center gap-[7px] bg-neutral"
+         data-match-id="{{ match.id }}">
+        <div class="team flex items-center justify-end gap-1.5 text-right">
+            {% if match.home_team %}
+            <span class="{{ match.home_mark }} text-[15px] font-semibold
+                         leading-[1.1]">{{ match.home_team.name_es }}</span>
+            {% if match.home_team.flag_path %}
+            <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                 src="{% static match.home_team.flag_path %}"
+                 alt="{{ match.home_team.name_es }}">
+            {% elif match.home_team.crest %}
+            <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                 src="{{ match.home_team.crest }}" alt="">
+            {% endif %}
+            {% else %}
+            <span class="team-placeholder font-medium italic text-muted
+                         opacity-70">{{ match.home_placeholder }}</span>
+            {% endif %}
+        </div>
+
+        <div class="score flex items-center gap-1">
+            {% if match.is_finished %}
+            {# Orden FIFA con penales: 3 (4) - (2) 3 #}
+            <span class="flex h-[26px] w-[30px] items-center justify-center
+                         text-2xl font-extrabold leading-none tabular-nums
+                         text-gold/75">{{ match.home_goals }}</span>
+            {% if match.decided_by == 'PENALTY_SHOOTOUT' %}
+            <span class="text-[11px] font-semibold tabular-nums
+                         text-muted">({{ match.home_penalties }})</span>
+            {% endif %}
+            <span class="text-sm font-bold opacity-70">-</span>
+            {% if match.decided_by == 'PENALTY_SHOOTOUT' %}
+            <span class="text-[11px] font-semibold tabular-nums
+                         text-muted">({{ match.away_penalties }})</span>
+            {% endif %}
+            <span class="flex h-[26px] w-[30px] items-center justify-center
+                         text-2xl font-extrabold leading-none tabular-nums
+                         text-gold/75">{{ match.away_goals }}</span>
+            {% elif match.home_team and match.away_team %}
+            <input type="number" min="0" step="1"
+                   class="h-[26px] w-[30px] rounded-md border-none
+                          bg-[#4b5563] p-0 text-center text-lg font-bold
+                          text-white outline-none
+                          shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]
+                          disabled:pointer-events-none disabled:cursor-default
+                          disabled:bg-transparent disabled:text-base-content
+                          disabled:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
+                   data-field="home_goals"
+                   value="{{ match.predicted_home }}"
+                   {% if not can_edit %}disabled{% endif %}>
+            <span class="text-sm font-bold opacity-70">-</span>
+            <input type="number" min="0" step="1"
+                   class="h-[26px] w-[30px] rounded-md border-none
+                          bg-[#4b5563] p-0 text-center text-lg font-bold
+                          text-white outline-none
+                          shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]
+                          disabled:pointer-events-none disabled:cursor-default
+                          disabled:bg-transparent disabled:text-base-content
+                          disabled:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
+                   data-field="away_goals"
+                   value="{{ match.predicted_away }}"
+                   {% if not can_edit %}disabled{% endif %}>
+            {% else %}
+            <span class="text-sm font-bold opacity-70">&ndash;</span>
+            {% endif %}
+        </div>
+
+        <div class="team flex items-center gap-1.5">
+            {% if match.away_team %}
+            {% if match.away_team.flag_path %}
+            <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                 src="{% static match.away_team.flag_path %}"
+                 alt="{{ match.away_team.name_es }}">
+            {% elif match.away_team.crest %}
+            <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                 src="{{ match.away_team.crest }}" alt="">
+            {% endif %}
+            <span class="{{ match.away_mark }} text-[15px] font-semibold
+                         leading-[1.1]">{{ match.away_team.name_es }}</span>
+            {% else %}
+            <span class="team-placeholder font-medium italic text-muted
+                         opacity-70">{{ match.away_placeholder }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if match.is_finished %}
+    <div class="relative flex w-full items-center justify-center text-xs
+                text-muted">
+        <span class="relative inline-flex items-center gap-1
+                     whitespace-nowrap">
+            <span class="absolute right-[calc(100%+4px)]">TÚ:</span>{% if match.chips %}<span class="inline-flex h-5 w-[26px] items-center justify-center rounded-md text-[13px] font-bold tabular-nums text-base-content shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]">{{ match.predicted_home }}</span><span class="font-bold opacity-70">-</span><span class="inline-flex h-5 w-[26px] items-center justify-center rounded-md text-[13px] font-bold tabular-nums text-base-content shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]">{{ match.predicted_away }}</span>{% else %}&mdash;{% endif %}
+        </span>
+        {% if match.chips %}
+        <span class="absolute right-0 top-1/2 inline-flex -translate-y-1/2
+                     gap-[5px]">
+            {% for chip in match.chips %}
+            <c-chip state="{{ chip.state }}"><span class="inline-flex items-center opacity-60">{% if chip.icon %}<c-icon name="location_searching" class="text-xs" />{% else %}{{ chip.label }}{% endif %}:</span>{{ chip.text }}</c-chip>
+            {% endfor %}
+        </span>
+        {% endif %}
+    </div>
+    <span class="absolute right-[0.2rem] top-1/2 flex -translate-y-1/2
+                 flex-col items-center leading-none
+                 {% if match.points_kind == 'none' %}text-muted{% endif %}">
+        {% if match.points_kind == 'none' %}&mdash;{% else %}<span class="text-[22px] font-extrabold tabular-nums {% if match.points_kind == 'zero' %}text-muted{% else %}text-gold{% endif %}">{{ match.user_points }}</span><span class="mt-0.5 text-[10px] text-muted">pts</span>{% endif %}
+    </span>
+    {% else %}
+    {# Bloque .meta intacto (clases legacy): match_dialog.js construye #}
+    {# este mismo markup y ambos comparten su CSS en styles.css. #}
+    <div class="meta" data-utc="{{ match.datetime.isoformat }}">
+        <span class="meta-time">{% if match.is_live %}<span class="live-tag">En juego</span>{% else %}{{ match.local_time }}{% endif %}</span>
+        <span class="meta-date">{{ match.local_day }}</span>
+        <span class="meta-place">{{ match.stadium.name_es|default:match.stadium.city }}{% if match.stadium.flag_path %}<img class="meta-flag" src="{% static match.stadium.flag_path %}" alt="{{ match.stadium.get_country_display }}">{% endif %}</span>
+    </div>
+    {% endif %}
+</section>

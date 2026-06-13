@@ -13,6 +13,8 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 `D:\env\quiniela\Scripts\python.exe`).
 
 - `python manage.py runserver` — local dev server (http://localhost:8000/)
+- `python manage.py tailwind runserver` — dev server + Tailwind watcher;
+  `tailwind build` recompiles once (needed before `collectstatic`).
 - `python manage.py check` — validate models/URLs/imports without a DB
 - `python manage.py test pool` — run the test suite (`pool/tests/`)
 - Seed (in order; each depends on the prior — `tournament` app):
@@ -48,6 +50,14 @@ The project venv lives at `D:\env\quiniela` (interpreter:
 - Data seeded from two sources committed under `db/jsons/`: OF (openfootball,
   base seed) and FD (football-data.org, `fd_id` + results). Manual overrides
   (e.g. Spanish names) in `db/jsons/manual/`; old files in `db/jsons/legacy/`.
+- **Frontend stack**: Tailwind v4 + daisyUI via `django-tailwind-cli`
+  (standalone `tailwindcss-extra` binary, no Node; version pinned in
+  settings). Source: `static/css/source.css` (daisyUI theme + tokens);
+  dist `static/css/tailwind.css` is gitignored. Reusable template
+  components are django-cotton (`templates/cotton/`, used as
+  `<c-match-card :match="m" />`). Icons: Material Symbols subset via the
+  Google Fonts `<link>` in `base.html` — adding an icon means adding its
+  name to `icon_names` there.
 
 ## Gotchas
 
@@ -101,6 +111,25 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   the `football-data-matches` skill). A match renders as "live" via a 2-hour
   window in `views/stages.py`, not real-time data. The `standing` context
   processor runs on every template and must degrade to `{}` on any error.
+- **JS↔markup contract.** Several classes are pure JS hooks (no CSS of their
+  own anymore): `.content[data-stage|state]`, `.group`/`.knockout`,
+  `.group-summary`, `.chip-title`, `.chevron`, `.group-flags`,
+  `.section-count`, `.match-card`, `.match[data-match-id]`,
+  `[data-field=*_goals]`, `.score`, `.team`, `.team-placeholder`, `.meta`,
+  `.deadline-note`. Renaming them in templates breaks `submit.js`,
+  `standings.js`, `match_dialog.js` or `countdown.js`. `pick-win`/`pick-tie`,
+  `#snackbar .show`, `.view-opt.active` are toggled by JS at runtime, so
+  they keep real CSS (styles.css or source.css), never inline utilities.
+- **styles.css is legacy in retirement.** Unlayered CSS always beats
+  Tailwind's layered utilities, so when migrating a view you must DELETE its
+  old rules from `styles.css` or they silently override the new classes.
+  What remains there: unmigrated views (board, rules), DOM that
+  `match_dialog.js` builds (`day-*`, `rivals-*`, `record-*`), the dialogs'
+  shell (`send-dialog`), `.submit-btn` and `#snackbar`.
+- **Don't name anything `.countdown`** (daisyUI component clashes; the
+  deadline footer uses `.deadline-note`). Tailwind's preflight also makes
+  every `img` display:block — inline flags need an explicit
+  `inline-block` (see `.meta-flag`, `.pred-group-head img`).
 
 ## Deploy
 
@@ -108,5 +137,6 @@ Targets AWS (EC2 + RDS Postgres), nginx terminating TLS in front of gunicorn
 (`SECURE_PROXY_SSL_HEADER` is set; prod also needs `CSRF_TRUSTED_ORIGINS` or
 POSTs get 403, and `SITE_URL` so recovery emails link to the real domain).
 Env vars are parsed via `config/get_env.py`; production reads `POSTGRES_*`,
-local dev with no `POSTGRES_DB` uses SQLite. Run `collectstatic` before
-serving in production.
+local dev with no `POSTGRES_DB` uses SQLite. Run `manage.py tailwind build`
+(the dist CSS is gitignored) and then `collectstatic` before serving in
+production.

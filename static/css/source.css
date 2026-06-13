@@ -1,0 +1,85 @@
+/* Fuente de Tailwind v4 + daisyUI. Se compila a css/tailwind.css con
+   `manage.py tailwind build|watch` (binario tailwindcss-extra, sin
+   Node). El dist no se versiona. */
+
+/* source(none) apaga la autodetección (escanearía staticfiles/ y
+   db/jsons/); solo templates y los JS que arman DOM con clases. */
+@import "tailwindcss" source(none);
+@source "../../templates";
+@source "../*.js";
+
+@plugin "daisyui" {
+  themes: sanginiela --default;
+}
+
+/* Tema único: la paleta dark/dorado que ya vivía en base.css. */
+@plugin "daisyui/theme" {
+  name: "sanginiela";
+  default: true;
+  color-scheme: dark;
+
+  --color-base-100: #0f1115;
+  --color-base-200: #232732;
+  --color-base-300: #1f2430;
+  --color-base-content: #e7e7e7;
+
+  --color-primary: #d4af37;
+  --color-primary-content: #0f1115;
+  --color-secondary: #b8c0cc;
+  --color-secondary-content: #0f1115;
+  --color-accent: #e5c55c;
+  --color-accent-content: #0f1115;
+  --color-neutral: #1e2536;
+  --color-neutral-content: #e7e7e7;
+
+  --color-info: #8fa8c7;
+  --color-info-content: #0f1115;
+  --color-success: #6bbf8a;
+  --color-success-content: #0f1115;
+  --color-warning: #e5c55c;
+  --color-warning-content: #0f1115;
+  --color-error: #e57373;
+  --color-error-content: #0f1115;
+
+  /* Radios actuales: cajas 14px, campos 6-7px, pills redondas. */
+  --radius-box: 0.875rem;
+  --radius-field: 0.4375rem;
+  --radius-selector: 2rem;
+}
+
+/* Tokens propios fuera de la semántica daisyUI; generan utilidades
+   (text-gold, bg-gold-soft, text-muted, bg-surface...). */
+@theme {
+  --color-gold: #d4af37;
+  --color-gold-soft: rgba(212, 175, 55, 0.14);
+  --color-muted: rgb(180, 180, 180);
+  --color-soft: #b8c0cc;
+  --color-surface: #232732;
+  --color-surface-2: #1f2430;
+}
+
+/* Todos los <input type=number> son marcadores: nunca queremos los
+   spinners nativos (tarjetas, captura de resultado del dialog). */
+@layer base {
+  input[type="number"] {
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+/* Clases con estado que JS togglea (no se pueden expresar como
+   utilidades en el markup porque la clase cambia en runtime). */
+@layer components {
+  /* Opción de un conmutador segmentado; standings.js togglea .active. */
+  .view-opt {
+    @apply cursor-pointer rounded-lg border-0 bg-transparent px-3.5
+      py-1 text-[12.5px] font-semibold text-muted no-underline;
+  }
+  .view-opt.active {
+    @apply bg-gold-soft text-gold;
+  }
+}

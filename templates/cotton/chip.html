@@ -1,0 +1,12 @@
+{# Chip de puntaje (desglose en tarjetas y reglas). state: "on" #}
+{# (dorado, punto ganado), "na" (atenuado, no aplica) u omitido #}
+{# (neutro). El contenido va por slot. #}
+{# Uso: <c-chip state="on">R&nbsp;+3</c-chip> #}
+<c-vars state="" />
+<span class="inline-flex items-center gap-0.5 whitespace-nowrap
+             rounded-md px-1.5 py-0.5 text-[11px] font-semibold
+             tabular-nums
+             {% if state == 'on' %}bg-gold-soft text-gold
+             {% elif state == 'na' %}bg-surface-2 text-muted opacity-50
+             {% else %}bg-surface-2 text-muted{% endif %}
+             {{ class }}">{{ slot }}</span>

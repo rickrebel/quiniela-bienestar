@@ -15,9 +15,10 @@ def create_stage_users(
     """Materializa un StageUser por cada fase al dar de alta un usuario.
 
     ``ignore_conflicts`` respeta el UniqueConstraint (user, stage) por si
-    la señal se redispara; solo crea las filas que falten.
+    la señal se redispara; solo crea las filas que falten. ``raw`` evita
+    duplicar contra los StageUser que un ``loaddata`` trae en el fixture.
     """
-    if not created:
+    if kwargs.get("raw") or not created:
         return
     StageUser.objects.bulk_create(
         [StageUser(user=instance, stage=s) for s in Stage.objects.all()],
