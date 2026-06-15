@@ -23,9 +23,12 @@ class ScoreDetail:
     """Puntos con desglose. ``exact`` y ``diff_bonus`` son disjuntos:
     un 4 puede ser exacto-empate o ganador+diferencia, así que los
     conteos deben salir de estos flags, nunca del valor numérico.
+    ``outcome`` no es disjunto: marca todo acierto de resultado
+    (exacto y diferencia lo implican).
     """
 
     points: int
+    outcome: bool
     exact: bool
     diff_bonus: bool
 
@@ -57,19 +60,19 @@ def score_detail(
     actual_result = _match_result(actual_home, actual_away)
 
     if predicted_result != actual_result:
-        return ScoreDetail(points=0, exact=False, diff_bonus=False)
+        return ScoreDetail(points=0, outcome=False, exact=False, diff_bonus=False)
 
     is_draw = actual_result == DRAW
     exact_score = (pred_home, pred_away) == (actual_home, actual_away)
     if exact_score:
         # El exacto ya incluye la diferencia: 3 + 1 + 1 (o 3 + 1 en empate).
         points = 4 if is_draw else 5
-        return ScoreDetail(points=points, exact=True, diff_bonus=False)
+        return ScoreDetail(points=points, outcome=True, exact=True, diff_bonus=False)
 
     same_difference = (pred_home - pred_away) == (actual_home - actual_away)
     diff_bonus = same_difference and not is_draw
     points = 4 if diff_bonus else 3
-    return ScoreDetail(points=points, exact=False, diff_bonus=diff_bonus)
+    return ScoreDetail(points=points, outcome=True, exact=False, diff_bonus=diff_bonus)
 
 
 def calculate_points(

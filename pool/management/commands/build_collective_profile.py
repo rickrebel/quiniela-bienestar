@@ -12,7 +12,6 @@ condición clave de la sabiduría colectiva (Lorenz et al., PNAS 2011).
 
 from collections import defaultdict
 
-from django.contrib.auth import get_user_model
 from django.core.management.base import (
     BaseCommand, CommandError, CommandParser)
 from django.db import transaction
@@ -20,11 +19,10 @@ from django.utils import timezone
 
 from pool.models import Prediction, StageUser
 from pool.services.aggregation import (
-    VIRTUAL_EMAIL, VIRTUAL_NAME, AggregateResult, aggregate_score)
+    VIRTUAL_NAME, AggregateResult, aggregate_score,
+    get_or_create_virtual_user)
 from pool.services.excel import generate_excel
 from tournament.models import Match, Stage
-
-User = get_user_model()
 
 
 class Command(BaseCommand):
@@ -52,7 +50,7 @@ class Command(BaseCommand):
                 "predicciones. Usa --force solo en pruebas."
             )
 
-        virtual = self._get_virtual_user()
+        virtual = get_or_create_virtual_user()
         stage_user, _ = StageUser.objects.get_or_create(
             user=virtual, stage=stage)
         if stage_user.sent_at and not options["force"]:
@@ -106,22 +104,6 @@ class Command(BaseCommand):
             f"Perfil «{VIRTUAL_NAME}» generado: {len(results)} partidos "
             f"de {stage.name}, Excel enviado a {virtual.email}."
         ))
-
-    def _get_virtual_user(self) -> User:
-        """Usuario virtual, creándolo en el primer uso.
-
-        ``create_user`` deja contraseña inusable e ``is_active=False``;
-        junto con la guarda de ``login_view`` nadie puede entrar con él.
-        La señal post_save le materializa sus StageUser.
-        """
-        user = User.objects.filter(email=VIRTUAL_EMAIL).first()
-        if user is None:
-            user = User.objects.create_user(
-                email=VIRTUAL_EMAIL,
-                first_name=VIRTUAL_NAME,
-                is_virtual=True,
-            )
-        return user
 
     def _predictions_by_match(
         self, stage: Stage

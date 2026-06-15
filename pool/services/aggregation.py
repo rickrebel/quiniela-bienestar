@@ -16,6 +16,27 @@ VIRTUAL_EMAIL = "rickrebel+ignorancia@gmail.com"
 VIRTUAL_NAME = "Ignorancia colectiva"
 
 
+def get_or_create_virtual_user():
+    """Usuario virtual, creándolo en el primer uso.
+
+    ``create_user`` deja contraseña inusable e ``is_active=False``;
+    junto con la guarda de ``login_view`` nadie puede entrar con él.
+    La señal post_save le materializa sus StageUser.
+    """
+    # Import local: el resto del módulo es matemática pura y debe seguir
+    # siendo importable sin tocar los modelos.
+    from pool.models import User
+
+    user = User.objects.filter(email=VIRTUAL_EMAIL).first()
+    if user is None:
+        user = User.objects.create_user(
+            email=VIRTUAL_EMAIL,
+            first_name=VIRTUAL_NAME,
+            is_virtual=True,
+        )
+    return user
+
+
 @dataclass(frozen=True)
 class AggregateResult:
     """Marcador agregado de un partido, con su evidencia.

@@ -12,18 +12,19 @@
             <span class="board-pos">#</span>
             <span></span>
             <span class="board-pts">pts</span>
+            <span class="board-stat" title="Resultados atinados">{% include 'icons/palomita.html' %}</span>
             <span class="board-stat" title="Diferencias acertadas">dif</span>
             <span class="board-stat" title="Marcadores exactos">{% include 'icons/mira.html' %}</span>
         </header>
 
         {% for row in rows %}
-        <div class="board-row{% if row.user == user %} board-row--me{% endif %}{% if not row.has_played %} board-row--idle{% endif %}">
-            <span class="board-pos">{% if row.position == 1 %}🥇{% elif row.position == 2 %}🥈{% elif row.position == 3 %}🥉{% else %}{{ row.position }}{% endif %}</span>
+        <div class="board-row{% if row.user == user %} board-row--me{% endif %}{% if row.user.is_virtual %} board-row--virtual{% endif %}">
+            <span class="board-pos">{% if row.user.is_virtual %}-{% elif row.position == 1 %}🥇{% elif row.position == 2 %}🥈{% elif row.position == 3 %}🥉{% else %}{{ row.position }}{% endif %}</span>
             <span class="board-name">
                 {{ row.user.first_name|default:row.user.email }}
-                {% if not row.has_played %}<small class="board-note">sin envío</small>{% endif %}
             </span>
             <span class="board-pts">{{ row.points }}</span>
+            <span class="board-stat">{{ row.outcomes }}</span>
             <span class="board-stat">{{ row.diffs }}</span>
             <span class="board-stat">{{ row.exact }}</span>
         </div>

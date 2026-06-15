@@ -116,8 +116,10 @@ python manage.py createsuperuser
 
 No se necesita Node ni npm: `django-tailwind-cli` descarga solo el binario
 de Tailwind (variante `tailwindcss-extra`, que ya incluye daisyUI) en la
-versión fijada en `settings.py`. La fuente es `static/css/source.css` (tema
-y tokens) y el compilado `static/css/tailwind.css` **no se versiona**.
+versión fijada en `settings.py`. La fuente es `assets/css/source.css` (tema
+y tokens; vive fuera de `static/` para que `collectstatic` no intente
+procesar su `@import "tailwindcss"`) y el compilado
+`static/css/tailwind.css` **no se versiona**.
 
 ```bash
 # desarrollo: Django + watcher de Tailwind en un solo comando

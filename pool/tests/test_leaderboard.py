@@ -60,6 +60,7 @@ class BuildLeaderboardTests(TestCase):
 
         row = build_leaderboard().row_for(self.ana)
         self.assertEqual(row.points, 5)
+        self.assertEqual(row.outcomes, 1)
         self.assertEqual(row.exact, 1)
         self.assertEqual(row.diffs, 0)
 
@@ -71,6 +72,8 @@ class BuildLeaderboardTests(TestCase):
 
         row = build_leaderboard().row_for(self.ana)
         self.assertEqual(row.points, 8)
+        # outcomes no es disjunto: el exacto y la diferencia cuentan ambos.
+        self.assertEqual(row.outcomes, 2)
         self.assertEqual(row.exact, 1)
         self.assertEqual(row.diffs, 1)
 
@@ -81,14 +84,26 @@ class BuildLeaderboardTests(TestCase):
         rows = build_leaderboard().rows
         self.assertEqual([r.position for r in rows], [1, 1])
 
-    def test_exact_breaks_points_tie(self):
+    def test_exact_orders_display_but_not_position(self):
         # Ambos con 4 pts: Ana por empate exacto, Beto por ganador+diferencia.
+        # El exacto pone a Ana arriba, pero la posición sale solo de puntos.
         _prediction(self.ana, self.finished_2, 0, 0)
         _prediction(self.beto, self.finished_1, 3, 2)
 
         rows = build_leaderboard().rows
         self.assertEqual(rows[0].user, self.ana)
-        self.assertEqual([r.position for r in rows], [1, 2])
+        self.assertEqual([r.position for r in rows], [1, 1])
+
+    def test_dense_ranking_does_not_skip_positions(self):
+        # Dos primeros lugares empatados: el siguiente es 2°, no 3°.
+        caro = User.objects.create_user("caro@x.com", first_name="Caro",
+                                        is_active=True)
+        _prediction(self.ana, self.finished_1, 2, 1)   # 5 pts
+        _prediction(self.beto, self.finished_1, 2, 1)  # 5 pts
+        _prediction(caro, self.finished_1, 1, 0)       # 3 pts
+
+        rows = build_leaderboard().rows
+        self.assertEqual([r.position for r in rows], [1, 1, 2])
 
     def test_inactive_users_excluded_and_idle_users_included(self):
         rows = build_leaderboard().rows
@@ -96,6 +111,46 @@ class BuildLeaderboardTests(TestCase):
         self.assertEqual(emails, {"ana@x.com", "beto@x.com"})
         self.assertFalse(any(row.has_played for row in rows))
         self.assertTrue(all(row.points == 0 for row in rows))
+
+    def test_virtual_user_included_despite_inactive(self):
+        virtual = User.objects.create_user(
+            "colectivo@x.com", first_name="Ignorancia colectiva",
+            is_virtual=True,
+        )
+        self.assertFalse(virtual.is_active)
+
+        rows = build_leaderboard().rows
+        self.assertIn(virtual, [row.user for row in rows])
+
+    def test_virtual_user_sorts_by_points_but_has_no_position(self):
+        virtual = User.objects.create_user(
+            "colectivo@x.com", first_name="Ignorancia colectiva",
+            is_virtual=True,
+        )
+        _prediction(self.ana, self.finished_1, 2, 1)      # 5 pts (exacto)
+        _prediction(virtual, self.finished_1, 3, 2)       # 4 pts (diferencia)
+        _prediction(self.beto, self.finished_1, 3, 1)     # 3 pts (solo resultado)
+
+        rows = build_leaderboard().rows
+        # Ordenado entre los reales por puntos, pero sin posición y sin
+        # recorrer a nadie: Beto sigue siendo 2°.
+        self.assertEqual([r.user for r in rows],
+                         [self.ana, virtual, self.beto])
+        self.assertEqual([r.position for r in rows], [1, 0, 2])
+
+    def test_virtual_user_on_top_does_not_take_first_place(self):
+        virtual = User.objects.create_user(
+            "colectivo@x.com", first_name="Ignorancia colectiva",
+            is_virtual=True,
+        )
+        _prediction(virtual, self.finished_1, 2, 1)   # 5 pts
+        _prediction(self.ana, self.finished_1, 1, 0)  # 3 pts
+
+        rows = build_leaderboard().rows
+        self.assertEqual(rows[0].user, virtual)
+        self.assertEqual(rows[0].position, 0)
+        self.assertEqual(rows[1].user, self.ana)
+        self.assertEqual(rows[1].position, 1)
 
     def test_max_points_sums_only_finished(self):
         # 5 por el 2-1 (ganador) + 4 por el 0-0 (empate); el TIMED no suma.

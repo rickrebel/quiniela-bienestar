@@ -52,7 +52,9 @@ The project venv lives at `D:\env\quiniela` (interpreter:
   (e.g. Spanish names) in `db/jsons/manual/`; old files in `db/jsons/legacy/`.
 - **Frontend stack**: Tailwind v4 + daisyUI via `django-tailwind-cli`
   (standalone `tailwindcss-extra` binary, no Node; version pinned in
-  settings). Source: `static/css/source.css` (daisyUI theme + tokens);
+  settings). Source: `assets/css/source.css` (daisyUI theme + tokens;
+  outside `static/` so collectstatic's Manifest storage never tries to
+  resolve its `@import "tailwindcss"` as a file);
   dist `static/css/tailwind.css` is gitignored. Reusable template
   components are django-cotton (`templates/cotton/`, used as
   `<c-match-card :match="m" />`). Icons: Material Symbols subset via the

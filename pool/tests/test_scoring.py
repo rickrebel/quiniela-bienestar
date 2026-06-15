@@ -40,30 +40,36 @@ class CalculatePointsTests(SimpleTestCase):
 
 
 class ScoreDetailFlagsTests(SimpleTestCase):
-    """Los flags alimentan los chips de la UI; deben ser disjuntos y
-    distinguir un 4 exacto-empate de un 4 ganador+diferencia."""
+    """Los flags alimentan los chips de la UI; ``exact`` y ``diff_bonus``
+    deben ser disjuntos y distinguir un 4 exacto-empate de un 4
+    ganador+diferencia. ``outcome`` marca todo acierto de resultado."""
 
     def test_exact_win_sets_only_exact(self):
         detail = score_detail(2, 1, 2, 1)
-        self.assertEqual((detail.points, detail.exact, detail.diff_bonus),
-                         (5, True, False))
+        self.assertEqual(
+            (detail.points, detail.outcome, detail.exact, detail.diff_bonus),
+            (5, True, True, False))
 
     def test_exact_draw_sets_only_exact(self):
         detail = score_detail(1, 1, 1, 1)
-        self.assertEqual((detail.points, detail.exact, detail.diff_bonus),
-                         (4, True, False))
+        self.assertEqual(
+            (detail.points, detail.outcome, detail.exact, detail.diff_bonus),
+            (4, True, True, False))
 
     def test_diff_bonus_without_exact(self):
         detail = score_detail(3, 2, 2, 1)
-        self.assertEqual((detail.points, detail.exact, detail.diff_bonus),
-                         (4, False, True))
+        self.assertEqual(
+            (detail.points, detail.outcome, detail.exact, detail.diff_bonus),
+            (4, True, False, True))
 
     def test_draw_never_gets_diff_bonus(self):
         detail = score_detail(2, 2, 1, 1)
-        self.assertEqual((detail.points, detail.exact, detail.diff_bonus),
-                         (3, False, False))
+        self.assertEqual(
+            (detail.points, detail.outcome, detail.exact, detail.diff_bonus),
+            (3, True, False, False))
 
     def test_miss_clears_all_flags(self):
         detail = score_detail(2, 0, 0, 2)
-        self.assertEqual((detail.points, detail.exact, detail.diff_bonus),
-                         (0, False, False))
+        self.assertEqual(
+            (detail.points, detail.outcome, detail.exact, detail.diff_bonus),
+            (0, False, False, False))

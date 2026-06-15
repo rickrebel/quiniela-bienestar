@@ -1,12 +1,14 @@
 /* Fuente de Tailwind v4 + daisyUI. Se compila a css/tailwind.css con
    `manage.py tailwind build|watch` (binario tailwindcss-extra, sin
-   Node). El dist no se versiona. */
+   Node). El dist no se versiona. Vive en assets/ y no en static/
+   para que collectstatic no la copie: el Manifest storage truena al
+   intentar resolver el @import "tailwindcss" como archivo. */
 
 /* source(none) apaga la autodetección (escanearía staticfiles/ y
    db/jsons/); solo templates y los JS que arman DOM con clases. */
 @import "tailwindcss" source(none);
 @source "../../templates";
-@source "../*.js";
+@source "../../static/*.js";
 
 @plugin "daisyui" {
   themes: sanginiela --default;

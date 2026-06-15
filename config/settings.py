@@ -129,14 +129,36 @@ STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 # Tailwind v4 vía binario standalone (sin Node). USE_DAISY_UI hace que
 # se descargue tailwindcss-extra, una build del CLI con daisyUI dentro.
+# La fuente vive en assets/ (no static/) porque su `@import
+# "tailwindcss"` es sintaxis de Tailwind, no un archivo: si collectstatic
+# la recogiera, el Manifest storage tronaría al intentar reescribirlo.
 # El dist (static/css/tailwind.css) es artefacto de build: va en
 # .gitignore y en deploy se genera con `manage.py tailwind build`
 # antes de collectstatic.
 TAILWIND_CLI_USE_DAISY_UI = True
 TAILWIND_CLI_VERSION = "2.8.3"
-TAILWIND_CLI_SRC_CSS = BASE_DIR / "static" / "css" / "source.css"
+TAILWIND_CLI_SRC_CSS = BASE_DIR / "assets" / "css" / "source.css"
 TAILWIND_CLI_DIST_CSS = "css/tailwind.css"
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# Cache busting: collectstatic copia cada archivo con un hash de su
+# contenido en el nombre (styles.abc123.css) y reescribe los @import
+# del CSS; al liberar estilos nuevos la URL cambia y el cache viejo de
+# los navegadores deja de aplicar. Solo en prod: el test runner fuerza
+# DEBUG=False y el Manifest exige un manifest que solo existe tras
+# collectstatic, así que activarlo siempre rompe los tests locales.
+if not DEBUG:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": (
+                "django.contrib.staticfiles.storage"
+                ".ManifestStaticFilesStorage"
+            ),
+        },
+    }

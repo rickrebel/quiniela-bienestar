@@ -12,7 +12,9 @@ from pool.views.stages import _build_tabs
 def leaderboard_view(request: HttpRequest) -> HttpResponse:
     board = build_leaderboard()
     context = {
-        "rows": board.rows,
+        # Quien no ha jugado nada no aparece en la tabla (pero sigue en
+        # board.rows para el context processor `standing`).
+        "rows": [row for row in board.rows if row.has_played],
         "max_points": board.max_points,
         "tabs": _build_tabs(request.user),
     }

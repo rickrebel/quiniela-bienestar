@@ -7,6 +7,8 @@ partidos FINISHED con marcador.
 
 from dataclasses import dataclass
 
+from django.db.models import Q
+
 from pool.models import Prediction, User
 from pool.services.scoring import score_detail
 from tournament.models import Match
@@ -17,6 +19,7 @@ class LeaderboardRow:
     position: int
     user: User
     points: int
+    outcomes: int    # resultados atinados (incluye exactos y diferencias)
     exact: int       # marcadores exactos
     diffs: int       # bonos por diferencia (disjunto de exact)
     has_played: bool  # tiene al menos una predicción evaluada
@@ -38,8 +41,14 @@ class Leaderboard:
 
 
 def build_leaderboard() -> Leaderboard:
-    """Posiciones de todos los usuarios activos, con empates compartidos
-    (1-2-2-4) sobre la tupla (puntos, exactos, diferencias)."""
+    """Posiciones de todos los usuarios activos. La posición depende solo
+    de los puntos, con ranking denso (1-2-2-3: los empates comparten lugar
+    y no recorren al siguiente). Exactos y diferencias solo ordenan
+    visualmente dentro de un empate, no cambian la posición.
+
+    El perfil virtual entra a la tabla (ordenado por sus puntos) pero
+    queda fuera del ranking: conserva ``position=0`` y no desplaza a
+    nadie."""
     results = {
         match_id: (home, away)
         for match_id, home, away in Match.objects.filter(
@@ -54,10 +63,10 @@ def build_leaderboard() -> Leaderboard:
 
     rows = {
         user.id: LeaderboardRow(
-            position=0, user=user, points=0, exact=0, diffs=0,
+            position=0, user=user, points=0, outcomes=0, exact=0, diffs=0,
             has_played=False,
         )
-        for user in User.objects.filter(is_active=True)
+        for user in User.objects.filter(Q(is_active=True) | Q(is_virtual=True))
     }
 
     predictions = Prediction.objects.filter(
@@ -70,6 +79,7 @@ def build_leaderboard() -> Leaderboard:
             continue
         row = rows[user_id]
         row.points += detail.points
+        row.outcomes += detail.outcome
         row.exact += detail.exact
         row.diffs += detail.diff_bonus
         row.has_played = True
@@ -78,9 +88,15 @@ def build_leaderboard() -> Leaderboard:
         rows.values(),
         key=lambda r: (*r.sort_key, (r.user.first_name or "").lower()),
     )
-    for i, row in enumerate(ordered):
-        if i and row.sort_key == ordered[i - 1].sort_key:
-            row.position = ordered[i - 1].position
+    previous = None
+    for row in ordered:
+        if row.user.is_virtual:
+            continue
+        if previous is None:
+            row.position = 1
+        elif row.points == previous.points:
+            row.position = previous.position
         else:
-            row.position = i + 1
+            row.position = previous.position + 1
+        previous = row
     return Leaderboard(rows=ordered, max_points=max_points)

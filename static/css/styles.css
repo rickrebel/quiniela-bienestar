@@ -96,6 +96,15 @@
   stroke: currentColor;
   stroke-width: 2;
 }
+.icon-check {
+  width: 12px;
+  height: 12px;
+}
+.icon-check polyline {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+}
 
 /* --- Tabla de posiciones --- */
 .board {
@@ -109,10 +118,10 @@
 }
 .board-row {
   display: grid;
-  grid-template-columns: 36px 1fr 52px 40px 40px;
+  grid-template-columns: 36px 1fr 52px 38px 38px 38px;
   align-items: center;
 
-  padding: 10px 14px;
+  padding: 10px 8px 10px 10px;
   border-top: 1px solid rgba(255,255,255,0.08);
 }
 .board-head {
@@ -132,6 +141,7 @@
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
+
 .board-name {
   font-weight: 600;
   font-size: 14px;
@@ -166,6 +176,12 @@
 }
 .board-row--idle {
   opacity: 0.45;
+}
+/* Perfil virtual (Ignorancia colectiva): fuera del ranking, se lee
+   como fila informativa — nombre y guión de posición en muted. */
+.board-row--virtual .board-name {
+  color: var(--muted);
+  font-style: italic;
 }
 .board-cap {
   margin: 10px auto 0;
