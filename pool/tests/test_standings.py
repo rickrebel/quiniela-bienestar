@@ -47,10 +47,11 @@ class SortKeyTests(SimpleTestCase):
         dirty = _trow(points=4, yellow=4)
         self.assertIs(self._first(dirty, clean), clean)
 
-    def test_name_breaks_full_tie(self):
-        zeta = _trow(name="Zambia")
-        alfa = _trow(name="Argelia")
-        self.assertIs(self._first(zeta, alfa), alfa)
+    # No necesitamos este test, no queremos en ningún caso que los equipos se ordenen alfabéticamente
+    # def test_name_breaks_full_tie(self):
+    #     zeta = _trow(name="Zambia")
+    #     alfa = _trow(name="Argelia")
+    #     self.assertIs(self._first(zeta, alfa), alfa)
 
 
 class BuildGroupStandingsTests(TestCase):

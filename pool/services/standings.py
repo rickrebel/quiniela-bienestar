@@ -38,7 +38,7 @@ class StandingRow:
         # FIFA simplificado: Pts, DG, GF, fair play (menos rojas,
         # luego menos amarillas) y nombre; sin head-to-head.
         return (-self.points, -self.goal_diff, -self.goals_for,
-                self.red, self.yellow, self.team.name_es)
+                self.red, self.yellow)
 
 
 @dataclass

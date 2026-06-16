@@ -25,10 +25,8 @@
         // data-order-est → dataset.orderEst, etc.
         const prop = "order" + variant[0].toUpperCase() + variant.slice(1);
         document.querySelectorAll(".group-flags").forEach(flags => {
-            // En "real" un grupo sin cerrar no tiene posiciones reales: se
-            // ocultan sus banderas en lugar de mostrar un orden inventado.
-            const hide = variant === "real" && flags.dataset.complete === "0";
-            flags.style.display = hide ? "none" : "";
+            // Las banderas nunca se ocultan, siempre hay un orden (el de la base de datos, no el alfabético)
+            // para mostrarlas, incluso si aún no se han jugado partidos
             flags.querySelectorAll("img").forEach(img => {
                 img.style.order = img.dataset[prop] ?? "";
             });
