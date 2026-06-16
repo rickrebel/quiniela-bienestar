@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+{% include 'header.html' %}
+
+<c-stage-tabs :tabs="tabs" active="fecha" />
+
+{# Calendario global de solo lectura, en dos niveles: por fase (título #}
+{# centrado con separador, sin card) y dentro por fecha local de la sede #}
+{# (con día de la semana). Las tarjetas no reciben can_edit (queda falsy), #}
+{# así los inputs van deshabilitados. #}
+<main class="content">
+    {% for section in sections %}
+    <div class="mx-2 mb-2.5 mt-4 flex items-center gap-3">
+        <span class="h-px flex-1 bg-gold/30"></span>
+        <h2 class="text-[15px] font-bold uppercase tracking-[0.4px]
+                   text-[#c3a764]/80">{{ section.label }}</h2>
+        <span class="h-px flex-1 bg-gold/30"></span>
+    </div>
+    {% for group in section.date_groups %}
+    <section class="mb-2 overflow-hidden rounded-[14px] border
+                    border-white/15 bg-surface">
+        <h6 class="chip-title flex w-full items-center px-3.5 py-1.5
+                   text-[15px] font-medium">{{ group.label }}{% if group.finished %}<span class="ml-auto text-xs font-bold tracking-[0.3px] text-[#c3a764]/80">{{ group.points }} pts</span>{% endif %}</h6>
+        {% for m in group.matches %}
+        <c-match-card :match="m" :stage="m.stage" state="locked"
+                      :is_group_stage="m.is_group" :by_date="m.is_group" />
+        {% endfor %}
+    </section>
+    {% endfor %}
+    {% endfor %}
+</main>
+
+{# El shell del match-dialog vive en header.html; aquí solo los datos de #}
+{# los partidos de esta página. #}
+{{ match_dialog_data|json_script:"match-dialog-data" }}
+
+{% endblock %}

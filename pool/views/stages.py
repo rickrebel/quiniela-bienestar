@@ -1,7 +1,8 @@
 """Vistas de predicción por fase del torneo (una página por Stage)."""
 
+import re
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
@@ -12,7 +13,7 @@ from pool.models import Prediction, StageUser, User
 from pool.services.match_dialog import build_match_dialog_payload
 from pool.services.scoring import score_detail
 from pool.services.standings import build_group_standings
-from pool.utils import format_day, format_time
+from pool.utils import format_day, format_long_day, format_time
 from tournament.models import Match, Stage, Team
 
 # Ventana en la que un partido se considera "en juego". La app no es en
@@ -20,7 +21,9 @@ from tournament.models import Match, Stage, Team
 LIVE_WINDOW = timedelta(hours=2)
 
 
-def _chip(label: str, value: int, state: str, icon: bool = False) -> dict:
+def _chip(label: str, value: int, state: str, icon: str = "") -> dict:
+    # icon: nombre del ícono a pintar en el chip ("check"/"mira") o "" para
+    # mostrar el texto del label. Alinea la iconografía con el leaderboard.
     text = {"on": str(value), "off": "0", "na": "—"}[state]
     return {"label": label, "text": text, "state": state, "icon": icon}
 
@@ -78,49 +81,44 @@ def annotate_result(match: Match, prediction: Prediction | None) -> None:
     # también su chip.
     diff_on = detail.diff_bonus or (detail.exact and not is_draw)
     match.chips = [
-        _chip("R", 3, "on" if detail.points else "off"),
+        _chip("Res", 3, "on" if detail.points else "off", icon="check"),
         _chip("Dif", 1, "na" if is_draw else ("on" if diff_on else "off")),
-        _chip("", 1, "on" if detail.exact else "off", icon=True),
+        _chip("", 1, "on" if detail.exact else "off", icon="mira"),
     ]
 
 
-def render_stage_sections(
-    user: User, stage: Stage, by_date: bool = False
-) -> list[dict]:
+def render_stage_sections(user: User, stage: Stage) -> list[dict]:
     """Devuelve las secciones de una fase listas para presentar.
 
-    Fase de grupos: una sección por grupo (A→L), o por **día local de la
-    sede** si ``by_date`` (la clave pasa a ser un ``date``; el orden del
-    modelo es ``of_number``, por eso se fuerza cronológico). Eliminatoria:
-    una sola sección (lista plana, equipos aún como placeholder). Cada
-    sección es ``{"key", "label", "matches", "filled", "total", "points",
+    Fase de grupos: una sección por grupo (A→L). Eliminatoria: una sola
+    sección (lista plana, equipos aún como placeholder). Cada sección es
+    ``{"key", "label", "matches", "filled", "total", "points", "complete",
     "teams", "standings"}`` (``teams`` y ``standings`` solo agrupando por
-    grupo: banderas del encabezado en el orden de la variante mix y
-    tablas de posiciones en tres variantes), donde ``filled`` cuenta los
-    partidos con predicción completa (una fila ``Prediction`` ya implica
-    ambos marcadores) y ``points`` suma los puntos ya ganados en la
-    sección. En cada partido
-    adjunta en memoria día y hora **locales de la sede**
+    grupo: banderas del encabezado en el orden de la variante mix y tablas
+    de posiciones en tres variantes), donde ``filled`` cuenta los partidos
+    con predicción completa (una fila ``Prediction`` ya implica ambos
+    marcadores) y ``points`` suma los puntos ya ganados en la sección. En
+    cada partido adjunta en memoria día y hora **locales de la sede**
     (``Match.datetime`` está en UTC; se aplica ``Stadium.utc_offset``) y,
     si el usuario ya predijo, ``predicted_home``/``predicted_away``.
     ``select_related`` evita N+1.
     """
-    matches = Match.objects.filter(stage=stage).select_related(
-        "home_team", "away_team", "stadium", "stage"
-    )
-    if by_date:
-        matches = matches.order_by("datetime", "of_number")
     # Materializado: el loop y build_group_standings deben compartir
     # instancias (y evita re-ejecutar el queryset).
-    matches = list(matches)
+    matches = list(
+        Match.objects.filter(stage=stage).select_related(
+            "home_team", "away_team", "stadium", "stage"
+        )
+    )
     predictions = Prediction.objects.filter(user=user, match__stage=stage)
     preds_by_match = {p.match_id: p for p in predictions}
 
     is_group = stage.key == Stage.GROUP_STAGE
-    SectionKey = str | date | None
+    SectionKey = str | None
     grouped: dict[SectionKey, list[Match]] = defaultdict(list)
     filled: dict[SectionKey, int] = defaultdict(int)
     points: dict[SectionKey, int] = defaultdict(int)
+    finished_count: dict[SectionKey, int] = defaultdict(int)
     teams: dict[SectionKey, dict[int, Team]] = defaultdict(dict)
     for match in matches:
         local_dt = match.datetime + timedelta(
@@ -128,10 +126,7 @@ def render_stage_sections(
         )
         match.local_day = format_day(local_dt)
         match.local_time = format_time(local_dt)
-        if by_date:
-            key = local_dt.date()
-        else:
-            key = match.home_team.group_name if is_group else None
+        key = match.home_team.group_name if is_group else None
         prediction = preds_by_match.get(match.id)
         if prediction is not None:
             match.predicted_home = prediction.home_goals
@@ -140,29 +135,30 @@ def render_stage_sections(
         annotate_result(match, prediction)
         if match.user_points is not None:
             points[key] += match.user_points
+        if match.is_finished:
+            finished_count[key] += 1
         grouped[key].append(match)
-        # Equipos del grupo para el encabezado (sin query extra); por
-        # fecha no aplica: serían hasta 12 banderas por día.
-        if is_group and not by_date:
+        # Equipos del grupo para el encabezado (sin query extra).
+        if is_group:
             for team in (match.home_team, match.away_team):
                 if team is not None:
                     teams[key][team.id] = team
 
     standings = (
-        build_group_standings(matches, preds_by_match)
-        if is_group and not by_date else {}
+        build_group_standings(matches, preds_by_match) if is_group else {}
     )
     keys = sorted(grouped) if is_group else list(grouped)
     return [
         {
             "key": key,
-            "label": (
-                grouped[key][0].local_day if by_date else f"Grupo {key}"
-            ),
+            "label": f"Grupo {key}",
             "matches": grouped[key],
             "filled": filled[key],
             "total": len(grouped[key]),
             "points": points[key],
+            # Grupo cerrado: sus 6 partidos ya terminaron. La variante
+            # "real" oculta banderas/equipos derivados si no lo está.
+            "complete": finished_count[key] == len(grouped[key]),
             "standings": standings.get(key),
             "teams": (
                 standings[key].teams if key in standings
@@ -171,6 +167,58 @@ def render_stage_sections(
         }
         for key in keys
     ]
+
+
+# Placeholder de posición de grupo en eliminatoria: "1A", "2B". Los
+# terceros ("3A/B/C/D/F") y ganadores ("W74") no son resolubles aquí.
+GROUP_POS_RE = re.compile(r"^([12])([A-L])$")
+VARIANTS = ("est", "mix", "real")
+
+
+def resolve_variant(value: str | None) -> str:
+    """Normaliza la variante de la querystring; mix por defecto."""
+    return value if value in VARIANTS else "mix"
+
+
+def resolve_group_placeholders(user: User, variant: str) -> dict[str, "Team"]:
+    """Mapa de placeholder de posición de grupo ('1A','2B') → equipo.
+
+    Resuelve 1.º/2.º de cada grupo según la variante elegida, reusando las
+    posiciones que ya calcula ``build_group_standings``. En 'real' solo
+    incluye grupos cerrados (6 partidos FINISHED): el resto queda sin
+    resolver para que la tarjeta muestre el placeholder textual.
+    """
+    group_matches = list(
+        Match.objects.filter(stage__key=Stage.GROUP_STAGE).select_related(
+            "home_team", "away_team", "stadium", "stage"
+        )
+    )
+    preds = {
+        p.match_id: p
+        for p in Prediction.objects.filter(
+            user=user, match__stage__key=Stage.GROUP_STAGE
+        )
+    }
+    standings = build_group_standings(group_matches, preds)
+
+    finished: dict[str, int] = defaultdict(int)
+    for m in group_matches:
+        if (
+            m.status == "FINISHED"
+            and m.home_goals is not None
+            and m.away_goals is not None
+            and m.home_team is not None
+        ):
+            finished[m.home_team.group_name] += 1
+
+    resolved: dict[str, Team] = {}
+    for group, gs in standings.items():
+        if variant == "real" and finished[group] < 6:
+            continue
+        table = next(t for t in gs.tables if t.variant == variant)
+        for pos, row in enumerate(table.rows[:2], start=1):
+            resolved[f"{pos}{group}"] = row.team
+    return resolved
 
 
 def _build_tabs(user: User) -> list[dict]:
@@ -203,12 +251,28 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
     stage_user, _ = StageUser.objects.select_related("stage").get_or_create(
         user=request.user, stage=stage
     )
-    by_date = (
-        stage.key == Stage.GROUP_STAGE
-        and request.GET.get("view") == "fecha"
-    )
-    sections = render_stage_sections(request.user, stage, by_date)
+    sections = render_stage_sections(request.user, stage)
     flat_matches = [m for s in sections for m in s["matches"]]
+
+    # En eliminatoria, rellenar en memoria los equipos de primera ronda
+    # (placeholders "1A"/"2B") según la variante elegida; las tarjetas y el
+    # dialog comparten estas instancias. Terceros y ganadores quedan como
+    # placeholder textual.
+    is_group_stage = stage.key == Stage.GROUP_STAGE
+    variant = resolve_variant(request.GET.get("variant"))
+    derivable = False
+    if not is_group_stage:
+        resolved = resolve_group_placeholders(request.user, variant)
+        for m in flat_matches:
+            if GROUP_POS_RE.match(m.home_placeholder or ""):
+                derivable = True
+                if m.home_team is None:
+                    m.home_team = resolved.get(m.home_placeholder)
+            if GROUP_POS_RE.match(m.away_placeholder or ""):
+                derivable = True
+                if m.away_team is None:
+                    m.away_team = resolved.get(m.away_placeholder)
+
     context = {
         "stage": stage,
         "state": stage_user.state,
@@ -217,8 +281,9 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
         "match_dialog_data": build_match_dialog_payload(
             flat_matches, request.user
         ),
-        "is_group_stage": stage.key == Stage.GROUP_STAGE,
-        "by_date": by_date,
+        "is_group_stage": is_group_stage,
+        "variant": variant,
+        "derivable": derivable,
         "tabs": _build_tabs(request.user),
         "deadline_iso": (
             stage.send_deadline.isoformat()
@@ -227,6 +292,76 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
         ),
     }
     return render(request, "stage.html", context)
+
+@login_required
+def por_fecha_view(request: HttpRequest) -> HttpResponse:
+    """Calendario global de solo lectura: todos los partidos por fase.
+
+    Doble agrupación: las fases van en orden de creación (= progresión del
+    torneo) y, dentro de cada una, los partidos se agrupan por **fecha
+    local de la sede** (con día de la semana). El queryset ya viene
+    ordenado por ``(stage_id, datetime, of_number)``, así que ambos cortes
+    son lineales. Reusa ``annotate_result`` y el dialog de detalle. No
+    edita: las tarjetas se renderizan sin ``can_edit``.
+    """
+    matches = list(
+        Match.objects.select_related(
+            "home_team", "away_team", "stadium", "stage"
+        ).order_by("stage_id", "datetime", "of_number")
+    )
+    preds = {
+        p.match_id: p
+        for p in Prediction.objects.filter(user=request.user)
+    }
+    sections: list[dict] = []
+    section: dict | None = None
+    date_group: dict | None = None
+    for match in matches:
+        local_dt = match.datetime + timedelta(
+            hours=match.stadium.utc_offset
+        )
+        match.local_day = format_day(local_dt)
+        match.local_time = format_time(local_dt)
+        match.is_group = match.stage.key == Stage.GROUP_STAGE
+        prediction = preds.get(match.id)
+        if prediction is not None:
+            match.predicted_home = prediction.home_goals
+            match.predicted_away = prediction.away_goals
+        annotate_result(match, prediction)
+        if section is None or section["stage_id"] != match.stage_id:
+            section = {
+                "stage_id": match.stage_id,
+                "label": match.stage.name,
+                "date_groups": [],
+            }
+            sections.append(section)
+            date_group = None
+        local_date = local_dt.date()
+        if date_group is None or date_group["date"] != local_date:
+            date_group = {
+                "date": local_date,
+                "label": format_long_day(local_dt),
+                "matches": [],
+                "points": 0,
+                "finished": 0,
+            }
+            section["date_groups"].append(date_group)
+        date_group["matches"].append(match)
+        # Puntos ganados ese día (mismo lenguaje que el header de grupos:
+        # total en dorado a la derecha cuando ya hay partidos terminados).
+        if match.is_finished:
+            date_group["finished"] += 1
+            date_group["points"] += match.user_points or 0
+
+    context = {
+        "sections": sections,
+        "match_dialog_data": build_match_dialog_payload(
+            matches, request.user
+        ),
+        "tabs": _build_tabs(request.user),
+    }
+    return render(request, "por_fecha.html", context)
+
 
 def reglas(request: HttpRequest) -> HttpResponse:
     return render(request, "reglas.html", {"tabs": _build_tabs(request.user)})

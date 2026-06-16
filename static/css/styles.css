@@ -136,6 +136,13 @@
   font-size: 12px;
   font-weight: 600;
 }
+/* Los SVG inline (✓/◎) se asientan en la baseline y descuadran el
+   encabezado; flex los centra en su celda, alineados con los números. */
+.board-head .board-stat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .board-pos {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -188,6 +195,43 @@
   text-align: center;
   color: var(--muted);
   font-size: 12px;
+}
+
+/* Leaderboard/reglas dentro de su Dialog: cierre con X en el header (sin
+   botón inferior). */
+#leaderboard-dialog .send-dialog-head,
+#rules-dialog .send-dialog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.dialog-x {
+  flex-shrink: 0;
+  padding: 2px 4px;
+
+  border: none;
+  background: none;
+  cursor: pointer;
+
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.dialog-x:hover {
+  color: var(--text);
+}
+/* El board ya es una "tarjeta" con su propio borde; dentro del Dialog eso
+   se duplica con el armazón del modal. Se aplana para no repetir borde ni
+   padding. */
+#leaderboard-dialog .send-dialog-body {
+  padding: 8px 10px;
+}
+#leaderboard-dialog .board {
+  max-width: none;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 /* --- Reglas --- */
@@ -329,6 +373,10 @@
 /* Diálogo de confirmación de envío. Reusa .match-card, .group-summary
    y .submit-btn; aquí solo va el armazón del modal. */
 .send-dialog {
+  /* margin:auto repone el centrado nativo del <dialog> modal: el
+     preflight de Tailwind v4 resetea margin:0 en *, anulándolo. */
+  margin: auto;
+
   width: min(440px, 92vw);
   max-height: 85vh;
   padding: 0;
@@ -622,16 +670,6 @@
 .match-dialog .day-points-val--miss { color: var(--muted); }
 .match-dialog .day-points-val--hit { color: var(--gold); }
 .match-dialog .day-points-val--exact { color: var(--gold); }
-.match-dialog .diff-badge {
-  margin-left: 4px;
-  padding: 0 4px;
-  border-radius: 6px;
-
-  background: var(--gold-soft);
-  color: var(--gold);
-  font-size: 10px;
-  font-weight: 700;
-}
 
 /* --- Captura manual de resultado (solo capturistas/superusers) --- */
 .record-form {

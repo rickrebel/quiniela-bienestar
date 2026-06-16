@@ -1,8 +1,9 @@
-{% load static %}
-{# Dialog de detalle de partido + predicciones de todos. #}
-{# Datos embebidos por la vista (build_match_dialog_payload); #}
-{# match_dialog.js lo llena al clic en cualquier [data-dialog-match]. #}
-{{ match_dialog_data|json_script:"match-dialog-data" }}
+{# Shell del dialog de detalle de partido + predicciones de todos. #}
+{# Lo incluye header.html una sola vez (está en todas las páginas). Los #}
+{# datos viajan en json_script: #match-dialog-data (matches de la página, #}
+{# emitido por stage/por_fecha) y #today-dialog-data (partidos de hoy del #}
+{# header). match_dialog.js (cargado con defer en base.html) los combina #}
+{# y rellena al clic en cualquier [data-dialog-match]. #}
 <dialog id="match-dialog" class="send-dialog match-dialog">
     <div class="send-dialog-head" id="match-dialog-title"></div>
     <div class="send-dialog-body" id="match-dialog-body"></div>
@@ -12,4 +13,3 @@
         </div>
     </footer>
 </dialog>
-<script src="{% static 'match_dialog.js' %}"></script>

@@ -9,8 +9,8 @@ full setup.
 
 ## Commands
 
-The project venv lives at `D:\env\quiniela` (interpreter:
-`D:\env\quiniela\Scripts\python.exe`).
+The project venv lives at `venv/` inside the repo (interpreter:
+`venv/bin/python`).
 
 - `python manage.py runserver` — local dev server (http://localhost:8000/)
 - `python manage.py tailwind runserver` — dev server + Tailwind watcher;

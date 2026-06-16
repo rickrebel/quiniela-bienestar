@@ -66,6 +66,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "pool.context_processors.standing",
+                "pool.context_processors.today_matches",
             ],
         },
     },

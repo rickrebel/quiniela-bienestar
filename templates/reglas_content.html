@@ -1,0 +1,70 @@
+{# Contenido de reglas reutilizable: la página /reglas/ (respaldo) y el #}
+{# dialog del menú de usuario (header.html) lo incluyen. #}
+<section class="rules-block">
+    <h6 class="rules-title">Puntaje por partido</h6>
+    <ul class="rules-list">
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">R&nbsp;+3</c-chip>
+            <span>Si atinas al resultado del partido (ganador o
+            empate): <b>3 puntos</b>.</span>
+        </li>
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">Dif&nbsp;+1</c-chip>
+            <span>Si atinas la diferencia de goles: <b>1 punto
+            extra</b> (excepto en empates). Este punto extra solo te
+            lo puedes llevar si le atinaste al resultado del
+            partido.</span>
+        </li>
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start"><svg viewBox="0 0 24 24" aria-hidden="true" class="h-3 w-3 fill-none stroke-current [stroke-width:2.5]"><circle cx="12" cy="12" r="6"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>&nbsp;+1</c-chip>
+            <span>Resultado exacto: <b>1 punto extra</b>.</span>
+        </li>
+    </ul>
+    <p class="rules-note">
+        Es decir, por un resultado exacto te llevas <b>5 puntos</b>
+        totales si hay ganador o <b>4 puntos</b> totales si es
+        empate.
+    </p>
+    <p class="rules-note">
+        En play offs se considerará el marcador <b>sin penales</b>:
+        calcula tu resultado pensando en que el partido puede durar
+        hasta 120 minutos (los goles en tiempos extras sí cuentan).
+    </p>
+</section>
+
+<section class="rules-block">
+    <h6 class="rules-title">Cierre de cada fase</h6>
+    <p class="rules-note">
+        Para todas las fases, si su quiniela no está llena a las
+        <b>11:59 pm del día previo</b> a que empiecen los partidos,
+        quedan fuera.
+    </p>
+</section>
+
+<section class="rules-block">
+    <h6 class="rules-title">Entrada y premios</h6>
+    <p class="rules-note">Entrada: <b>$200 pesos</b>.</p>
+    <ul class="prizes">
+        <li class="prize-row">
+            <span class="prize-place">1er lugar</span>
+            <span>Todo lo que se junte, menos 3 entradas.</span>
+        </li>
+        <li class="prize-row">
+            <span class="prize-place">2do lugar</span>
+            <span>Tu entrada y una extra ($400).</span>
+        </li>
+        <li class="prize-row">
+            <span class="prize-place">3er lugar</span>
+            <span>Reintegro ($200).</span>
+        </li>
+        <li class="prize-row">
+            <span class="prize-place">Último</span>
+            <span>Bello diploma digital para el recuerdo 😅</span>
+        </li>
+    </ul>
+    <p class="rules-note">
+        Si hay empate, se divide el premio del lugar en el que
+        empataron: por ejemplo, dos terceros lugares se llevan $100
+        cada uno.
+    </p>
+</section>

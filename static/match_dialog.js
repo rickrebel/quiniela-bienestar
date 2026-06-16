@@ -6,13 +6,24 @@
  * jugador son datos de usuario y no deben interpolarse como HTML. */
 
 (function () {
-    const dataEl = document.getElementById("match-dialog-data");
     const dialog = document.getElementById("match-dialog");
-    if (!dataEl || !dialog) return;
+    if (!dialog) return;
 
-    const byId = new Map(
-        JSON.parse(dataEl.textContent).map(m => [String(m.id), m])
-    );
+    // Dos fuentes: los partidos de la página (#match-dialog-data, en
+    // stage/por_fecha) y los de hoy del header (#today-dialog-data, en
+    // todas). El mismo id trae los mismos datos, así que el merge es
+    // idempotente; basta con que exista alguna.
+    const byId = new Map();
+    for (const id of ["match-dialog-data", "today-dialog-data"]) {
+        const node = document.getElementById(id);
+        if (!node) continue;
+        const rows = JSON.parse(node.textContent);
+        if (!Array.isArray(rows)) continue;
+        for (const m of rows) {
+            byId.set(String(m.id), m);
+        }
+    }
+    if (!byId.size) return;
     const title = document.getElementById("match-dialog-title");
     const body = document.getElementById("match-dialog-body");
 
@@ -135,12 +146,8 @@
             `${pred.home} - ${pred.away}`));
         const pts = el("span", "rivals-pts");
         if (pred.points) {
-            const value = el("b", `day-points-val--${pred.points.kind}`,
-                `${pred.points.base} pts`);
-            pts.append(value);
-            if (pred.points.bonus) {
-                pts.append(el("span", "diff-badge", "+1"));
-            }
+            pts.append(el("b", `day-points-val--${pred.points.kind}`,
+                String(pred.points.total)));
         } else {
             pts.textContent = "—";
         }

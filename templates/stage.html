@@ -16,27 +16,20 @@
               text-soft">El plazo de esta fase terminó.</p>
     {% endif %}
 
-    {% if is_group_stage %}
-    <div class="mx-auto mb-2.5 mt-1.5 flex flex-wrap justify-center gap-2">
-        {# Conmutador grupo/fecha: links que recargan con ?view=fecha #}
-        {# (reagrupado server-side). El de posiciones usa botones (sin #}
-        {# recarga); .view-opt y su .active viven en source.css porque #}
-        {# standings.js togglea la clase en runtime. #}
+    {% if derivable %}
+    {# Variante de equipos derivados (solo donde hay cruces de posición de #}
+    {# grupo). Recarga con ?variant=; el server resuelve 1.º/2.º según la #}
+    {# elección. En grupos el selector es por tabla (cliente). #}
+    <div class="mx-auto mb-2.5 mt-1.5 flex justify-center">
         <nav class="flex w-fit gap-0.5 rounded-[10px] bg-surface-2 p-[3px]"
-             aria-label="Agrupar partidos">
-            <a class="view-opt{% if not by_date %} active{% endif %}"
-               href="{% url 'stage' stage.key %}">Por grupo</a>
-            <a class="view-opt{% if by_date %} active{% endif %}"
-               href="{% url 'stage' stage.key %}?view=fecha">Por fecha</a>
+             aria-label="Variante de equipos">
+            <a class="view-opt{% if variant == 'est' %} active{% endif %}"
+               href="?variant=est">Estimado</a>
+            <a class="view-opt{% if variant == 'mix' %} active{% endif %}"
+               href="?variant=mix">Est. + Real</a>
+            <a class="view-opt{% if variant == 'real' %} active{% endif %}"
+               href="?variant=real">Real</a>
         </nav>
-        {% if not by_date %}
-        <nav class="flex w-fit gap-0.5 rounded-[10px] bg-surface-2 p-[3px]"
-             data-standings-switch aria-label="Variante de posiciones">
-            <button type="button" class="view-opt" data-variant="est">Estimado</button>
-            <button type="button" class="view-opt active" data-variant="mix">Est. + Real</button>
-            <button type="button" class="view-opt" data-variant="real">Real</button>
-        </nav>
-        {% endif %}
     </div>
     {% endif %}
 
@@ -46,7 +39,7 @@
     {# submit.js (agrupa y clona para el resumen de envío). La clase #}
     {# group además habilita las variantes group-open: de Tailwind #}
     {# (chevron y banderas reaccionan al <details> abierto). #}
-    {% if is_group_stage and not by_date %}
+    {% if is_group_stage %}
     <details class="group mb-2 overflow-hidden rounded-[14px] border
                     border-white/15 bg-surface">
         <summary class="group-summary relative flex cursor-pointer
@@ -58,24 +51,11 @@
                            group-open:rotate-90" />
             {{ section.label }}
             {# group-flags: hook de standings.js (reordena por style.order) #}
-            {% if section.teams %}<span class="group-flags ml-10 inline-flex items-center gap-1 transition-opacity duration-300 group-open:opacity-40">{% for team in section.teams %}{% if team.flag_path %}<img class="h-[18px] w-auto max-w-[26px] rounded-sm" src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}" data-order-est="{{ team.order_est }}" data-order-mix="{{ team.order_mix }}" data-order-real="{{ team.order_real }}">{% endif %}{% endfor %}</span>{% endif %}
+            {% if section.teams %}<span class="group-flags ml-10 inline-flex items-center gap-1 transition-opacity duration-300 group-open:opacity-40" data-complete="{{ section.complete|yesno:'1,0' }}">{% for team in section.teams %}{% if team.flag_path %}<img class="h-[18px] w-auto max-w-[26px] rounded-sm" src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}" data-order-est="{{ team.order_est }}" data-order-mix="{{ team.order_mix }}" data-order-real="{{ team.order_real }}">{% endif %}{% endfor %}</span>{% endif %}
             <c-section-count state="{{ state }}" points="{{ section.points }}"
                              filled="{{ section.filled }}"
                              total="{{ section.total }}" />
         </summary>
-    {% elif by_date %}
-    {# Por fecha no hay desplegable: fila de fecha + partidos visibles. #}
-    {# Conserva .group (submit.js agrupa por ella) y .group-summary #}
-    {# (buildSummary la clona como título del dialog de envío). #}
-    <section class="group mb-2 overflow-hidden rounded-[14px] border
-                    border-white/15 bg-surface">
-        <div class="group-summary relative flex items-center px-3.5 py-3
-                    text-[15.8px] font-medium">
-            {{ section.label }}
-            <c-section-count state="{{ state }}" points="{{ section.points }}"
-                             filled="{{ section.filled }}"
-                             total="{{ section.total }}" />
-        </div>
     {% else %}
     <div class="knockout mb-2 overflow-hidden rounded-[14px] border
                 border-white/15 bg-surface pt-3">
@@ -94,30 +74,43 @@
 
         {% for match in section.matches %}
         <c-match-card :match="match" :stage="stage" state="{{ state }}"
-                      :can_edit="can_edit" :is_group_stage="is_group_stage"
-                      :by_date="by_date" />
+                      :can_edit="can_edit" :is_group_stage="is_group_stage" />
         {% endfor %}
 
         {% if section.standings %}
         <div class="border-t-[2.5px] border-white/20 px-3.5 pb-3 pt-2">
+            {# Selector de variante por grupo (antes era global, arriba de #}
+            {# todo). standings.js sincroniza todos los navs y persiste la #}
+            {# elección; .view-opt/.active viven en source.css. #}
+            <nav class="mx-auto mb-2.5 flex w-fit gap-0.5 rounded-[10px]
+                        bg-surface-2 p-[3px]"
+                 data-standings-switch aria-label="Variante de posiciones">
+                <button type="button" class="view-opt" data-variant="est">Estimado</button>
+                <button type="button" class="view-opt active" data-variant="mix">Est. + Real</button>
+                <button type="button" class="view-opt" data-variant="real">Real</button>
+            </nav>
             {% for table in section.standings.tables %}
             <c-standings-table :table="table" />
             {% endfor %}
         </div>
         {% endif %}
 
-    {% if is_group_stage and not by_date %}</details>{% elif by_date %}</section>{% else %}</div>{% endif %}
+    {% if is_group_stage %}</details>{% else %}</div>{% endif %}
 
     {% endfor %}
 </main>
 
+{# El footer solo se renderiza si tiene algo que mostrar: botón de envío, #}
+{# aviso "enviadas" (solo antes del cierre) o la nota de cuenta regresiva. #}
+{# Tras vencer el plazo de una fase ya enviada queda sin barra pegajosa. #}
+{% if state == 'editing' or state == 'sent' and not stage.is_past_deadline or deadline_iso and state != 'sent' %}
 <footer class="sticky bottom-0 z-[1000] border-t border-gold/40
                bg-[#0f1115]/90 px-2 pt-2.5
                pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
     <div class="mx-auto flex max-w-[900px] gap-2">
         {% if state == 'editing' %}
         <button class="submit-btn" onclick="sendPredictions()">Enviar</button>
-        {% elif state == 'sent' %}
+        {% elif state == 'sent' and not stage.is_past_deadline %}
         <span class="mx-auto inline-flex h-11 items-center gap-2 px-4
                      text-[13px] font-bold uppercase tracking-[0.04em]
                      text-success">
@@ -136,6 +129,7 @@
          data-deadline="{{ deadline_iso }}"></div>
     {% endif %}
 </footer>
+{% endif %}
 
 <div id="snackbar">
     <span class="snack-icon">✓</span>
@@ -160,9 +154,11 @@
     </footer>
 </dialog>
 
-{% include 'match_dialog.html' %}
+{# El shell del match-dialog vive en header.html; aquí solo los datos de #}
+{# los partidos de esta página (los de hoy los emite el header). #}
+{{ match_dialog_data|json_script:"match-dialog-data" }}
 
-{% if is_group_stage and not by_date %}
+{% if is_group_stage %}
 <script src="{% static 'standings.js' %}" defer></script>
 {% endif %}
 

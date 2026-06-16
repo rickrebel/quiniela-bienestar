@@ -1,0 +1,29 @@
+{% load static %}
+{# Tabla de posiciones reutilizable: la página /posiciones/ y el dialog #}
+{# del header la incluyen. Espera `rows` y `max_points` en el contexto #}
+{# (la página los pasa directo; el header como board_rows/board_max). #}
+{# CSS .board* en styles.css (legacy, compartido). #}
+<section class="board">
+    <header class="board-row board-head" aria-hidden="true">
+        <span class="board-pos"></span>
+        <span class="board-name">Participante</span>
+        <span class="board-pts">pts</span>
+        <span class="board-stat" title="Resultados atinados">{% include 'icons/palomita.html' %}</span>
+        <span class="board-stat" title="Diferencias acertadas">dif</span>
+        <span class="board-stat" title="Marcadores exactos">{% include 'icons/mira.html' %}</span>
+    </header>
+
+    {% for row in rows %}
+    <div class="board-row{% if row.user == user %} board-row--me{% endif %}{% if row.user.is_virtual %} board-row--virtual{% endif %}">
+        <span class="board-pos">{% if row.user.is_virtual %}-{% elif row.position == 1 %}🥇{% elif row.position == 2 %}🥈{% elif row.position == 3 %}🥉{% else %}{{ row.position }}{% endif %}</span>
+        <span class="board-name">
+            {{ row.user.first_name|default:row.user.email }}
+        </span>
+        <span class="board-pts">{{ row.points }}</span>
+        <span class="board-stat">{{ row.outcomes }}</span>
+        <span class="board-stat">{{ row.diffs }}</span>
+        <span class="board-stat">{{ row.exact }}</span>
+    </div>
+    {% endfor %}
+</section>
+<p class="board-cap">{{ max_points }} puntos en juego hasta ahora</p>

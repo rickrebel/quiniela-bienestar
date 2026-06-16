@@ -17,10 +17,26 @@ MONTHS_ES: dict[int, str] = {
     12: "diciembre",
 }
 
+# date.weekday(): 0 = lunes … 6 = domingo.
+WEEKDAYS_ES: dict[int, str] = {
+    0: "lunes",
+    1: "martes",
+    2: "miércoles",
+    3: "jueves",
+    4: "viernes",
+    5: "sábado",
+    6: "domingo",
+}
+
 
 def format_day(date: datetime) -> str:
     """Formatea la fecha como '{día} de {mes}' (mes en español)."""
     return f"{date.day} de {MONTHS_ES[date.month]}"
+
+
+def format_long_day(date: datetime) -> str:
+    """Formatea como '{día semana} {día} de {mes}' ('lunes 15 de junio')."""
+    return f"{WEEKDAYS_ES[date.weekday()]} {format_day(date)}"
 
 
 def format_time(date: datetime) -> str:

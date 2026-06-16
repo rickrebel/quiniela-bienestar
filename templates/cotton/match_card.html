@@ -22,6 +22,13 @@
     {% elif not is_group_stage %}
     <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[0.8rem]
                  tabular-nums text-[#c3a764]/85">{{ match.of_number }}</span>
+    {% if match.home_placeholder and match.away_placeholder %}
+    {# Origen del cruce siempre visible (1A · 2B): ubica de dónde sale #}
+    {# cada equipo aunque ya esté derivado/decidido. #}
+    <div class="text-[0.72rem] font-semibold tabular-nums
+                text-[#c3a764]/60">{{ match.home_placeholder }} ·
+        {{ match.away_placeholder }}</div>
+    {% endif %}
     {% elif by_date %}
     <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[0.8rem]
                  tabular-nums text-[#c3a764]/85">{{ match.home_team.group_name }}</span>
@@ -125,15 +132,15 @@
         <span class="absolute right-0 top-1/2 inline-flex -translate-y-1/2
                      gap-[5px]">
             {% for chip in match.chips %}
-            <c-chip state="{{ chip.state }}"><span class="inline-flex items-center opacity-60">{% if chip.icon %}<c-icon name="location_searching" class="text-xs" />{% else %}{{ chip.label }}{% endif %}:</span>{{ chip.text }}</c-chip>
+            <c-chip state="{{ chip.state }}">{% if chip.icon == 'check' %}<svg viewBox="0 0 24 24" aria-hidden="true" class="h-2.5 w-2.5 fill-none stroke-current [stroke-width:3]"><polyline points="4 13 10 19 20 6"/></svg>{% elif chip.icon == 'mira' %}<svg viewBox="0 0 24 24" aria-hidden="true" class="h-2.5 w-2.5 fill-none stroke-current [stroke-width:2.5]"><circle cx="12" cy="12" r="6"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>{% else %}{{ chip.label }}{% endif %}</c-chip>
             {% endfor %}
         </span>
         {% endif %}
     </div>
     <span class="absolute right-[0.2rem] top-1/2 flex -translate-y-1/2
-                 flex-col items-center leading-none
+                 items-center leading-none
                  {% if match.points_kind == 'none' %}text-muted{% endif %}">
-        {% if match.points_kind == 'none' %}&mdash;{% else %}<span class="text-[22px] font-extrabold tabular-nums {% if match.points_kind == 'zero' %}text-muted{% else %}text-gold{% endif %}">{{ match.user_points }}</span><span class="mt-0.5 text-[10px] text-muted">pts</span>{% endif %}
+        {% if match.points_kind == 'none' %}&mdash;{% else %}<span class="text-[22px] font-extrabold tabular-nums {% if match.points_kind == 'zero' %}text-muted{% else %}text-gold{% endif %}">{{ match.user_points }}</span>{% endif %}
     </span>
     {% else %}
     {# Bloque .meta intacto (clases legacy): match_dialog.js construye #}

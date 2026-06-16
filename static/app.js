@@ -31,3 +31,20 @@ function closeUserBarOnOutsideClick(event) {
 
 // document.addEventListener("click", closeSidebarOnOutsideClick);
 document.addEventListener("click", closeUserBarOnOutsideClick);
+
+/* Dialog de reglas: lo abre la opción "Reglas" del menú de usuario; al
+   abrir se cierra el user-bar. Mismo patrón que leaderboard.js. */
+const rulesDialog = document.getElementById("rules-dialog");
+if (rulesDialog) {
+    document.addEventListener("click", e => {
+        if (e.target.closest("[data-rules-open]")) {
+            userBar.classList.remove("open");
+            rulesDialog.showModal();
+            return;
+        }
+        if (e.target.closest("[data-rules-close]")
+                || e.target === rulesDialog) {
+            rulesDialog.close();
+        }
+    });
+}
