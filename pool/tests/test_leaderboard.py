@@ -62,7 +62,8 @@ class BuildLeaderboardTests(TestCase):
         self.assertEqual(row.points, 5)
         self.assertEqual(row.outcomes, 1)
         self.assertEqual(row.exact, 1)
-        self.assertEqual(row.diffs, 0)
+        # el exacto no-empate también acertó la diferencia
+        self.assertEqual(row.diffs, 1)
 
     def test_counts_come_from_flags_not_value(self):
         # 4 pts por ganador+diferencia (3-2 vs 2-1) no es un exacto.

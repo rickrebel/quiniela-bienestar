@@ -21,7 +21,7 @@ class LeaderboardRow:
     points: int
     outcomes: int    # resultados atinados (incluye exactos y diferencias)
     exact: int       # marcadores exactos
-    diffs: int       # bonos por diferencia (disjunto de exact)
+    diffs: int       # bonos por diferencia (incluye los exactos no-empate)
     has_played: bool  # tiene al menos una predicción evaluada
 
     @property
@@ -81,7 +81,9 @@ def build_leaderboard() -> Leaderboard:
         row.points += detail.points
         row.outcomes += detail.outcome
         row.exact += detail.exact
-        row.diffs += detail.diff_bonus
+        # El exacto (salvo empate) también acertó la diferencia: cuenta
+        # como bono de diferencia aunque ``diff_bonus`` salga disjunto.
+        row.diffs += detail.diff_bonus or (detail.exact and actual_home != actual_away)
         row.has_played = True
 
     ordered = sorted(
