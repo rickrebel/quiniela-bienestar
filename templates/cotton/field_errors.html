@@ -1,0 +1,6 @@
+{# Errores de un campo de formulario, en el estilo de auth (rojo). #}
+{# Uso: <c-field-errors :field="form.email" /> #}
+<c-vars field="" />
+{% for error in field.errors %}
+<span style="color: #c86b52;">[{{ error }}]</span>
+{% endfor %}
