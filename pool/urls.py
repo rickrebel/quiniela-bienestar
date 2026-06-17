@@ -7,6 +7,7 @@ from pool.views import auth, leaderboard, predictions, results, stages
 
 urlpatterns = [
     path("login/", auth.login_view, name="login"),
+    path("registro/", auth.register_view, name="register"),
     path("logout/", auth.logout_view, name="logout"),
     path(
         "recuperar/",

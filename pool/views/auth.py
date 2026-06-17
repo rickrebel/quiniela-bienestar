@@ -7,7 +7,8 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
 from pool.forms import (
-    EmailAccessForm, RecoveryConfirmForm, RecoveryRequestForm)
+    EmailAccessForm, RecoveryConfirmForm, RecoveryRequestForm,
+    RegistrationForm)
 from pool.models import PasswordRecoveryToken
 from pool.services.recovery import (
     create_recovery_token, recovery_url, send_recovery_email)
@@ -64,6 +65,46 @@ def login_view(request: HttpRequest) -> HttpResponse:
         form = EmailAccessForm()
 
     return render(request, "auth/login.html", {"form": form})
+
+
+def register_view(request: HttpRequest) -> HttpResponse:
+    """Alta de un jugador por sí mismo.
+
+    GET: muestra el formulario de registro.
+    POST: valida nombre, email y contraseña. Si el email ya tiene cuenta
+    activa (o es un perfil virtual) lo rechaza; si existe un preregistro
+    sin estrenar lo completa; en otro caso crea el usuario y sus
+    StageUser. Al terminar inicia sesión y redirige a la fase de grupos.
+    """
+    if request.method == "POST":
+        form = RegistrationForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"]
+            first_name = form.cleaned_data["first_name"]
+            user = User.objects.filter(email__iexact=email).first()
+            if user is not None and user.is_virtual:
+                form.add_error("email", "Este perfil no tiene acceso")
+            elif user is not None and user.is_active:
+                form.add_error(
+                    "email", "Ya existe una cuenta con este email")
+            else:
+                if user is None:
+                    # Alta nueva: create_user dispara la señal que
+                    # materializa los StageUser de cada fase.
+                    user = User.objects.create_user(
+                        email=email, first_name=first_name)
+                else:
+                    # Preregistro sin estrenar: ya tiene StageUser.
+                    user.first_name = first_name
+                user.set_password(form.cleaned_data["password"])
+                user.is_active = True
+                user.save()
+                login(request, user, backend=_AUTH_BACKEND)
+                return redirect("stage", key="GROUP_STAGE")
+    else:
+        form = RegistrationForm()
+
+    return render(request, "auth/register.html", {"form": form})
 
 
 def logout_view(request: HttpRequest) -> HttpResponse:

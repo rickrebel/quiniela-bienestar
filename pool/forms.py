@@ -32,6 +32,58 @@ class EmailAccessForm(forms.Form):
     )
 
 
+class RegistrationForm(forms.Form):
+    """Alta de un jugador por sí mismo: nombre, email y contraseña.
+
+    La contraseña no tiene mínimo de caracteres (solo no vacía) pero sí
+    confirmación. La unicidad del email se valida en la vista para
+    distinguir cuenta activa de preregistro sin estrenar.
+    """
+
+    first_name = forms.CharField(
+        label="Nombre",
+        widget=forms.TextInput(attrs={"autocomplete": "name"}),
+        error_messages={"required": "El nombre es requerido"},
+    )
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={"autocomplete": "username"}),
+        error_messages={
+            "required": "El email es requerido",
+            "invalid": "Ingresa un correo válido",
+        },
+    )
+    password = forms.CharField(
+        label="Contraseña",
+        widget=forms.PasswordInput(
+            attrs={"autocomplete": "new-password"}
+        ),
+        error_messages={"required": "La contraseña es requerida"},
+    )
+    password_confirm = forms.CharField(
+        label="Confirmar contraseña",
+        widget=forms.PasswordInput(
+            attrs={"autocomplete": "new-password"}
+        ),
+        error_messages={"required": "Confirma la contraseña"},
+    )
+
+    def clean_first_name(self) -> str:
+        return self.cleaned_data["first_name"].strip()
+
+    def clean_email(self) -> str:
+        return self.cleaned_data["email"].strip().lower()
+
+    def clean(self) -> dict:
+        data = super().clean()
+        password = data.get("password")
+        confirm = data.get("password_confirm")
+        if password and confirm and password != confirm:
+            self.add_error(
+                "password_confirm", "Las contraseñas no coinciden")
+        return data
+
+
 class RecoveryRequestForm(forms.Form):
     """Solicitud del link de recuperación: solo el correo."""
 
