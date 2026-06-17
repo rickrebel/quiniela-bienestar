@@ -143,10 +143,93 @@
   align-items: center;
   justify-content: center;
 }
+/* Sub-grid: columna fija de 6px para la flecha + el rango. La flecha vive en
+   su propia columna (sin position:absolute) y el rango queda fijo en la 2ª,
+   así los números/medallas se alinean tengan o no flecha. */
 .board-pos {
+  display: grid;
+  grid-template-columns: 6px auto;
+  column-gap: 4px;
+  align-items: center;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
+}
+.board-trend {
+  grid-column: 1;
+  justify-self: center;
+  display: flex;
+}
+.board-rank {
+  grid-column: 2;  /* fijo aunque la columna 1 (flecha) quede vacía */
+}
+.board-trend .icon-trend {
+  width: 6px;
+  height: auto;  /* el viewBox 12×14 mantiene la proporción, sin distorsión */
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.board-trend--up { color: var(--success); }
+.board-trend--down { color: var(--error); }
+/* Sin JS se ve solo la baseline por defecto (por partido);
+   leaderboard.js conmuta cuál baseline mostrar. */
+.board-trend[data-baseline="day"] { display: none; }
+
+/* --- Toggle de baseline de la flecha (un solo control) --- */
+.board-trend-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 12px auto 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.board-trend-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+.board-trend-opt.active { color: var(--gold); }
+.board-trend-opt .icon-swap {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* Switch tipo pastilla: el pulgar corre entre "por partido" y "por día". */
+.board-trend-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+}
+.board-trend-toggle::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.board-trend-toggle:checked::after {
+  transform: translateX(14px);
 }
 
 .board-name {
@@ -179,7 +262,9 @@
 .board-row--me {
   background: var(--gold-soft);
   border-left: 3px solid var(--gold);
-  padding-left: 11px;
+  /* El borde de 3px corre el contenido a la derecha; restamos 3px al
+     padding (11→8) para realinear posición y nombre con las demás filas. */
+  padding-left: 8px;
 }
 .board-row--idle {
   opacity: 0.45;
@@ -272,14 +357,38 @@
     transition: none;
   }
 }
+/* El cuerpo no scrollea: es una columna flex (lista + footer fijo). Solo
+   la lista de filas (.board) desplaza; el toggle y el "puntos en juego"
+   quedan pegados abajo, siempre visibles. */
 #leaderboard-dialog .send-dialog-body {
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 #leaderboard-dialog .board {
   max-width: none;
   border: none;
   border-radius: 0;
   background: transparent;
+
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  /* No propagar el gesto de scroll a la página detrás del diálogo. */
+  overscroll-behavior: contain;
+}
+/* Footer fijo: toggle + leyenda de puntos. */
+#leaderboard-dialog .board-trend-switch {
+  flex: none;
+  margin-top: 0;
+  padding: 10px 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+#leaderboard-dialog .board-cap {
+  flex: none;
+  padding-bottom: 12px;
 }
 
 /* --- Reglas --- */

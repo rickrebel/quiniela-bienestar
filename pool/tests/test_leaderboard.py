@@ -156,3 +156,100 @@ class BuildLeaderboardTests(TestCase):
     def test_max_points_sums_only_finished(self):
         # 5 por el 2-1 (ganador) + 4 por el 0-0 (empate); el TIMED no suma.
         self.assertEqual(build_leaderboard().max_points, 9)
+
+
+class LeaderboardTrendTests(TestCase):
+    """Flechas de tendencia: 'batch' excluye la última tanda (mismo horario)
+    para comparar; 'day' excluye la última jornada (todo el día más reciente,
+    en fecha local del estadio)."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.stage = Stage.objects.create(
+            key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
+            color="#4CAF50", order=1,
+        )
+        cls.stadium = Stadium.objects.create(
+            name="Estadio Azteca", city="CDMX", country="mx", utc_offset=-6,
+        )
+        cls.team_a = Team.objects.create(
+            name="Mexico", name_es="México", fifa_code="MEX", group_name="A",
+            confederation="concacaf",
+        )
+        cls.team_b = Team.objects.create(
+            name="Canada", name_es="Canadá", fifa_code="CAN", group_name="A",
+            confederation="concacaf",
+        )
+        cls.ana = User.objects.create_user("ana@x.com", first_name="Ana",
+                                           is_active=True)
+        cls.beto = User.objects.create_user("beto@x.com", first_name="Beto",
+                                            is_active=True)
+
+    def _match(self, of_number, dt, home, away):
+        return Match.objects.create(
+            datetime=dt, stage=self.stage, stadium=self.stadium,
+            home_team=self.team_a, away_team=self.team_b, of_number=of_number,
+            home_goals=home, away_goals=away, status="FINISHED",
+        )
+
+    def _scenario(self):
+        """Día 1 (1 tanda) + Día 2 (2 tandas). Ana lidera tras el día 1;
+        Beto la supera el día 2 acertando ambos partidos."""
+        from datetime import datetime, timezone as dt_tz
+
+        def utc(*args):
+            return datetime(*args, tzinfo=dt_tz.utc)
+
+        # Día 1 (local 06-11): m1. Día 2 (local 06-12): m2 (tanda B) y m3
+        # (tanda C, la más tardía -> última tanda).
+        m1 = self._match(1, utc(2026, 6, 11, 18, 0), 1, 0)
+        m2 = self._match(2, utc(2026, 6, 12, 18, 0), 1, 0)
+        m3 = self._match(3, utc(2026, 6, 12, 22, 0), 3, 0)
+
+        _prediction(self.ana, m1, 1, 0)   # exacto: 5
+        _prediction(self.ana, m2, 5, 5)   # fallo: 0
+        _prediction(self.ana, m3, 0, 1)   # fallo: 0
+
+        _prediction(self.beto, m1, 2, 2)  # fallo: 0
+        _prediction(self.beto, m2, 1, 0)  # exacto: 5
+        _prediction(self.beto, m3, 3, 0)  # exacto: 5
+        return m1, m2, m3
+
+    def test_day_baseline_reflects_swap_over_the_last_day(self):
+        self._scenario()
+        rows = {r.user: r for r in build_leaderboard().rows}
+        # Antes del día 2: Ana 5 (1°), Beto 0 (2°). Ahora Beto 10 (1°),
+        # Ana 5 (2°): Beto sube, Ana baja.
+        self.assertEqual(rows[self.beto].trend_day, "up")
+        self.assertEqual(rows[self.ana].trend_day, "down")
+
+    def test_batch_baseline_excludes_only_the_last_batch(self):
+        self._scenario()
+        rows = {r.user: r for r in build_leaderboard().rows}
+        # Excluyendo solo m3: Ana 5, Beto 5 (empate, ambos 1°). Ahora Beto
+        # es 1° y Ana cae a 2°: Ana baja, Beto sin cambio.
+        self.assertEqual(rows[self.beto].trend_batch, None)
+        self.assertEqual(rows[self.ana].trend_batch, "down")
+
+    def test_no_trend_when_only_one_batch_exists(self):
+        # Un solo partido (una tanda, un día): no hay con qué comparar.
+        from datetime import datetime, timezone as dt_tz
+        m1 = self._match(
+            1, datetime(2026, 6, 11, 18, 0, tzinfo=dt_tz.utc), 1, 0,
+        )
+        _prediction(self.ana, m1, 1, 0)
+        rows = {r.user: r for r in build_leaderboard().rows}
+        self.assertIsNone(rows[self.ana].trend_batch)
+        self.assertIsNone(rows[self.ana].trend_day)
+
+    def test_virtual_user_has_no_trend(self):
+        virtual = User.objects.create_user(
+            "colectivo@x.com", first_name="Ignorancia colectiva",
+            is_virtual=True,
+        )
+        m1, m2, m3 = self._scenario()
+        _prediction(virtual, m1, 0, 0)
+        _prediction(virtual, m3, 3, 0)
+        row = build_leaderboard().row_for(virtual)
+        self.assertIsNone(row.trend_batch)
+        self.assertIsNone(row.trend_day)

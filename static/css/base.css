@@ -13,6 +13,11 @@
   --gold: #d4af37;
   --gold-soft: rgba(212, 175, 55, 0.14);
 
+  /* Verde/rojo del tema (mismos valores que los tokens daisyUI
+     --color-success/--color-error en source.css). */
+  --success: #6bbf8a;
+  --error: #e57373;
+
   --surface-light: #252525;
   --gold-hover: #e5c55c;
   --border: #353535;
