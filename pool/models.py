@@ -75,6 +75,9 @@ class User(AbstractUser):
         self.username = self.email
         super().save(*args, **kwargs)
 
+    def __str__(self):
+        return self.first_name or self.username
+
 
 class PasswordRecoveryToken(models.Model):
     """Token de un solo uso para restablecer la contraseña.

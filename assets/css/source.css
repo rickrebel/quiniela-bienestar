@@ -20,16 +20,16 @@
   default: true;
   color-scheme: dark;
 
-  --color-base-100: #0f1115;
-  --color-base-200: #232732;
-  --color-base-300: #1f2430;
+  --color-base-100: #1f1c02;
+  --color-base-200: #2c2706;
+  --color-base-300: #2f2b0c;
   --color-base-content: #e7e7e7;
 
-  --color-primary: #d4af37;
+  --color-primary: #d48b37;
   --color-primary-content: #0f1115;
   --color-secondary: #b8c0cc;
   --color-secondary-content: #0f1115;
-  --color-accent: #e5c55c;
+  --color-accent: #e5aa5c;
   --color-accent-content: #0f1115;
   --color-neutral: #1e2536;
   --color-neutral-content: #e7e7e7;
@@ -52,7 +52,7 @@
 /* Tokens propios fuera de la semántica daisyUI; generan utilidades
    (text-gold, bg-gold-soft, text-muted, bg-surface...). */
 @theme {
-  --color-gold: #d4af37;
+  --color-gold: #d49037;
   --color-gold-soft: rgba(212, 175, 55, 0.14);
   --color-muted: rgb(180, 180, 180);
   --color-soft: #b8c0cc;

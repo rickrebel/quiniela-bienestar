@@ -9,7 +9,36 @@ class StageUserAdmin(admin.ModelAdmin):
     list_filter = ("stage",)
 
 
-admin.site.register(Prediction)
+@admin.register(Prediction)
+class PredictionAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "home_team_name",
+        "away_team_name",
+        "home_goals",
+        "away_goals",
+    )
+    list_editable = ("home_goals", "away_goals")
+    list_filter = ("user", "match__stage")
+    search_fields = (
+        "match__home_team__name_es",
+        "match__away_team__name_es",
+        "user__first_name",
+        "user__email",
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related(
+            "user", "match__home_team", "match__away_team")
+
+    @admin.display(description="Local", ordering="match__home_team__name")
+    def home_team_name(self, obj: Prediction) -> str:
+        return obj.match.home_team.name_es if obj.match.home_team else "—"
+
+    @admin.display(description="Visitante", ordering="match__away_team__name")
+    def away_team_name(self, obj: Prediction) -> str:
+        return obj.match.away_team.name_es if obj.match.away_team else "—"
 
 
 class StageUserInline(admin.StackedInline):
