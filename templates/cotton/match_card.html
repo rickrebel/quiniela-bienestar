@@ -84,7 +84,7 @@
                           disabled:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
                    data-field="home_goals"
                    value="{{ match.predicted_home }}"
-                   {% if not can_edit %}disabled{% endif %}>
+                   {% if not match.editable %}disabled{% endif %}>
             <span class="text-sm font-bold opacity-70">-</span>
             <input type="number" min="0" step="1"
                    class="h-[26px] w-[30px] rounded-md border-none
@@ -96,7 +96,7 @@
                           disabled:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.15)]"
                    data-field="away_goals"
                    value="{{ match.predicted_away }}"
-                   {% if not can_edit %}disabled{% endif %}>
+                   {% if not match.editable %}disabled{% endif %}>
             {% else %}
             <span class="text-sm font-bold opacity-70">&ndash;</span>
             {% endif %}

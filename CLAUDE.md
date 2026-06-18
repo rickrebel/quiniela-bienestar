@@ -21,6 +21,12 @@ The project venv lives at `venv/` inside the repo (interpreter:
   `load_stadiums` → `load_stages` → `load_teams` → `load_matches`,
   reading from `db/jsons/{of,fd,manual}/`.
 - `python manage.py preregister <email> "<name>"` — add a player (`pool` app)
+- `python manage.py bootstrap_bienestar --yes` — one-time fork bootstrap over
+  a **clone** of the original DB (`pool` app, idempotent): splits the group
+  stage into `SUBGROUP_1/2/3` (reassigns only `Match.stage`, never results),
+  deletes round-1 predictions, nulls every `StageUser.sent_at`. Clone the DB
+  first with `pg_dump | psql` (see README); `POSTGRES_DB_ORIGINAL` names the
+  source. `SUBGROUP_2/3` dates are set by hand in the admin afterwards.
 - `python manage.py build_collective_profile <stage_key>` — freeze the
   virtual profile's aggregated predictions for a closed stage (`pool` app)
 - `python manage.py fetch_sim_source` — one-time download of real finished
@@ -85,11 +91,31 @@ The project venv lives at `venv/` inside the repo (interpreter:
   `group_name` lives only on `Team` (CHOICES A–L).
 - **OF↔FD team join is by code** (`fifa_code` == `tla`), with one override
   `URU`→`URY` (Uruguay). Match join is by (UTC datetime + home `tla`).
-- **`Stage` has 6 rows, not 7**: FD `THIRD_PLACE`+`FINAL` collapse into `FINAL`;
-  distinguish via `Match.of_number` (103 = third place, 104 = final). Note the
-  ES false friend: `LAST_32` = "dieciseisavos", `LAST_16` = "octavos". OF omits
-  `num` for group matches **and** for third place/final, so group detection keys
-  off the round (`Matchday*`), never `num` presence.
+- **`Stage` has 8 rows**: the group stage is split into 3 sub-stages
+  (`SUBGROUP_1/2/3`, one per matchday, `is_group=True`, orders 1-3) plus the
+  5 knockout stages (orders 4-8). FD `THIRD_PLACE`+`FINAL` collapse into
+  `FINAL`; distinguish via `Match.of_number` (103 = third place, 104 = final).
+  Note the ES false friend: `LAST_32` = "dieciseisavos", `LAST_16` =
+  "octavos". OF omits `num` for group matches **and** for third place/final, so
+  group detection keys off the round (`Matchday*`), never `num` presence.
+  **Beware:** OF's `Matchday N` is the *global* calendar round (1–17), NOT each
+  group's 1st/2nd/3rd game — the per-group round (→ `SUBGROUP_1/2/3`) is derived
+  by sorting each group's 6 matches by `datetime` and chunking in pairs
+  (`tournament/services/group_rounds.py:round_by_match`).
+- **Group stage = 3 sub-stages, one UI tab.** `Stage.is_group=True` marks the
+  3 matchday sub-stages; the UI **collapses them into a single "Grupos" tab**
+  that shows all groups A-L. Use `stage.is_group` (never `key ==
+  "GROUP_STAGE"`) and query group matches with `stage__is_group=True`. The
+  group **standings table is cumulative** across the 3 sub-stages, but
+  **editability and `send` are per sub-stage**: only the live matchday is
+  editable, and "Enviar" finalizes just that sub-stage's `StageUser`.
+  `SUBGROUP_1` is born closed (matchday 1 already played).
+- **`Stage.multiplier`** (Decimal, default 1) is a per-stage scoring weight
+  (1, 1.5, 2 … 10×) stored in the DB but **NOT yet applied** by
+  `scoring.py` — pending.
+- **`Prediction.advancing_team`** (FK→Team, nullable) records who the player
+  thinks wins the penalty shootout when they predict a knockout draw. Stored
+  but with **no frontend nor scoring logic yet** — pending.
 - **Per-match autosave.** Scores save on `change` via `save_prediction`
   (`/prediction/<id>/`), not a bulk submit. A `Prediction` row exists only when
   both goals are set — an incomplete match deletes its row. Completeness and

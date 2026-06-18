@@ -29,6 +29,9 @@ function buildPayload() {
         const awayEl = match.querySelector('[data-field="away_goals"]');
         // Sin inputs = equipos aún placeholder (final por definir): se omite.
         if (!homeEl || !awayEl) return;
+        // Inputs deshabilitados = jornada no vigente (grupos): el envío se
+        // acota a la sub-fase abierta, así que se omiten del payload.
+        if (homeEl.disabled || awayEl.disabled) return;
         const home = homeEl.value;
         const away = awayEl.value;
         predictions.push({

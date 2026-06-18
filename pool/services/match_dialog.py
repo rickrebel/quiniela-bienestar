@@ -16,7 +16,7 @@ from django.templatetags.static import static
 from pool.models import Prediction, User
 from pool.services.scoring import ScoreDetail, result_chips, score_detail
 from pool.utils import format_day, format_time
-from tournament.models import Match, Stage
+from tournament.models import Match
 
 
 def group_predictions(rows: list[dict]) -> list[dict]:
@@ -111,7 +111,7 @@ def scorers_by_team(match: Match) -> tuple[list[str], list[str]]:
 def phase_label(match: Match) -> str:
     """Etiqueta de fase: 'Grupo X' en grupos, nombre del partido o de
     la fase en eliminatorias."""
-    if match.stage.key == Stage.GROUP_STAGE:
+    if match.stage.is_group:
         return f"Grupo {match.home_team.group_name}"
     return match.name or match.stage.name
 
@@ -144,7 +144,7 @@ def _match_payload(match: Match, finished: bool, can_record: bool) -> dict:
             if match.stadium.flag_path else None
         ),
         "finished": finished,
-        "is_knockout": match.stage.key != Stage.GROUP_STAGE,
+        "is_knockout": not match.stage.is_group,
         # Permiso + estado; el gate de 105 min lo calcula el JS al abrir
         # (un timing horneado al render se vuelve obsoleto) y el endpoint
         # revalida todo de cualquier forma.

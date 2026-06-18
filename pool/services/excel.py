@@ -84,7 +84,7 @@ def _write_sheet(sheet: Worksheet, user, stage: Stage) -> None:
     el ``of_number`` del partido (eliminatoria). El marcador queda en
     blanco si el usuario aún no predijo (o el cruce sigue siendo placeholder).
     """
-    is_group = stage.key == Stage.GROUP_STAGE
+    is_group = stage.is_group
     sheet.append(["Grupo" if is_group else "Partido", *_REST_HEADER])
 
     for section in render_stage_sections(user, stage):

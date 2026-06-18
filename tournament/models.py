@@ -8,6 +8,8 @@ Fuentes de datos:
 Convención: ``home``/``away`` en lugar de ``a``/``b`` para alinear con FD.
 """
 
+from decimal import Decimal
+
 from django.db import models
 from django.utils import timezone
 
@@ -68,6 +70,18 @@ class Stage(models.Model):
         max_length=7, blank=True, help_text="Color hex, p. ej. #4CAF50."
     )
     order = models.PositiveSmallIntegerField(unique=True)
+    is_group = models.BooleanField(
+        default=False,
+        help_text="True en las 3 jornadas de grupos; la UI las colapsa "
+                  "en una sola pestaña.",
+    )
+    multiplier = models.DecimalField(
+        max_digits=3,
+        decimal_places=1,
+        default=Decimal("1.0"),
+        help_text="Ponderador de la fase: los puntos se multiplican por "
+                  "este factor (1, 1.5, 2 … hasta 10). Aún no aplicado.",
+    )
     opens_at = models.DateTimeField(
         null=True,
         blank=True,

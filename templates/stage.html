@@ -5,7 +5,7 @@
 
 {% include 'header.html' %}
 
-<c-stage-tabs :tabs="tabs" active="{{ stage.key }}" />
+<c-stage-tabs :tabs="tabs" active="{{ tabs_active }}" />
 
 <main class="content" data-stage="{{ stage.key }}" data-state="{{ state }}">
     {% if state == 'upcoming' %}
@@ -109,7 +109,7 @@
                pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
     <div class="mx-auto flex max-w-[900px] gap-2">
         {% if state == 'editing' %}
-        <button class="submit-btn" onclick="sendPredictions()">Enviar</button>
+        <button class="submit-btn" onclick="sendPredictions()">{% if is_group_stage %}Enviar {{ stage.short_name }}{% else %}Enviar{% endif %}</button>
         {% elif state == 'sent' and not stage.is_past_deadline %}
         <span class="mx-auto inline-flex h-11 items-center gap-2 px-4
                      text-[13px] font-bold uppercase tracking-[0.04em]

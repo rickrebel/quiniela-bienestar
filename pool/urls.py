@@ -22,6 +22,9 @@ urlpatterns = [
     path("reglas/", stages.reglas, name="reglas"),
     path("calendario/", stages.por_fecha_view, name="by_date"),
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
+    # El alias de grupos va antes que <key> para que no lo capture la ruta
+    # genérica de fase.
+    path("stage/grupos/", stages.groups_view, name="groups"),
     path("stage/<str:key>/", stages.stage_view, name="stage"),
     path("save/", predictions.save_predictions, name="save"),
     path(
@@ -37,7 +40,7 @@ urlpatterns = [
     ),
     path(
         "",
-        RedirectView.as_view(url="/stage/GROUP_STAGE/"),
+        RedirectView.as_view(url="/stage/grupos/"),
         name="root",
     ),
 ]

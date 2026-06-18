@@ -131,6 +131,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+POSTGRES_DB_ORIGINAL = os.environ.get("POSTGRES_DB_ORIGINAL", "")
 
 # Tailwind v4 vía binario standalone (sin Node). USE_DAISY_UI hace que
 # se descargue tailwindcss-extra, una build del CLI con daisyUI dentro.

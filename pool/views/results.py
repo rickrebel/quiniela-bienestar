@@ -14,7 +14,7 @@ from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from tournament.models import Match, Stage
+from tournament.models import Match
 
 FORBIDDEN = "No tienes permiso para capturar resultados."
 MATCH_NOT_FOUND = "No existe ese partido."
@@ -81,7 +81,7 @@ def record_result(request: HttpRequest, match_id: int) -> JsonResponse:
         return JsonResponse({"error": INVALID_NUMBER}, status=400)
 
     tied = values["home_goals"] == values["away_goals"]
-    is_knockout = match.stage.key != Stage.GROUP_STAGE
+    is_knockout = not match.stage.is_group
     if has_pens and not (tied and is_knockout):
         return JsonResponse({"error": PENALTIES_NOT_ALLOWED}, status=400)
     if tied and is_knockout and not has_pens:

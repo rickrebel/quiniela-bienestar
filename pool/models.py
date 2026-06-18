@@ -7,7 +7,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.db.models import UniqueConstraint
 from django.utils import timezone
-from tournament.models import Stage, Match
+from tournament.models import Stage, Match, Team
 
 
 class UserManager(BaseUserManager):
@@ -188,6 +188,16 @@ class Prediction(models.Model):
         Match, on_delete=models.CASCADE, related_name="predictions",)
     home_goals = models.IntegerField()
     away_goals = models.IntegerField()
+    advancing_team = models.ForeignKey(
+        Team,
+        on_delete=models.PROTECT,
+        related_name="predicted_advances",
+        null=True,
+        blank=True,
+        help_text="Solo eliminatorias con empate pronosticado: equipo "
+                  "que el jugador cree que gana la tanda de penales y "
+                  "avanza.",
+    )
 
     class Meta:
         constraints = [

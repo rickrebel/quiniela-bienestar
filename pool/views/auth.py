@@ -52,7 +52,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
                 if user.is_active:
                     if user.check_password(form.cleaned_data["password"]):
                         login(request, user, backend=_AUTH_BACKEND)
-                        return redirect("stage", key="GROUP_STAGE")
+                        return redirect("groups")
                     else:
                         form.add_error("password", "Contraseña incorrecta")
                 else:
@@ -60,7 +60,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
                     user.is_active = True
                     user.save()
                     login(request, user, backend=_AUTH_BACKEND)
-                    return redirect("stage", key="GROUP_STAGE")
+                    return redirect("groups")
     else:
         form = EmailAccessForm()
 
@@ -100,7 +100,7 @@ def register_view(request: HttpRequest) -> HttpResponse:
                 user.is_active = True
                 user.save()
                 login(request, user, backend=_AUTH_BACKEND)
-                return redirect("stage", key="GROUP_STAGE")
+                return redirect("groups")
     else:
         form = RegistrationForm()
 
@@ -174,7 +174,7 @@ def reset_password_view(request: HttpRequest, key) -> HttpResponse:
             user.save()
             token.mark_used()
             login(request, user, backend=_AUTH_BACKEND)
-            return redirect("stage", key="GROUP_STAGE")
+            return redirect("groups")
     else:
         form = RecoveryConfirmForm()
 

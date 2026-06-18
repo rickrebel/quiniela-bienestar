@@ -23,7 +23,7 @@ class RegisterViewTests(TestCase):
     def test_new_user_is_created_active_and_logged_in(self):
         response = self.client.post(self.url, self._payload())
         self.assertRedirects(
-            response, reverse("stage", kwargs={"key": "GROUP_STAGE"}),
+            response, reverse("groups"),
             fetch_redirect_response=False,
         )
         user = User.objects.get(email="ana@example.com")
@@ -93,7 +93,7 @@ class RegisterViewTests(TestCase):
         response = self.client.post(
             self.url, self._payload(first_name="Ana"))
         self.assertRedirects(
-            response, reverse("stage", kwargs={"key": "GROUP_STAGE"}),
+            response, reverse("groups"),
             fetch_redirect_response=False,
         )
         user.refresh_from_db()

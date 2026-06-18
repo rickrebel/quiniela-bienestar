@@ -97,8 +97,42 @@ def render_stage_sections(user: User, stage: Stage) -> list[dict]:
     )
     predictions = Prediction.objects.filter(user=user, match__stage=stage)
     preds_by_match = {p.match_id: p for p in predictions}
+    return _build_sections(matches, preds_by_match, stage.is_group)
 
-    is_group = stage.key == Stage.GROUP_STAGE
+
+def render_group_sections(user: User) -> list[dict]:
+    """Secciones de la sombrilla de grupos (las 3 sub-fases juntas).
+
+    A diferencia de ``render_stage_sections`` (una sub-fase), carga TODOS
+    los partidos ``stage__is_group=True`` para que la tabla de posiciones
+    sea **acumulada** sobre las 3 jornadas. La editabilidad por partido la
+    decide la vista (``groups_view``), no esta función.
+    """
+    matches = list(
+        Match.objects.filter(stage__is_group=True).select_related(
+            "home_team", "away_team", "stadium", "stage"
+        )
+    )
+    preds_by_match = {
+        p.match_id: p
+        for p in Prediction.objects.filter(
+            user=user, match__stage__is_group=True
+        )
+    }
+    return _build_sections(matches, preds_by_match, True)
+
+
+def _build_sections(
+    matches: list[Match],
+    preds_by_match: dict[int, Prediction],
+    is_group: bool,
+) -> list[dict]:
+    """Arma las secciones a partir de partidos ya cargados y predicciones.
+
+    Núcleo compartido por ``render_stage_sections`` (una fase) y
+    ``render_group_sections`` (sombrilla de grupos): agrupa, adjunta día/
+    hora locales y resultado en memoria, y calcula tablas de posiciones.
+    """
     SectionKey = str | None
     grouped: dict[SectionKey, list[Match]] = defaultdict(list)
     filled: dict[SectionKey, int] = defaultdict(int)
@@ -168,14 +202,14 @@ def resolve_group_placeholders(user: User, variant: str) -> dict[str, "Team"]:
     resolver para que la tarjeta muestre el placeholder textual.
     """
     group_matches = list(
-        Match.objects.filter(stage__key=Stage.GROUP_STAGE).select_related(
+        Match.objects.filter(stage__is_group=True).select_related(
             "home_team", "away_team", "stadium", "stage"
         )
     )
     preds = {
         p.match_id: p
         for p in Prediction.objects.filter(
-            user=user, match__stage__key=Stage.GROUP_STAGE
+            user=user, match__stage__is_group=True
         )
     }
     standings = build_group_standings(group_matches, preds)
@@ -201,22 +235,55 @@ def resolve_group_placeholders(user: User, variant: str) -> dict[str, "Team"]:
 
 
 def _build_tabs(user: User) -> list[dict]:
-    """Arma los tabs: una fase por entrada, con su estado para el usuario.
+    """Arma los tabs (uno por fase visible), en orden de torneo.
 
-    Para fases sin ``StageUser`` aún se usa una instancia transitoria (no
-    guardada) solo para derivar ``state``; no escribe en la base.
+    Las 3 sub-fases ``is_group`` se colapsan en un único tab "Grupos" que
+    enlaza al alias ``/stage/grupos/``. Cada tab es ``{"key", "short_name"}``
+    (``key`` "grupos" para el bloque de grupos).
     """
+    tabs: list[dict] = []
+    group_done = False
+    for stage in Stage.objects.all():
+        if stage.is_group:
+            if group_done:
+                continue
+            group_done = True
+            tabs.append({"key": "grupos", "short_name": "Grupos"})
+        else:
+            tabs.append(
+                {"key": stage.key, "short_name": stage.short_name}
+            )
+    return tabs
+
+
+def current_group_stage(user: User) -> StageUser:
+    """``StageUser`` de la sub-fase de grupos vigente para el usuario.
+
+    Vigente = la sub-fase ``is_group`` abierta y sin vencer, de menor
+    ``order`` (la jornada en captura). Si ninguna está abierta, cae a la
+    primera no enviada (encabezado en solo lectura) o, en su defecto, a la
+    última. Igual que las vistas, materializa al vuelo un ``StageUser`` si
+    el usuario aún no tiene la fila.
+    """
+    substages = list(Stage.objects.filter(is_group=True))
     states = {
         su.stage_id: su
-        for su in StageUser.objects.select_related("stage").filter(user=user)
-    }
-    tabs = []
-    for stage in Stage.objects.all():
-        stage_user = states.get(stage.id) or StageUser(
-            user=user, stage=stage
+        for su in StageUser.objects.select_related("stage").filter(
+            user=user, stage__is_group=True
         )
-        tabs.append({"stage": stage, "state": stage_user.state})
-    return tabs
+    }
+
+    def su_for(stage: Stage) -> StageUser:
+        return states.get(stage.id) or StageUser(user=user, stage=stage)
+
+    for stage in substages:
+        if stage.is_open and not stage.is_past_deadline:
+            return su_for(stage)
+    for stage in substages:
+        su = su_for(stage)
+        if su.state != StageUser.SENT:
+            return su
+    return su_for(substages[-1])
 
 
 @login_required
@@ -237,7 +304,7 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
     # (placeholders "1A"/"2B") según la variante elegida; las tarjetas y el
     # dialog comparten estas instancias. Terceros y ganadores quedan como
     # placeholder textual.
-    is_group_stage = stage.key == Stage.GROUP_STAGE
+    is_group_stage = stage.is_group
     variant = resolve_variant(request.GET.get("variant"))
     derivable = False
     if not is_group_stage:
@@ -252,6 +319,9 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
                 if m.away_team is None:
                     m.away_team = resolved.get(m.away_placeholder)
 
+    for m in flat_matches:
+        m.editable = stage_user.can_edit
+
     context = {
         "stage": stage,
         "state": stage_user.state,
@@ -264,6 +334,7 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
         "variant": variant,
         "derivable": derivable,
         "tabs": _build_tabs(request.user),
+        "tabs_active": stage.key,
         "deadline_iso": (
             stage.send_deadline.isoformat()
             if stage.send_deadline
@@ -271,6 +342,47 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
         ),
     }
     return render(request, "stage.html", context)
+
+
+@login_required
+def groups_view(request: HttpRequest) -> HttpResponse:
+    """Pestaña unificada de Grupos sobre las 3 sub-fases (``is_group``).
+
+    Muestra todos los grupos A–L con la tabla de posiciones **acumulada**,
+    pero solo los partidos de la sub-fase vigente son editables; el resto
+    se ve en solo lectura. "Enviar" finaliza únicamente esa sub-fase: el
+    contexto (``stage``/``state``/``deadline_iso``) apunta a la vigente, y
+    su ``key`` viaja en ``data-stage`` para que ``/send/`` cierre la
+    jornada correcta.
+    """
+    active = current_group_stage(request.user)
+    stage = active.stage
+    sections = render_group_sections(request.user)
+    flat_matches = [m for s in sections for m in s["matches"]]
+    for m in flat_matches:
+        m.editable = m.stage_id == active.stage_id and active.can_edit
+
+    context = {
+        "stage": stage,
+        "state": active.state,
+        "can_edit": active.can_edit,
+        "sections": sections,
+        "match_dialog_data": build_match_dialog_payload(
+            flat_matches, request.user
+        ),
+        "is_group_stage": True,
+        "variant": resolve_variant(request.GET.get("variant")),
+        "derivable": False,
+        "tabs": _build_tabs(request.user),
+        "tabs_active": "grupos",
+        "deadline_iso": (
+            stage.send_deadline.isoformat()
+            if stage.send_deadline
+            else ""
+        ),
+    }
+    return render(request, "stage.html", context)
+
 
 @login_required
 def por_fecha_view(request: HttpRequest) -> HttpResponse:
@@ -301,7 +413,7 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
         )
         match.local_day = format_day(local_dt)
         match.local_time = format_time(local_dt)
-        match.is_group = match.stage.key == Stage.GROUP_STAGE
+        match.is_group = match.stage.is_group
         prediction = preds.get(match.id)
         if prediction is not None:
             match.predicted_home = prediction.home_goals

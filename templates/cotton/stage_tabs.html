@@ -10,9 +10,9 @@
     <a class="{{ base }} {% if active == 'fecha' %}{{ on }}{% else %}{{ off }}{% endif %}"
        href="{% url 'by_date' %}">por fecha</a>
     {% for tab in tabs %}
-    <a class="{{ base }} {% if tab.stage.key == active %}{{ on }}{% else %}{{ off }}{% endif %}"
-       href="{% url 'stage' tab.stage.key %}">
-        {{ tab.stage.short_name }}
+    <a class="{{ base }} {% if tab.key == active %}{{ on }}{% else %}{{ off }}{% endif %}"
+       href="{% if tab.key == 'grupos' %}{% url 'groups' %}{% else %}{% url 'stage' tab.key %}{% endif %}">
+        {{ tab.short_name }}
     </a>
     {% endfor %}
 </nav>

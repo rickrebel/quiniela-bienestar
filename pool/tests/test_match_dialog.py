@@ -83,7 +83,8 @@ class DialogPayloadPrivacyTests(TestCase):
         now = timezone.now()
         cls.open_stage = Stage.objects.create(
             key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
-            color="#4CAF50", order=1, send_deadline=now + timedelta(days=1),
+            color="#4CAF50", order=1, is_group=True,
+            send_deadline=now + timedelta(days=1),
         )
         cls.closed_stage = Stage.objects.create(
             key="LAST_32", name="Dieciseisavos", short_name="16avos",

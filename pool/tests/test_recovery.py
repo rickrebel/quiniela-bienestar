@@ -110,7 +110,7 @@ class ResetPasswordViewTests(TestCase):
         }
         response = self.client.post(self._url(token), payload)
         self.assertRedirects(
-            response, reverse("stage", kwargs={"key": "GROUP_STAGE"}),
+            response, reverse("groups"),
             fetch_redirect_response=False,
         )
         user.refresh_from_db()
