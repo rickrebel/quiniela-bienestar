@@ -38,13 +38,13 @@
 
 <header class="header">
     {% if my_standing %}
-    {# rank-chip: ahora abre el dialog de posiciones (no navega). Solo #}
-    {# la posición; los puntos se quitaron a pedido. #}
-    <button class="rank-chip" type="button" data-leaderboard-open
-            title="Tabla de posiciones">
+    {# rank-chip: navega a la vista completa de posiciones. Solo la #}
+    {# posición; los puntos se quitaron a pedido. #}
+    <a class="rank-chip" href="{% url 'standings' %}"
+       title="Tabla de posiciones">
         <span class="rank-icon">🏆</span>
         <span class="rank-pos">{{ my_standing.position }}°</span>
-    </button>
+    </a>
     {% else %}
     <span>🏆</span>
     {% endif %}

@@ -388,17 +388,17 @@ def groups_view(request: HttpRequest) -> HttpResponse:
 def por_fecha_view(request: HttpRequest) -> HttpResponse:
     """Calendario global de solo lectura: todos los partidos por fase.
 
-    Doble agrupación: las fases van en orden de creación (= progresión del
-    torneo) y, dentro de cada una, los partidos se agrupan por **fecha
-    local de la sede** (con día de la semana). El queryset ya viene
-    ordenado por ``(stage_id, datetime, of_number)``, así que ambos cortes
-    son lineales. Reusa ``annotate_result`` y el dialog de detalle. No
-    edita: las tarjetas se renderizan sin ``can_edit``.
+    Doble agrupación: las fases van en orden de torneo (``Stage.order``) y,
+    dentro de cada una, los partidos se agrupan por **fecha local de la
+    sede** (con día de la semana). El queryset ya viene ordenado por
+    ``(stage__order, datetime, of_number)``, así que ambos cortes son
+    lineales. Reusa ``annotate_result`` y el dialog de detalle. No edita:
+    las tarjetas se renderizan sin ``can_edit``.
     """
     matches = list(
         Match.objects.select_related(
             "home_team", "away_team", "stadium", "stage"
-        ).order_by("stage_id", "datetime", "of_number")
+        ).order_by("stage__order", "datetime", "of_number")
     )
     preds = {
         p.match_id: p
