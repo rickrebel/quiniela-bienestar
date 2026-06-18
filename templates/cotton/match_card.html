@@ -10,10 +10,14 @@
 {# Uso: <c-match-card :match="match" :stage="stage" state="{{ state }}" #}
 {#        :can_edit="can_edit" :is_group_stage="is_group_stage" #}
 {#        :by_date="by_date" /> #}
-<section class="match-card relative mx-2 flex cursor-pointer flex-col
+{# En edición la tarjeta NO abre el dialog (ni cursor-pointer ni #}
+{# data-dialog-match): facilita teclear los marcadores sin que un tap #}
+{# fuera de los inputs dispare el modal. Per-tarjeta: en Grupos las #}
+{# jornadas bloqueadas sí siguen abriéndolo. #}
+<section class="match-card relative mx-2 flex flex-col
                 items-center justify-center gap-2 border-t-[2.5px]
-                border-white/20 py-2.5 pl-10 pr-8"
-         data-dialog-match="{{ match.id }}">
+                border-white/20 py-2.5 pl-10 pr-8{% if not match.editable %} cursor-pointer{% endif %}"
+         {% if not match.editable %}data-dialog-match="{{ match.id }}"{% endif %}>
     {% if stage.key == 'FINAL' %}
     <div class="flex items-baseline gap-2 text-[0.82rem]">
         <span class="font-bold uppercase tracking-[0.04em]
