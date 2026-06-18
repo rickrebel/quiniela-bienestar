@@ -20,28 +20,28 @@
   default: true;
   color-scheme: dark;
 
-  --color-base-100: #1f1c02;
-  --color-base-200: #2c2706;
-  --color-base-300: #2f2b0c;
+  --color-base-100: #0a1c34;
+  --color-base-200: #111F36;
+  --color-base-300: #1c263a;
   --color-base-content: #e7e7e7;
 
   --color-primary: #d48b37;
-  --color-primary-content: #0f1115;
+  --color-primary-content: #04172c;
   --color-secondary: #b8c0cc;
-  --color-secondary-content: #0f1115;
+  --color-secondary-content: #04172c;
   --color-accent: #e5aa5c;
-  --color-accent-content: #0f1115;
+  --color-accent-content: #04172c;
   --color-neutral: #1e2536;
   --color-neutral-content: #e7e7e7;
 
   --color-info: #8fa8c7;
-  --color-info-content: #0f1115;
+  --color-info-content: #04172c;
   --color-success: #6bbf8a;
-  --color-success-content: #0f1115;
+  --color-success-content: #04172c;
   --color-warning: #e5c55c;
-  --color-warning-content: #0f1115;
+  --color-warning-content: #04172c;
   --color-error: #e57373;
-  --color-error-content: #0f1115;
+  --color-error-content: #04172c;
 
   /* Radios actuales: cajas 14px, campos 6-7px, pills redondas. */
   --radius-box: 0.875rem;
