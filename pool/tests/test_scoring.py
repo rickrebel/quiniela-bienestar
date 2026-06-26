@@ -2,7 +2,8 @@
 
 from django.test import SimpleTestCase
 
-from pool.services.scoring import calculate_points, score_detail
+from pool.services.scoring import (
+    calculate_points, chips_from_codes, score_detail)
 
 
 class CalculatePointsTests(SimpleTestCase):
@@ -73,3 +74,32 @@ class ScoreDetailFlagsTests(SimpleTestCase):
         self.assertEqual(
             (detail.points, detail.outcome, detail.exact, detail.diff_bonus),
             (0, False, False, False))
+
+
+class ChipsFromCodesTests(SimpleTestCase):
+    """Los chips de desglose: Dif se omite en empate y Pen solo aparece en
+    knockouts por penales."""
+
+    def _labels(self, chips):
+        return [c["label"] for c in chips]
+
+    def test_non_draw_has_three_chips(self):
+        chips = chips_from_codes(["RESULT", "DIFF"], is_draw=False)
+        self.assertEqual(self._labels(chips), ["Res", "Dif", ""])
+        self.assertEqual(chips[1]["state"], "on")
+
+    def test_draw_omits_dif_chip(self):
+        chips = chips_from_codes(["RESULT", "EXACT"], is_draw=True)
+        self.assertEqual(self._labels(chips), ["Res", ""])
+
+    def test_penalty_chip_on_when_hit(self):
+        chips = chips_from_codes(
+            ["RESULT", "EXACT", "PENALTY"], is_draw=True, show_penalty=True)
+        self.assertEqual(self._labels(chips), ["Res", "", "Pen"])
+        self.assertEqual(chips[-1]["state"], "on")
+
+    def test_penalty_chip_off_when_missed(self):
+        chips = chips_from_codes(
+            ["RESULT", "EXACT"], is_draw=True, show_penalty=True)
+        self.assertEqual(chips[-1]["label"], "Pen")
+        self.assertEqual(chips[-1]["state"], "off")

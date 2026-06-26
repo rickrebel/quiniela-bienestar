@@ -13,6 +13,25 @@ def getenv_list(
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def getenv_map(
+    name: str, default: dict[str, str] | None = None
+) -> dict[str, str]:
+    """Mapa ``clave:valor`` separado por comas (p. ej. ``host:slug``).
+
+    ``a.com:x,b.com:y`` → ``{"a.com": "x", "b.com": "y"}``. Pares sin ``:``
+    se ignoran. Devuelve ``default`` (o ``{}``) si la variable no existe.
+    """
+    value = os.getenv(name)
+    if value is None:
+        return default if default is not None else {}
+    result: dict[str, str] = {}
+    for pair in value.split(","):
+        if ":" in pair:
+            key, val = pair.split(":", 1)
+            result[key.strip()] = val.strip()
+    return result
+
+
 def getenv_bool(name: str, default: bool = False) -> bool:
     """``True`` si vale 1/true/yes/on (insensible a mayúsculas)."""
     value = os.getenv(name)

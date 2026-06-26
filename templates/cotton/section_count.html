@@ -2,6 +2,6 @@
 {# mientras se edita. La clase section-count es hook de submit.js #}
 {# (updateCounter reescribe el texto al autoguardar). #}
 <span class="section-count ml-auto text-xs font-bold tracking-[0.3px]
-             text-[#c3a764]/70">
+             text-accent/70">
     {% if state == 'sent' %}{{ points }} pts{% else %}{{ filled }}/{{ total }}{% endif %}
 </span>

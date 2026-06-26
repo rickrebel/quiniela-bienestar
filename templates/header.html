@@ -1,38 +1,9 @@
 {% load static %}
-<aside class="user-bar">
-    <nav class="user-bar-nav" aria-label="Navegación de usuario">
-        <span class="user-hi">Queonda {{ user.first_name }}!</span>
-        <button class="user-nav-item" type="button" data-rules-open>
-            Reglas
-        </button>
-        <a class="logout-anchor" href="{% url 'logout' %}">Salir
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <!-- puerta -->
-                <path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9"/>
-
-                <!-- flecha -->
-                <path d="M10 12h11"/>
-                <path d="M17 7l5 5-5 5"/>
-            </svg>
-        </a>
-    </nav>
-</aside>
-
 <header class="header">
     {% if my_standing %}
     {# rank-chip: navega a la vista completa de posiciones. Solo la #}
     {# posición; los puntos se quitaron a pedido. #}
-    <a class="rank-chip" href="{% url 'standings' %}"
+    <a class="rank-chip" href="{% url 'standings' request.quiniela.slug %}"
        title="Tabla de posiciones">
         <span class="rank-icon">🏆</span>
         <span class="rank-pos">{{ my_standing.position }}°</span>
@@ -61,7 +32,11 @@
     <h1 class="title"><span>⚽</span>quiniela</h1>
     {% endif %}
 
-    <button class="user-chip">
+    {# Menú de cuenta: dropdown daisyUI (<details>), único trigger en el #}
+    {# ícono de persona. Agrupa saludo, cambio de quiniela, reglas y salir. #}
+    {# El cierre (fuera/al elegir) lo maneja app.js. #}
+    <details class="dropdown dropdown-end user-menu">
+    <summary class="user-chip" aria-label="Menú de usuario">
     <span class="user-icon">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path
@@ -69,11 +44,47 @@
         />
       </svg>
     </span>
-    <span class="user-name">
-      Nombrelargo
-    </span>
+    </summary>
+    <ul class="menu dropdown-content z-10 mt-2 w-56 rounded-box border
+               border-base-content/10 bg-base-200 p-2 shadow-lg">
+        <li class="menu-title user-greeting">
+            ¡Hola, {{ user.first_name }}!
+        </li>
 
-  </button>
+        {% if user_quinielas|length > 1 %}
+        <li class="menu-title">Cambiar quiniela</li>
+        {% for q in user_quinielas %}
+        <li>
+            <a href="{% url 'window' q.slug 1 %}"
+               class="{% if q.id == active_quiniela.id %}font-bold text-primary{% endif %}">
+                {{ q.name }}
+            </a>
+        </li>
+        {% endfor %}
+        {% endif %}
+
+        <li><hr class="my-1 border-base-content/10"></li>
+
+        <li>
+            <button type="button" data-rules-open class="user-menu-action">
+                <span class="user-menu-emoji">📖</span> Reglas
+            </button>
+        </li>
+        <li>
+            <a class="user-menu-action user-menu-logout"
+               href="{% url 'logout' %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round"
+                     stroke-linejoin="round" aria-hidden="true">
+                    <path d="M14 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9"/>
+                    <path d="M10 12h11"/>
+                    <path d="M17 7l5 5-5 5"/>
+                </svg>
+                Salir
+            </a>
+        </li>
+    </ul>
+    </details>
 
 </header>
 

@@ -20,8 +20,11 @@ function getCookie(name) {
 
 const csrftoken = getCookie("csrftoken");
 
+// Prefijo de la quiniela activa (slug del path); base.html lo inyecta.
+const apiBase = "/" + (window.QUINIELA_SLUG || "");
+
 function buildPayload() {
-    const stage = document.querySelector(".content").dataset.stage;
+    const windowOrder = document.querySelector(".content").dataset.window;
     const predictions = [];
 
     document.querySelectorAll(".match").forEach(match => {
@@ -41,7 +44,7 @@ function buildPayload() {
         });
     });
 
-    return { stage, predictions };
+    return { window: windowOrder, predictions };
 }
 
 function isComplete(payload) {
@@ -148,16 +151,47 @@ function initWinnerMarks() {
 
 document.addEventListener("DOMContentLoaded", initWinnerMarks);
 
+// --- Selector de avance por penales (eliminatoria + empate previsto) ---
+// El bloque .advancing-pick solo se renderiza en knockouts editables. Se
+// muestra (clase .show) cuando el marcador previsto es empate; el equipo
+// elegido (.is-picked) viaja como advancing_team_id en el autoguardado.
+
+function advancingPick(matchEl) {
+    return matchEl.closest(".match-card")?.querySelector(".advancing-pick");
+}
+
+function selectedAdvancing(matchEl) {
+    const picked = advancingPick(matchEl)?.querySelector(
+        ".advancing-opt.is-picked");
+    return picked ? parseInt(picked.dataset.advancing) : null;
+}
+
+// Muestra el selector solo en empate (ambos marcadores iguales y llenos);
+// fuera de empate lo oculta y limpia la selección.
+function syncAdvancing(matchEl) {
+    const pick = advancingPick(matchEl);
+    if (!pick) return;
+    const home = matchEl.querySelector('[data-field="home_goals"]').value;
+    const away = matchEl.querySelector('[data-field="away_goals"]').value;
+    const isDraw = home !== "" && away !== "" && home === away;
+    pick.classList.toggle("show", isDraw);
+    if (!isDraw) {
+        pick.querySelectorAll(".advancing-opt").forEach(
+            o => o.classList.remove("is-picked"));
+    }
+}
+
 async function saveMatch(matchEl) {
     const home = matchEl.querySelector('[data-field="home_goals"]').value;
     const away = matchEl.querySelector('[data-field="away_goals"]').value;
     const payload = {
         home_goals: home === "" ? null : parseInt(home),
         away_goals: away === "" ? null : parseInt(away),
+        advancing_team_id: selectedAdvancing(matchEl),
     };
     try {
         const data = await postPredictions(
-            `/prediction/${matchEl.dataset.matchId}/`, payload
+            `${apiBase}/prediction/${matchEl.dataset.matchId}/`, payload
         );
         // Solo se avisa cuando el partido quedó completo (guardado real);
         // un input suelto al salir del campo no debe gritar "Guardado".
@@ -173,11 +207,24 @@ function initAutosave() {
 
     document.querySelectorAll(".match").forEach(matchEl => {
         const container = matchEl.closest(".group, .knockout");
+        syncAdvancing(matchEl);  // estado inicial según lo ya guardado
         matchEl.querySelectorAll('input[type="number"]').forEach(input => {
+            input.addEventListener("input", () => syncAdvancing(matchEl));
             input.addEventListener("change", () => {
                 updateCounter(container);
                 void saveMatch(matchEl);
             });
+        });
+    });
+
+    document.querySelectorAll(".advancing-opt").forEach(opt => {
+        opt.addEventListener("click", () => {
+            const pick = opt.closest(".advancing-pick");
+            pick.querySelectorAll(".advancing-opt").forEach(
+                o => o.classList.remove("is-picked"));
+            opt.classList.add("is-picked");
+            const matchEl = opt.closest(".match-card").querySelector(".match");
+            void saveMatch(matchEl);
         });
     });
 }
@@ -210,6 +257,17 @@ function buildSummary() {
         ".content > .group, .content > .knockout"
     );
     blocks.forEach(block => {
+        // Bloques sin partidos (p. ej. "Mejores terceros") no aportan al
+        // resumen: ni encabezado huérfano ni su switch "Simular cruces".
+        // En grupos cada bloque trae las 3 jornadas pero solo se envía la
+        // vigente: se filtran las tarjetas deshabilitadas (jornada no viva).
+        const cards = [...block.querySelectorAll(".match-card")].filter(
+            card => {
+                const input = card.querySelector(".score input");
+                return !input || !input.disabled;
+            }
+        );
+        if (!cards.length) return;
         // Grupos: el título es .group-summary ("Grupo A"). Finales: no hay
         // summary, así que se usa el .chip-title de la sección (p. ej.
         // "OCTAVOS"). Se clona el que exista.
@@ -221,9 +279,7 @@ function buildSummary() {
             head.querySelector(".chevron")?.remove();
             body.appendChild(head);
         }
-        block.querySelectorAll(".match-card").forEach(card => {
-            body.appendChild(freezeCard(card));
-        });
+        cards.forEach(card => body.appendChild(freezeCard(card)));
     });
 }
 
@@ -236,13 +292,45 @@ function freezeCard(card) {
         input.value = liveInputs[i].value;
         input.disabled = true;
     });
+    summarizeAdvancing(clone);
     return clone;
+}
+
+// En el resumen del envío el selector de avance se colapsa a una línea de
+// solo lectura: "Pasa: › <bandera> <equipo>". Si no se eligió (o no era
+// empate) se quita el bloque.
+function summarizeAdvancing(clone) {
+    const pick = clone.querySelector(".advancing-pick");
+    if (!pick) return;
+    const picked = pick.querySelector(".advancing-opt.is-picked");
+    if (!pick.classList.contains("show") || !picked) {
+        pick.remove();
+        return;
+    }
+    const flag = picked.querySelector("img");
+    const name = picked.querySelector("span")?.textContent ?? "";
+    pick.classList.add("advancing-summary");
+    pick.innerHTML = "";
+
+    const label = document.createElement("span");
+    label.className = "advancing-summary-text";
+    label.textContent = "Pasa:";
+    const icon = document.createElement("span");
+    icon.className = "material-symbols-outlined advancing-summary-icon";
+    icon.setAttribute("aria-hidden", "true");
+    icon.textContent = "chevron_right";
+    pick.append(label, icon);
+    if (flag) pick.append(flag.cloneNode(true));
+    const teamName = document.createElement("span");
+    teamName.className = "advancing-summary-text";
+    teamName.textContent = name;
+    pick.append(teamName);
 }
 
 async function confirmSend() {
     savingOverlay.hidden = false;
     try {
-        await postPredictions("/send/", buildPayload());
+        await postPredictions(`${apiBase}/send/`, buildPayload());
         location.reload();
     } catch (err) {
         alert(err.message);

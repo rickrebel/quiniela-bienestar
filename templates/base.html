@@ -1,12 +1,12 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="{{ quiniela_theme }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>quiniela</title>
     <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
-    <meta name="theme-color" content="#142B4A">
+    <meta name="theme-color" content="{{ quiniela_theme_color }}">
 
     {# Material Symbols con subset: icon_names lista (alfabética) solo #}
     {# los iconos usados; agregar uno nuevo = sumarlo a la lista. #}
@@ -22,6 +22,11 @@
 
 {% block content %}{% endblock %}
 
+<script>
+    // Slug de la quiniela activa: submit.js y match_dialog.js prefijan los
+    // endpoints con él (vacío en páginas de auth, que no los usan).
+    window.QUINIELA_SLUG = "{{ request.quiniela.slug|default:'' }}";
+</script>
 <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
 <script src="{% static 'local_time.js' %}"></script>
 <script src="{% static 'app.js' %}"></script>

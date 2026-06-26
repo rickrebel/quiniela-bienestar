@@ -10,11 +10,16 @@
 @source "../../templates";
 @source "../../static/*.js";
 
+/* Cinco paletas conmutables por quiniela (<html data-theme>). El slug
+   lo fija Quiniela.theme; el context processor quiniela_theme lo inyecta.
+   accent = realce "oro apagado" de los metadatos (antes #c3a764 fijo);
+   por eso cambia de color con el tema. Radios compartidos por todas:
+   cajas 14px, campos 7px, pills redondas. */
 @plugin "daisyui" {
-  themes: sanginiela --default;
+  themes: sanginiela --default, medianoche, bienestar, bosque, violeta;
 }
 
-/* Tema único: la paleta dark/dorado que ya vivía en base.css. */
+/* ① sanginiela — azul marino + oro (original, intacto). */
 @plugin "daisyui/theme" {
   name: "sanginiela";
   default: true;
@@ -29,7 +34,7 @@
   --color-primary-content: #04172c;
   --color-secondary: #b8c0cc;
   --color-secondary-content: #04172c;
-  --color-accent: #e5aa5c;
+  --color-accent: #c3a764;
   --color-accent-content: #04172c;
   --color-neutral: #1e2536;
   --color-neutral-content: #e7e7e7;
@@ -43,21 +48,147 @@
   --color-error: #e57373;
   --color-error-content: #04172c;
 
-  /* Radios actuales: cajas 14px, campos 6-7px, pills redondas. */
   --radius-box: 0.875rem;
   --radius-field: 0.4375rem;
   --radius-selector: 2rem;
 }
 
-/* Tokens propios fuera de la semántica daisyUI; generan utilidades
-   (text-gold, bg-gold-soft, text-muted, bg-surface...). */
-@theme {
-  --color-gold: #d49037;
-  --color-gold-soft: rgba(212, 175, 55, 0.14);
-  --color-muted: rgb(180, 180, 180);
-  --color-soft: #b8c0cc;
-  --color-surface: #232732;
-  --color-surface-2: #1f2430;
+/* ② medianoche — carbón neutro + oro clásico (réplica del look de
+   producción, sanginiela.yeeko.org). Base no es azul marino sino un
+   gris casi negro frío; base-200 va más claro que base-300, como en
+   prod. */
+@plugin "daisyui/theme" {
+  name: "medianoche";
+  color-scheme: dark;
+
+  --color-base-100: #0f1115;
+  --color-base-200: #232732;
+  --color-base-300: #1f2430;
+  --color-base-content: #e7e7e7;
+
+  --color-primary: #d4af37;
+  --color-primary-content: #0f1115;
+  --color-secondary: #b8c0cc;
+  --color-secondary-content: #0f1115;
+  --color-accent: #e5c55c;
+  --color-accent-content: #0f1115;
+  --color-neutral: #1e2536;
+  --color-neutral-content: #e7e7e7;
+
+  --color-info: #8fa8c7;
+  --color-info-content: #0f1115;
+  --color-success: #6bbf8a;
+  --color-success-content: #0f1115;
+  --color-warning: #e5c55c;
+  --color-warning-content: #0f1115;
+  --color-error: #e57373;
+  --color-error-content: #0f1115;
+
+  --radius-box: 0.875rem;
+  --radius-field: 0.4375rem;
+  --radius-selector: 2rem;
+}
+
+/* ③ bienestar — Guinda y Dorado (Gobierno Federal MX), adaptado al contraste de Sanginiela. */
+@plugin "daisyui/theme" {
+  name: "bienestar";
+  color-scheme: dark;
+
+  /* Bases: Progresión desde el fondo absoluto hasta los contenedores de la identidad */
+  --color-base-100: #161a1d; /* Negro neutro: Fondo general de la app para alto contraste */
+  --color-base-200: #611232; /* Guinda oscuro: Fondos solemnes para tarjetas y profundidad */
+  --color-base-300: #9b2247; /* Guinda principal: Bordes, contenedores activos y cabeceras */
+  --color-base-content: #e6d194; /* Dorado claro / Arena: Texto principal que evita el cansancio visual */
+
+  /* Acciones e Interacción: El "Pop" de gala idéntico al comportamiento de Sanginiela */
+  --color-primary: #a57f2c; /* Dorado institucional: El botón principal y realces de gala */
+  --color-primary-content: #161a1d; /* Negro neutro para máxima legibilidad sobre el botón dorado */
+  --color-secondary: #1e5b4f; /* Verde institucional: Botones secundarios y acentos visuales[cite: 1] */
+  --color-secondary-content: #ffffff; /* Blanco puro para destacar sobre el verde institucional */
+  --color-accent: #e6d194; /* Dorado claro / Arena: Metadatos y el equivalente al "oro apagado"[cite: 1] */
+  --color-accent-content: #161a1d; /* Negro neutro para contraste en etiquetas de acento[cite: 1] */
+  --color-neutral: #002f2a; /* Verde oscuro: Variante profunda para componentes secundarios neutros[cite: 1] */
+  --color-neutral-content: #e6d194; /* Dorado claro para mantener la consistencia de lectura[cite: 1] */
+
+  /* Utilidades semánticas integradas al ecosistema visual */
+  --color-info: #7fb0a0; /* Tono suavizado derivado del espectro de verdes institucionales[cite: 1] */
+  --color-info-content: #161a1d;
+  --color-success: #5fb98a;
+  --color-success-content: #161a1d;
+  --color-warning: #e6d194; /* Reutiliza el arena institucional para advertencias elegantes[cite: 1] */
+  --color-warning-content: #161a1d;
+  --color-error: #e0726a;
+  --color-error-content: #161a1d;
+
+  --radius-box: 0.875rem;
+  --radius-field: 0.4375rem;
+  --radius-selector: 2rem;
+}
+
+/* ④ bosque — esmeralda con acento ámbar. */
+@plugin "daisyui/theme" {
+  name: "bosque";
+  color-scheme: dark;
+
+  --color-base-100: #0c1f1a;
+  --color-base-200: #122a23;
+  --color-base-300: #1b372e;
+  --color-base-content: #e6efe9;
+
+  --color-primary: #4fb286;
+  --color-primary-content: #05140f;
+  --color-secondary: #b8c4bd;
+  --color-secondary-content: #0c1f1a;
+  --color-accent: #d9a44e;
+  --color-accent-content: #0c1f1a;
+  --color-neutral: #16261f;
+  --color-neutral-content: #e6efe9;
+
+  --color-info: #79b8a8;
+  --color-info-content: #05140f;
+  --color-success: #57c08a;
+  --color-success-content: #05140f;
+  --color-warning: #e0c25c;
+  --color-warning-content: #0c1f1a;
+  --color-error: #e07a72;
+  --color-error-content: #0c1f1a;
+
+  --radius-box: 0.875rem;
+  --radius-field: 0.4375rem;
+  --radius-selector: 2rem;
+}
+
+/* ⑤ violeta — ciruela con acento rosa. */
+@plugin "daisyui/theme" {
+  name: "violeta";
+  color-scheme: dark;
+
+  --color-base-100: #1a1228;
+  --color-base-200: #231833;
+  --color-base-300: #2e2042;
+  --color-base-content: #ece7f3;
+
+  --color-primary: #9a78d6;
+  --color-primary-content: #0d0818;
+  --color-secondary: #c2bcd0;
+  --color-secondary-content: #0d0818;
+  --color-accent: #e0a3c4;
+  --color-accent-content: #1a1228;
+  --color-neutral: #251a36;
+  --color-neutral-content: #ece7f3;
+
+  --color-info: #8fa6d8;
+  --color-info-content: #0d0818;
+  --color-success: #62bf95;
+  --color-success-content: #0d0818;
+  --color-warning: #e3c463;
+  --color-warning-content: #1a1228;
+  --color-error: #e0787f;
+  --color-error-content: #1a1228;
+
+  --radius-box: 0.875rem;
+  --radius-field: 0.4375rem;
+  --radius-selector: 2rem;
 }
 
 /* Todos los <input type=number> son marcadores: nunca queremos los
@@ -79,9 +210,9 @@
   /* Opción de un conmutador segmentado; standings.js togglea .active. */
   .view-opt {
     @apply cursor-pointer rounded-lg border-0 bg-transparent px-3.5
-      py-1 text-[12.5px] font-semibold text-muted no-underline;
+      py-1 text-[12.5px] font-semibold text-base-content/60 no-underline;
   }
   .view-opt.active {
-    @apply bg-gold-soft text-gold;
+    @apply bg-primary/15 text-primary;
   }
 }

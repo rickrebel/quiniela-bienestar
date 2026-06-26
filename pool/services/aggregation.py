@@ -20,8 +20,9 @@ def get_or_create_virtual_user():
     """Usuario virtual, creándolo en el primer uso.
 
     ``create_user`` deja contraseña inusable e ``is_active=False``;
-    junto con la guarda de ``login_view`` nadie puede entrar con él.
-    La señal post_save le materializa sus StageUser.
+    junto con la guarda de ``login_view`` nadie puede entrar con él. Su
+    ``WindowUser`` nace al inscribirlo en una quiniela (``UserQuiniela``,
+    vía el signal ``create_window_users``).
     """
     # Import local: el resto del módulo es matemática pura y debe seguir
     # siendo importable sin tocar los modelos.

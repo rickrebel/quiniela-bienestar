@@ -99,50 +99,31 @@ python manage.py load_teams
 python manage.py load_matches
 ```
 
-Preregistrar un participante (comando de la app `pool`; entra después solo con
-su correo):
+Preregistrar un participante e inscribirlo a una quiniela (comando de la app
+`pool`; entra después solo con su correo). El último argumento es el slug de la
+quiniela; reejecuta con otro slug para sumar al mismo usuario a una segunda:
 
 ```bash
-python manage.py preregister correo@ejemplo.com "Nombre del Jugador"
+python manage.py preregister correo@ejemplo.com "Nombre del Jugador" bienestar
 ```
 
-## Bootstrap del fork "bienestar" desde la quiniela original
+## Varias quinielas en una misma BD
 
-Este fork reutiliza los datos de la quiniela original (usuarios, contraseñas,
-partidos **con resultados reales** y predicciones). En vez de re-sembrar, se
-**clona** la BD original y sobre el clon se aplica una transformación
-idempotente. Mismo procedimiento en local y en producción; las credenciales
-son idénticas (solo cambia el nombre de la BD, ver `POSTGRES_DB` y
-`POSTGRES_DB_ORIGINAL` en `.env`).
+La estructura del torneo (las 8 fases atómicas) es **compartida**; cada
+quiniela es **configuración**, no un esquema aparte. Tras los seeds:
 
 ```bash
-# Toma las credenciales del entorno; psql/pg_dump piden la contraseña vía
-# PGPASSWORD (o ~/.pgpass) para no exponerla en el comando.
-export PGPASSWORD="$POSTGRES_PASSWORD"
-
-# 1) Crear la BD destino vacía (una sola vez).
-createdb -h "$POSTGRES_HOST" -U "$POSTGRES_USER" "$POSTGRES_DB"
-
-# 2) Clonar la original -> destino (snapshot consistente, en caliente).
-pg_dump -h "$POSTGRES_HOST" -U "$POSTGRES_USER" "$POSTGRES_DB_ORIGINAL" \
-  | psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" "$POSTGRES_DB"
-
-# 3) Aplicar las migraciones del fork (columnas nuevas: is_group,
-#    multiplier, advancing_team) y transformar el clon.
-python manage.py migrate
-python manage.py bootstrap_bienestar --yes
+# Crea/actualiza el catálogo de reglas y las quinielas con sus puntos base.
+python manage.py load_rules
+# Agrupa las fases en ventanas por quiniela (sanginiela concentra los 3
+# subgrupos en una ventana "Grupos"; bienestar los separa). Idempotente.
+python manage.py seed_windows
 ```
 
-`bootstrap_bienestar` parte la fase de grupos en 3 sub-fases
-(`SUBGROUP_1/2/3`) reasignando solo el FK `stage` de cada partido (no toca
-marcadores ni `status`), borra las predicciones de la 1.ª jornada (ya jugada;
-`SUBGROUP_1` nace cerrada) y pone todos los `sent_at` en null. Es idempotente
-en estructura, pero **reejecutarlo vuelve a reiniciar los `sent_at`**: corre
-solo en el montaje, antes de abrir la quiniela. Después, fija en el admin las
-fechas (`opens_at` / `send_deadline`) de `SUBGROUP_2` y `SUBGROUP_3`.
-
-> El clon es **puntual**, no un espejo en vivo: tras clonar, las dos
-> quinielas divergen (un cambio de contraseña en la original no se propaga).
+Las definiciones de quinielas/ventanas viven en esos comandos (`load_rules`,
+`seed_windows`). El calendario y el peso de cada ventana (`opens_at`,
+`send_deadline`, `multiplier`) se ajustan en el admin; en las ventanas 1:1
+(una sola fase) caen por defecto al valor de la fase.
 
 ## Crear un superuser para poder entrar al admin
 

@@ -10,7 +10,9 @@ from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
 from pool.models import Prediction, User
-from pool.services.standings import StandingRow, build_group_standings
+from pool.services.standings import (
+    StandingRow, build_group_standings, rank_group,
+)
 from tournament.models import Match, Stadium, Stage, Team
 
 
@@ -52,6 +54,50 @@ class SortKeyTests(SimpleTestCase):
     #     zeta = _trow(name="Zambia")
     #     alfa = _trow(name="Argelia")
     #     self.assertIs(self._first(zeta, alfa), alfa)
+
+
+class HeadToHeadTests(SimpleTestCase):
+    """Desempate por enfrentamiento directo (regla FIFA 2026), sobre
+    ``rank_group``. Los pares son (home_id, away_id, home_goals, away_goals).
+    """
+
+    @staticmethod
+    def _row(tid: int, **kwargs) -> StandingRow:
+        return StandingRow(team=Team(id=tid, name_es=str(tid)), **kwargs)
+
+    @staticmethod
+    def _ids(ordered: list[StandingRow]) -> list[int]:
+        return [r.team.id for r in ordered]
+
+    def test_direct_winner_breaks_points_tie(self):
+        # Empate a pts y DG global; A le ganó 1-0 a B en el directo.
+        a = self._row(1, points=3, goals_for=2, goals_against=1)
+        b = self._row(2, points=3, goals_for=2, goals_against=1)
+        self.assertEqual(self._ids(rank_group([b, a], [(1, 2, 1, 0)])),
+                         [1, 2])
+
+    def test_drawn_direct_falls_to_global(self):
+        # El directo empató (1-1): no separa, decide GF global (B 3 > A 2).
+        a = self._row(1, points=3, goals_for=2, goals_against=1)
+        b = self._row(2, points=3, goals_for=3, goals_against=2)
+        self.assertEqual(self._ids(rank_group([a, b], [(1, 2, 1, 1)])),
+                         [2, 1])
+
+    def test_three_way_mini_league(self):
+        # A gana a B y C; B gana a C. Directo: A 6, B 3, C 0 pts.
+        a = self._row(1, points=4)
+        b = self._row(2, points=4)
+        c = self._row(3, points=4)
+        pairs = [(1, 2, 1, 0), (1, 3, 1, 0), (2, 3, 1, 0)]
+        self.assertEqual(self._ids(rank_group([c, b, a], pairs)), [1, 2, 3])
+
+    def test_full_tie_keeps_stable_order(self):
+        # Sin partidos entre ellos y todo igual: orden estable (sin ranking
+        # FIFA). El orden de entrada manda.
+        a = self._row(1, points=3, goals_for=1, goals_against=1)
+        b = self._row(2, points=3, goals_for=1, goals_against=1)
+        self.assertEqual(self._ids(rank_group([a, b], [])), [1, 2])
+        self.assertEqual(self._ids(rank_group([b, a], [])), [2, 1])
 
 
 class BuildGroupStandingsTests(TestCase):
@@ -156,9 +202,10 @@ class BuildGroupStandingsTests(TestCase):
             {c: r.points for c, r in rows.items()},
             {"CAN": 6, "JAM": 4, "USA": 4, "MEX": 2},
         )
-        # JAM y USA empatan en pts y DG (+1); GF decide (5 vs 3).
+        # JAM y USA empatan en pts y DG (+1); el directo decide: USA le
+        # ganó 2-0 a JAM (m2), así que va por delante (regla FIFA 2026).
         self.assertEqual(self._order(self._standings()["A"], "est"),
-                         ["CAN", "JAM", "USA", "MEX"])
+                         ["CAN", "USA", "JAM", "MEX"])
 
     def test_mix_combines_real_and_predictions(self):
         group = self._standings()["A"]

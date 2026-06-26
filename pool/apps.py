@@ -9,5 +9,5 @@ class PoolConfig(AppConfig):
     verbose_name = "Quiniela"
 
     def ready(self) -> None:
-        """Registra las señales de la app (alta de StageUser)."""
+        """Registra las señales (alta de WindowUser vía UserQuiniela)."""
         from . import signals  # noqa: F401

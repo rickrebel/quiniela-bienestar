@@ -50,15 +50,16 @@ class RoundByMatchTests(SimpleTestCase):
         self.assertEqual(rounds[5], 3)
 
     def test_groups_are_independent(self) -> None:
-        a1 = _match(1, 11, "A")
-        b1 = _match(2, 11, "B")
-        a2 = _match(3, 18, "A")
-        b2 = _match(4, 18, "B")
-        rounds = round_by_match([a1, b1, a2, b2])
-        self.assertEqual(rounds[1], 1)
-        self.assertEqual(rounds[2], 1)
-        self.assertEqual(rounds[3], 2)
-        self.assertEqual(rounds[4], 2)
+        # Cada grupo con sus 6 partidos; B juega todo después de A. El corte
+        # 2+2+2 debe hacerse POR grupo: si se mezclaran, los de B caerían en
+        # rondas 4-6. Entrada desordenada a propósito.
+        a = [_match(i, d, "A") for i, d in enumerate(
+            [11, 11, 13, 13, 15, 15], start=1)]
+        b = [_match(i, d, "B") for i, d in enumerate(
+            [21, 21, 23, 23, 25, 25], start=7)]
+        rounds = round_by_match([*b[::-1], *a[::-1]])
+        self.assertEqual([rounds[m.id] for m in a], [1, 1, 2, 2, 3, 3])
+        self.assertEqual([rounds[m.id] for m in b], [1, 1, 2, 2, 3, 3])
 
     def test_skips_matches_without_home_team(self) -> None:
         placeholder = _match(99, 20, None)

@@ -4,7 +4,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from config.get_env import getenv_bool, getenv_db, getenv_int, getenv_list
+from config.get_env import (
+    getenv_bool, getenv_db, getenv_int, getenv_list, getenv_map)
 
 load_dotenv()
 
@@ -28,6 +29,14 @@ CSRF_TRUSTED_ORIGINS = getenv_list("CSRF_TRUSTED_ORIGINS", [])
 # detrás de ngrok, donde el Host llega reescrito a localhost; si está
 # vacía se usa build_absolute_uri del request.
 SITE_URL = os.environ.get("SITE_URL", "")
+
+# Quiniela activa por dominio (auto-detección): mapa host→slug, p. ej.
+# "sanginiela.yeeko.org:sanginiela,quiniela.yeeko.org:bienestar". El
+# dominio pelón redirige a la ventana 1 de esta quiniela; sin coincidencia
+# se cae a DEFAULT_QUINIELA_SLUG y, en última instancia, a la primera de la
+# BD (ver pool/views/scope.py).
+QUINIELA_DOMAINS = getenv_map("QUINIELA_DOMAINS", {})
+DEFAULT_QUINIELA_SLUG = os.environ.get("DEFAULT_QUINIELA_SLUG", "")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -67,6 +76,8 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "pool.context_processors.standing",
                 "pool.context_processors.today_matches",
+                "pool.context_processors.quinielas",
+                "pool.context_processors.quiniela_theme",
             ],
         },
     },

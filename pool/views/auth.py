@@ -12,6 +12,7 @@ from pool.forms import (
 from pool.models import PasswordRecoveryToken
 from pool.services.recovery import (
     create_recovery_token, recovery_url, send_recovery_email)
+from pool.views.scope import home_slug
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -52,7 +53,8 @@ def login_view(request: HttpRequest) -> HttpResponse:
                 if user.is_active:
                     if user.check_password(form.cleaned_data["password"]):
                         login(request, user, backend=_AUTH_BACKEND)
-                        return redirect("groups")
+                        return redirect(
+                            "window", quiniela=home_slug(request), order=1)
                     else:
                         form.add_error("password", "Contraseña incorrecta")
                 else:
@@ -60,7 +62,8 @@ def login_view(request: HttpRequest) -> HttpResponse:
                     user.is_active = True
                     user.save()
                     login(request, user, backend=_AUTH_BACKEND)
-                    return redirect("groups")
+                    return redirect(
+                        "window", quiniela=home_slug(request), order=1)
     else:
         form = EmailAccessForm()
 
@@ -73,8 +76,8 @@ def register_view(request: HttpRequest) -> HttpResponse:
     GET: muestra el formulario de registro.
     POST: valida nombre, email y contraseña. Si el email ya tiene cuenta
     activa (o es un perfil virtual) lo rechaza; si existe un preregistro
-    sin estrenar lo completa; en otro caso crea el usuario y sus
-    StageUser. Al terminar inicia sesión y redirige a la fase de grupos.
+    sin estrenar lo completa; en otro caso crea el usuario. Al terminar
+    inicia sesión y redirige a la primera ventana.
     """
     if request.method == "POST":
         form = RegistrationForm(request.POST)
@@ -89,18 +92,17 @@ def register_view(request: HttpRequest) -> HttpResponse:
                     "email", "Ya existe una cuenta con este email")
             else:
                 if user is None:
-                    # Alta nueva: create_user dispara la señal que
-                    # materializa los StageUser de cada fase.
                     user = User.objects.create_user(
                         email=email, first_name=first_name)
                 else:
-                    # Preregistro sin estrenar: ya tiene StageUser.
+                    # Preregistro sin estrenar: solo falta la contraseña.
                     user.first_name = first_name
                 user.set_password(form.cleaned_data["password"])
                 user.is_active = True
                 user.save()
                 login(request, user, backend=_AUTH_BACKEND)
-                return redirect("groups")
+                return redirect(
+                    "window", quiniela=home_slug(request), order=1)
     else:
         form = RegistrationForm()
 
@@ -174,7 +176,8 @@ def reset_password_view(request: HttpRequest, key) -> HttpResponse:
             user.save()
             token.mark_used()
             login(request, user, backend=_AUTH_BACKEND)
-            return redirect("groups")
+            return redirect(
+                "window", quiniela=home_slug(request), order=1)
     else:
         form = RecoveryConfirmForm()
 

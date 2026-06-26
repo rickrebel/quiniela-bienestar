@@ -3,6 +3,15 @@
 Perfil virtual que agrega las predicciones de los 31 participantes.
 Visible en la app, pero excluido de la repartición de premios.
 
+> **Actualización 2026-06-25 (multi-quiniela).** El ciclo de vida pasó de
+> `Stage`/`StageUser` a `Window`/`WindowUser`: cada quiniela tiene su propia
+> "Ignorancia colectiva" (un `User` virtual inscrito vía `UserQuiniela`), y la
+> agregación es **por ventana** (todas sus fases: la ventana "Grupos" junta
+> los 3 subgrupos en un solo agregado). El comando es ahora
+> `build_collective_profile <orden-de-ventana> --quiniela <slug>` y congela el
+> `WindowUser` del virtual tras el `resolved_send_deadline` de la ventana. Lo
+> que sigue describe el diseño original (single-quiniela, por fase).
+
 ## Restricciones que impone el modelo actual
 
 - `Prediction` exige un `User` real (FK) y tiene unicidad `(user, match)`.

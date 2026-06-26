@@ -20,23 +20,23 @@ The project venv lives at `venv/` inside the repo (interpreter:
 - Seed (in order; each depends on the prior — `tournament` app):
   `load_stadiums` → `load_stages` → `load_teams` → `load_matches`,
   reading from `db/jsons/{of,fd,manual}/`.
-- `python manage.py preregister <email> "<name>"` — add a player (`pool` app)
-- `python manage.py bootstrap_bienestar --yes` — one-time fork bootstrap over
-  a **clone** of the original DB (`pool` app, idempotent): splits the group
-  stage into `SUBGROUP_1/2/3` (reassigns only `Match.stage`, never results),
-  deletes round-1 predictions, nulls every `StageUser.sent_at`. Clone the DB
-  first with `pg_dump | psql` (see README); `POSTGRES_DB_ORIGINAL` names the
-  source. `SUBGROUP_2/3` dates are set by hand in the admin afterwards.
-- `python manage.py build_collective_profile <stage_key>` — freeze the
-  virtual profile's aggregated predictions for a closed stage (`pool` app)
-- `python manage.py fetch_sim_source` — one-time download of real finished
-  matches (current Champions season; free FD tier has no historic seasons)
-  to `db/jsons/sim/cl2025.json`, committed (`tournament` app).
-- `python manage.py simulate [--day N]` — leave the local DB as if today were
-  day N of the World Cup: shifts the calendar, applies real disguised results
-  from `cl2025.json`, fills predictions and marks sends (`pool` app).
-  Local-only: refuses to run with `DEBUG=False` unless `--force`. No reset:
-  re-seed or restore a backup to undo.
+- `python manage.py load_rules` — seed/update the scoring-rule catalog and
+  the quinielas with their base points (`pool` app, idempotent; definitions
+  live in the command). Run once before `recompute_scores`.
+- `python manage.py recompute_scores` — re-evaluate every prediction and
+  rebuild the per-match cumulative snapshots (`pool` app; backfill or after a
+  manual result fix). Capture already triggers this automatically.
+- `python manage.py preregister <email> "<name>" <quiniela-slug>` — add a
+  player and enroll them in a quiniela via `UserQuiniela` (`pool` app); the
+  `UserQuiniela` signal materializes their `WindowUser`. Idempotent: an
+  existing user can be enrolled in a further quiniela.
+- `python manage.py build_collective_profile <window-order> --quiniela <slug>`
+  — freeze the virtual profile's aggregated predictions for a closed
+  **window** (all its stages; the "Grupos" window aggregates the 3 subgroups),
+  scoped to one quiniela; freezes the virtual's `WindowUser` (`pool` app).
+- `python manage.py extract_anexo_c` — regenerate the anexo C combinations
+  JSON (`pool/services/data/anexo_c.json`) from `docs/anexo_c.html` with
+  BeautifulSoup; idempotent, no DB (`pool` app).
 - DB selection is env-driven: set `POSTGRES_DB` for Postgres, leave it empty
   to fall back to SQLite at `db/app.sqlite3`.
 
@@ -46,13 +46,15 @@ The project venv lives at `venv/` inside the repo (interpreter:
   from `tournament`, never the reverse.
 - `tournament/`: sports data models (`Stadium`, `Stage`, `Team`, `Match`).
 - `pool/`: `User` (custom, `AUTH_USER_MODEL = "pool.User"`), `Prediction`,
-  `StageUser`, `PasswordRecoveryToken`.
+  `Window`/`WindowUser`, `UserQuiniela`, `PasswordRecoveryToken`, scoring
+  engine (`Quiniela`, `Rule`, `QuinielaRule`, `ScoreSnapshot`).
 - Views split by concern in `pool/views/`: `auth.py` (login + password
   recovery), `stages.py` (per-stage predictions page + tabs + result cards),
   `predictions.py` (JSON save + per-match autosave + send), `leaderboard.py`
   (standings page).
 - Business logic in `pool/services/`, one module per concern: excel,
-  scoring, standings, leaderboard, aggregation, match_dialog, recovery.
+  scoring, evaluation, standings, leaderboard, aggregation, match_dialog,
+  recovery.
 - Data seeded from two sources committed under `db/jsons/`: OF (openfootball,
   base seed) and FD (football-data.org, `fd_id` + results). Manual overrides
   (e.g. Spanish names) in `db/jsons/manual/`; old files in `db/jsons/legacy/`.
@@ -79,13 +81,20 @@ The project venv lives at `venv/` inside the repo (interpreter:
   display name lives in `first_name`, not `username`.
 - **`home`/`away`, not `a`/`b`.** Models, templates and `static/submit.js` all
   use `home_team`/`away_team`, `home_goals`/`away_goals`, aligned with FD.
-- **Per-stage flow.** Predictions are scoped to a `Stage` (tabs at
-  `/stage/<key>/`). Sending is single and final. `StageUser.state` is a
-  computed lifecycle (`upcoming`→`editing`→`sent`, plus `locked`) derived from
-  `sent_at`, `Stage.opens_at` and `Stage.send_deadline`. A stage is editable
-  only once `opens_at` is set and reached (null = not yet enabled).
-  `send_expired_stages` (cron, pending on EC2) auto-sends whatever was saved
-  for stages past their deadline (skips users who saved nothing).
+- **Per-window flow + quiniela by path (multi-quiniela).** The active quiniela
+  comes from the URL prefix `/<slug>/…`: `config/urls.py` mounts `pool.urls`
+  under `<slug:quiniela>/`, the `with_quiniela` decorator
+  (`pool/views/scope.py`) sets `request.quiniela`, and `quiniela_for_host`
+  auto-detects it from the domain (`QUINIELA_DOMAINS`). Auth is global
+  (`pool/urls_auth.py`); old flat paths redirect via `legacy_redirect`.
+  Predictions, sending and lifecycle scope to a **`Window`** (per-quiniela
+  grouping of 1+ `Stage`), not a bare `Stage`: windows are the tabs at
+  `/<slug>/ventana/<order>/` (`window_view`, one view for groups and
+  knockouts). `WindowUser.state` (`upcoming`→`editing`→`sent`/`locked`) derives
+  from `sent_at` and the window's `resolved_opens_at`/`resolved_send_deadline`
+  (override, or fallback to its single stage). Sending is single/final **per
+  window**; all cards in a window share its editable state.
+  `send_expired_stages` auto-sends per window.
 - **`Match.datetime` is UTC**; local stadium time derives from
   `Stadium.utc_offset` (int). Group/`Stage` is derived on Match, not stored;
   `group_name` lives only on `Team` (CHOICES A–L).
@@ -102,20 +111,53 @@ The project venv lives at `venv/` inside the repo (interpreter:
   group's 1st/2nd/3rd game — the per-group round (→ `SUBGROUP_1/2/3`) is derived
   by sorting each group's 6 matches by `datetime` and chunking in pairs
   (`tournament/services/group_rounds.py:round_by_match`).
-- **Group stage = 3 sub-stages, one UI tab.** `Stage.is_group=True` marks the
-  3 matchday sub-stages; the UI **collapses them into a single "Grupos" tab**
-  that shows all groups A-L. Use `stage.is_group` (never `key ==
-  "GROUP_STAGE"`) and query group matches with `stage__is_group=True`. The
-  group **standings table is cumulative** across the 3 sub-stages, but
-  **editability and `send` are per sub-stage**: only the live matchday is
-  editable, and "Enviar" finalizes just that sub-stage's `StageUser`.
-  `SUBGROUP_1` is born closed (matchday 1 already played).
-- **`Stage.multiplier`** (Decimal, default 1) is a per-stage scoring weight
-  (1, 1.5, 2 … 10×) stored in the DB but **NOT yet applied** by
-  `scoring.py` — pending.
+- **Group stage = 3 sub-stages, grouped by a `Window`.** `Stage.is_group=True`
+  marks the 3 matchday sub-stages. `GROUP_STAGE` no longer exists (removed in
+  1c): use `stage.is_group` and query group matches with
+  `stage__is_group=True`, never a `key ==` check. The group **standings table
+  is cumulative** across the 3 sub-stages. **Editability and `send` are per
+  `Window`** (`WindowUser`), not per sub-stage: the original quiniela wraps
+  all 3 sub-stages in one "Grupos" window (one tab showing groups A-L, sent as
+  a unit); bienestar splits them into 3 separate 1:1 windows. `SUBGROUP_1` is
+  born closed (matchday 1 already played).
+- **Group tiebreaker = head-to-head FIRST** (FIFA 2026 rule change): teams
+  level on points are ranked by the direct mini-league (h2h points, then h2h
+  GD, GF) **before** overall GD/GF. Implemented in
+  `standings.py:rank_group`/`_break_tie` (recursive mini-league), not by the
+  scalar `StandingRow.sort_key` (that's only the global fallback when h2h
+  doesn't separate). Final FIFA criterion (world ranking) is **not**
+  implemented — residual ties keep a stable order.
+- **Best 8 thirds + anexo C.** With 12 groups, the 8 best third-placed teams
+  qualify; ranked by Pts, GD, GF, fair play (no h2h — different groups) in
+  `pool/services/thirds.py:build_thirds`. Which third plays which group winner
+  in LAST_32 comes from the **anexo C** combination table: static reference
+  JSON `pool/services/data/anexo_c.json` (495 combos, **no DB**), regenerable
+  from `docs/anexo_c.html` via `manage.py extract_anexo_c`. Lookup:
+  `anexo_c.py:assign_thirds(qualified_groups)`; LAST_32 resolution +
+  variant-aware thirds table wired in `views/stages.py:stage_view`.
+- **`Window.multiplier`** (Decimal, default 1) is a per-window scoring weight
+  (1, 1.5, 2 … 10×), resolved per stage by `evaluation.py:multiplier_by_stage`
+  (the window of that quiniela whose `stages` contain `match.stage`).
+  `evaluation.py` stores `Prediction.points = base × multiplier` (Decimal).
+  Display as `{{ value|floatformat:"-1" }}` → "5" / "16.5".
 - **`Prediction.advancing_team`** (FK→Team, nullable) records who the player
-  thinks wins the penalty shootout when they predict a knockout draw. Stored
-  but with **no frontend nor scoring logic yet** — pending.
+  thinks wins the penalty shootout when they predict a knockout draw, and
+  **drives the `PENALTY` rule** (linked only to quinielas that use it, e.g.
+  `bienestar`). Scoring lives in `evaluation.py:evaluate_scoreline`
+  (`advancing_team_id` arg): `PENALTY` fires only when the quiniela has it
+  **and** the match is knockout **and** `decided_by == PENALTY_SHOOTOUT` **and**
+  the prediction is a draw **and** `advancing_team` == the shootout winner
+  (`_penalty_winner_id`, more penalties). Capture UI: the two-button selector
+  in `match_card.html` (`.advancing-pick`, shown by `submit.js` only on a
+  predicted knockout draw); `save_prediction` persists it (and clears it when
+  the score stops being a draw). The detail dialog **splits the draw subgroup
+  per advancing pick** (`match_dialog.py:_split_by_advancing`) because the bonus
+  is per-player, not per-scoreline. Chips: **`Dif` is omitted on any draw** and
+  a **`Pen` chip** is shown on penalty knockouts (`scoring.py:chips_from_codes`,
+  `show_penalty`). The sent Excel adds an **"Avanza" column** on knockout sheets
+  (`excel.py:_advancing_cell`); the send-dialog summary collapses the selector
+  to a read-only "Pasa: › 🏴 equipo" line (`submit.js:summarizeAdvancing`,
+  `chevron_right` icon, already in the base.html subset).
 - **Per-match autosave.** Scores save on `change` via `save_prediction`
   (`/prediction/<id>/`), not a bulk submit. A `Prediction` row exists only when
   both goals are set — an incomplete match deletes its row. Completeness and
@@ -128,24 +170,45 @@ The project venv lives at `venv/` inside the repo (interpreter:
 - **Scoring** (`pool/services/scoring.py`): 3 pts for the match result, +1
   for goal difference (never on draws), +1 for exact score (max 5, 4 on
   draws). Knockouts compare regular/extra-time goals, never penalties.
+- **Scoring is frozen, not computed on the fly.** Each scoring rule is a
+  `Rule` row (catalog: RESULT/DIFF/EXACT/PENALTY); `QuinielaRule` sets its
+  base points **per `Quiniela`** (the original has no PENALTY). The active
+  quiniela comes from the URL slug (`request.quiniela`), not a default flag;
+  `recompute_all` iterates **every quiniela**, freezing scores independently.
+  `evaluation.py:recompute_all`
+  (idempotent, full rebuild) freezes `Prediction.points`/`base_points`/the
+  `rules` M2M and rebuilds `ScoreSnapshot` (per user×match×quiniela cumulative
+  for the progress charts; simultaneous matches share the tick's
+  value/position). It
+  runs on every result capture (`views/results.py`);
+  `manage.py recompute_scores` backfills. `leaderboard.py` and the result
+  cards/dialog **read these stored values** — they no longer call
+  `score_detail` per page. `load_rules` seeds the catalog (idempotent
+  `update_or_create`; definitions live in code).
 - **Virtual profile** ("Ignorancia colectiva", `User.is_virtual`): shows in
   standings, can't log in, out of prizes, excluded from
   `send_expired_stages`. `build_collective_profile` only runs after the
-  stage's `send_deadline` — aggregating earlier would leak the crowd's pick.
+  window's `resolved_send_deadline` — aggregating earlier would leak the
+  crowd's pick.
 - **Password recovery uses its own `PasswordRecoveryToken`** (UUID PK, 24 h,
   single-use), not Django's token generator. When building the email link,
   `SITE_URL` overrides `request.build_absolute_uri` (needed behind ngrok).
-- **Real results sync is NOT implemented yet** (`sync_results` pending; see
-  the `football-data-matches` skill). A match renders as "live" via a 2-hour
-  window in `views/stages.py`, not real-time data. The `standing` context
-  processor runs on every template and must degrade to `{}` on any error.
+- **Results are captured manually, never synced.** The football-data API
+  proved unreliable, so `sync_results` was dropped: trusted users
+  (`can_record_results`) capture finished matches via `views/results.py`,
+  which is also the only place that triggers `recompute_all`. A match renders
+  as "live" via a 2-hour window in `views/stages.py`, not real-time data. The
+  `standing` context processor runs on every template and must degrade to
+  `{}` on any error.
 - **JS↔markup contract.** Several classes are pure JS hooks (no CSS of their
-  own anymore): `.content[data-stage|state]`, `.group`/`.knockout`,
+  own anymore): `.content[data-window|state]`, `.group`/`.knockout`,
   `.group-summary`, `.chip-title`, `.chevron`, `.group-flags`,
   `.section-count`, `.match-card`, `.match[data-match-id]`,
   `[data-field=*_goals]`, `.score`, `.team`, `.team-placeholder`, `.meta`,
-  `.deadline-note`. Renaming them in templates breaks `submit.js`,
-  `standings.js`, `match_dialog.js` or `countdown.js`. `pick-win`/`pick-tie`,
+  `.deadline-note`, `.advancing-pick`/`.advancing-opt[data-advancing]`
+  (selector de avance por penales). Renaming them in templates breaks
+  `submit.js`, `standings.js`, `match_dialog.js` or `countdown.js`.
+  `pick-win`/`pick-tie`, `.advancing-pick.show`/`.advancing-opt.is-picked`,
   `#snackbar .show`, `.view-opt.active` are toggled by JS at runtime, so
   they keep real CSS (styles.css or source.css), never inline utilities.
 - **styles.css is legacy in retirement.** Unlayered CSS always beats

@@ -35,8 +35,10 @@ class StandingRow:
 
     @property
     def sort_key(self) -> tuple:
-        # FIFA simplificado: Pts, DG, GF, fair play (menos rojas,
-        # luego menos amarillas); sin head-to-head.
+        # Desempate GLOBAL (Pts, DG, GF, fair play). En 2026 el primer
+        # criterio tras los puntos es el enfrentamiento directo, que se
+        # aplica antes en ``_break_tie``; esto es solo el fallback cuando
+        # el directo no separa.
         return (-self.points, -self.goal_diff, -self.goals_for,
                 self.red, self.yellow)
 
@@ -76,6 +78,71 @@ def _apply(home: StandingRow, away: StandingRow, hg: int, ag: int) -> None:
         away.drawn += 1
 
 
+Pair = tuple[int, int, int, int]  # (home_id, away_id, home_goals, away_goals)
+
+
+def _mini_table(
+    rows: list[StandingRow], pairs: list[Pair]
+) -> dict[int, tuple[int, int, int]]:
+    """Mini-liga del enfrentamiento directo: (pts, DG, GF) de cada equipo
+    contando SOLO los partidos jugados entre los equipos de ``rows``."""
+    ids = {r.team.id for r in rows}
+    agg: dict[int, list[int]] = {tid: [0, 0, 0] for tid in ids}  # pts gf ga
+    for home_id, away_id, hg, ag in pairs:
+        if home_id not in ids or away_id not in ids:
+            continue
+        agg[home_id][1] += hg
+        agg[home_id][2] += ag
+        agg[away_id][1] += ag
+        agg[away_id][2] += hg
+        if hg > ag:
+            agg[home_id][0] += 3
+        elif hg < ag:
+            agg[away_id][0] += 3
+        else:
+            agg[home_id][0] += 1
+            agg[away_id][0] += 1
+    return {tid: (pts, gf - ga, gf) for tid, (pts, gf, ga) in agg.items()}
+
+
+def _break_tie(rows: list[StandingRow], pairs: list[Pair]) -> list[StandingRow]:
+    """Ordena equipos empatados a puntos por la mini-liga del directo
+    (pts, DG, GF entre ellos), reaplicada a cada subgrupo aún empatado. Si
+    el directo no separa a nadie, cae al desempate global (``sort_key``)."""
+    if len(rows) == 1:
+        return list(rows)
+    mini = _mini_table(rows, pairs)
+    ordered = sorted(rows, key=lambda r: tuple(-v for v in mini[r.team.id]))
+    blocks: list[list[StandingRow]] = []
+    for row in ordered:
+        if blocks and mini[blocks[-1][0].team.id] == mini[row.team.id]:
+            blocks[-1].append(row)
+        else:
+            blocks.append([row])
+    if len(blocks) == 1:
+        return sorted(rows, key=lambda r: r.sort_key)
+    result: list[StandingRow] = []
+    for block in blocks:
+        result.extend(_break_tie(block, pairs))
+    return result
+
+
+def rank_group(rows: list[StandingRow], pairs: list[Pair]) -> list[StandingRow]:
+    """Ordena un grupo: primero por puntos; cada empate a puntos se resuelve
+    por enfrentamiento directo (regla FIFA 2026)."""
+    by_points = sorted(rows, key=lambda r: -r.points)
+    result: list[StandingRow] = []
+    block: list[StandingRow] = []
+    for row in by_points:
+        if block and block[-1].points != row.points:
+            result.extend(_break_tie(block, pairs))
+            block = []
+        block.append(row)
+    if block:
+        result.extend(_break_tie(block, pairs))
+    return result
+
+
 def build_group_standings(
     matches: list[Match], predictions: dict[int, Prediction]
 ) -> dict[str, GroupStandings]:
@@ -87,6 +154,8 @@ def build_group_standings(
     # en las mismas instancias que se devuelven en ``teams``.
     canonical: dict[str, dict[int, Team]] = {}
     rows: dict[str, dict[str, dict[int, StandingRow]]] = {}
+    # Partidos jugados por grupo y variante, para la mini-liga del directo.
+    pairs: dict[str, dict[str, list[Pair]]] = {}
 
     for match in matches:
         if match.home_team is None or match.away_team is None:
@@ -96,6 +165,7 @@ def build_group_standings(
         home = teams.setdefault(match.home_team.id, match.home_team)
         away = teams.setdefault(match.away_team.id, match.away_team)
         by_variant = rows.setdefault(group, {v: {} for v in VARIANTS})
+        by_pairs = pairs.setdefault(group, {v: [] for v in VARIANTS})
 
         finished = (
             match.status == "FINISHED"
@@ -114,6 +184,7 @@ def build_group_standings(
             source = sources[variant]
             if source is not None:
                 _apply(hrow, arow, *source)
+                by_pairs[variant].append((home.id, away.id, *source))
             if finished:
                 hrow.played += 1
                 arow.played += 1
@@ -126,8 +197,9 @@ def build_group_standings(
     for group, by_variant in rows.items():
         tables = []
         for variant in VARIANTS:
-            ordered = sorted(
-                by_variant[variant].values(), key=lambda r: r.sort_key
+            ordered = rank_group(
+                list(by_variant[variant].values()),
+                pairs[group][variant],
             )
             for i, row in enumerate(ordered):
                 setattr(row.team, f"order_{variant}", i)

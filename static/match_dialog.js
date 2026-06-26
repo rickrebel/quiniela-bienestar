@@ -189,6 +189,11 @@
 
         if (sub.points) {
             const evalLine = el("div", "pred-sub-eval");
+            // Penales: la rama de empate trae el equipo que avanza.
+            if (sub.advancing_label) {
+                evalLine.append(el("span", "pred-advancing",
+                    sub.advancing_label));
+            }
             evalLine.append(el("span", "pred-pts",
                 `${sub.points.total} pts`));
             for (const chip of sub.chips) evalLine.append(predChip(chip));
@@ -351,7 +356,9 @@
         async function submitResult(v, btn) {
             btn.disabled = true;
             try {
-                const response = await fetch(`/match/${data.id}/result/`, {
+                const slug = window.QUINIELA_SLUG || "";
+                const response = await fetch(
+                    `/${slug}/match/${data.id}/result/`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",

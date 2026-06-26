@@ -1,44 +1,29 @@
-const sidebar = document.querySelector(".sidebar");
-const menuBtn = document.querySelector(".menu-btn");
+/* Menú de cuenta: dropdown daisyUI (<details>) con un único trigger, el
+   .user-chip. Reemplaza al antiguo panel deslizante .user-bar (que se abría
+   con el mismo clic que el dropdown de quiniela y quedaban superpuestos). */
+const accountMenu = document.querySelector(".user-menu");
 
-const userBtn = document.querySelector(".user-chip");
-const userBar = document.querySelector(".user-bar")
-
-/*
-menuBtn.addEventListener("click", () => {
-    sidebar.classList.toggle("open");
-});*/
-userBtn.addEventListener("click", () => {
-    userBar.classList.toggle("open");
-});
-
-/*function closeSidebarOnOutsideClick(event) {
-    const clickedInsideSidebar = sidebar.contains(event.target);
-    const clickedMenuBtn = menuBtn.contains(event.target);
-
-    if (!clickedInsideSidebar && !clickedMenuBtn ) {
-        sidebar.classList.remove("open");
-    }
-}*/
-function closeUserBarOnOutsideClick(event) {
-    const clickedInsideUserBar = userBar.contains(event.target);
-    const clickedUserBtn = userBtn.contains(event.target);
-
-    if (!clickedInsideUserBar && !clickedUserBtn ) {
-        userBar.classList.remove("open");
-    }
+if (accountMenu) {
+    // <details> no se autocierra: lo cerramos al hacer clic fuera...
+    document.addEventListener("click", e => {
+        if (!accountMenu.contains(e.target)) {
+            accountMenu.removeAttribute("open");
+        }
+    });
+    // ...y al elegir cualquier opción del menú.
+    accountMenu.querySelectorAll("a, button").forEach(el => {
+        el.addEventListener("click", () => {
+            accountMenu.removeAttribute("open");
+        });
+    });
 }
 
-// document.addEventListener("click", closeSidebarOnOutsideClick);
-document.addEventListener("click", closeUserBarOnOutsideClick);
-
-/* Dialog de reglas: lo abre la opción "Reglas" del menú de usuario; al
-   abrir se cierra el user-bar. Mismo patrón que leaderboard.js. */
+/* Dialog de reglas: lo abre la opción "Reglas" del menú de cuenta. Mismo
+   patrón que leaderboard.js. */
 const rulesDialog = document.getElementById("rules-dialog");
 if (rulesDialog) {
     document.addEventListener("click", e => {
         if (e.target.closest("[data-rules-open]")) {
-            userBar.classList.remove("open");
             rulesDialog.showModal();
             return;
         }

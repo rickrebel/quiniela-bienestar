@@ -5,15 +5,20 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import get_object_or_404, render
+from django.http import Http404, HttpRequest, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.utils import timezone
 
-from pool.models import Prediction, StageUser, User
+from pool.models import Prediction, Quiniela, User, Window, WindowUser
+from pool.services import anexo_c
+from pool.services.anexo_c import assign_thirds
 from pool.services.match_dialog import build_match_dialog_payload
-from pool.services.scoring import result_chips, score_detail
+from pool.services.scoring import chips_from_codes
 from pool.services.standings import build_group_standings
+from pool.services.thirds import build_thirds
 from pool.utils import format_day, format_long_day, format_time
+from pool.views.scope import with_quiniela
 from tournament.models import Match, Stage, Team
 
 # Ventana en la que un partido se considera "en juego". La app no es en
@@ -61,77 +66,60 @@ def annotate_result(match: Match, prediction: Prediction | None) -> None:
         marks = ("pick-win", "") if home_wins else ("", "pick-win")
         match.home_mark, match.away_mark = marks
 
-    if prediction is None:
+    # Lee lo congelado por la evaluación; points None = aún sin evaluar.
+    if prediction is None or prediction.points is None:
         return
-    detail = score_detail(
-        prediction.home_goals, prediction.away_goals,
-        match.home_goals, match.away_goals,
-    )
-    match.user_points = detail.points
-    match.points_kind = "won" if detail.points else "zero"
-    match.chips = result_chips(detail, is_draw)
+    codes = [rule.code for rule in prediction.rules.all()]
+    match.user_points = prediction.points
+    match.points_kind = "won" if prediction.points else "zero"
+    show_penalty = match.decided_by == Match.PENALTY_SHOOTOUT
+    match.chips = chips_from_codes(codes, is_draw, show_penalty)
 
 
-def render_stage_sections(user: User, stage: Stage) -> list[dict]:
-    """Devuelve las secciones de una fase listas para presentar.
+def render_window_sections(
+    user: User, quiniela: Quiniela, stages: list[Stage], is_group: bool,
+    attach_standings: bool = True,
+) -> list[dict]:
+    """Secciones de una ventana (sus 1+ fases) listas para presentar.
 
-    Fase de grupos: una sección por grupo (A→L). Eliminatoria: una sola
-    sección (lista plana, equipos aún como placeholder). Cada sección es
-    ``{"key", "label", "matches", "filled", "total", "points",
-    "teams", "standings"}`` (``teams`` y ``standings`` solo agrupando por
-    grupo: banderas del encabezado en el orden de la variante mix y tablas
-    de posiciones en tres variantes), donde ``filled`` cuenta los partidos
-    con predicción completa (una fila ``Prediction`` ya implica ambos
-    marcadores) y ``points`` suma los puntos ya ganados en la sección. En
-    cada partido adjunta en memoria día y hora **locales de la sede**
-    (``Match.datetime`` está en UTC; se aplica ``Stadium.utc_offset``) y,
-    si el usuario ya predijo, ``predicted_home``/``predicted_away``.
-    ``select_related`` evita N+1.
+    Carga los partidos de ``stages`` (una fase de eliminatoria o las 3 de
+    grupos concentrados) y las predicciones del usuario **en esta
+    quiniela**. Cada sección es ``{"key", "label", "matches", "filled",
+    "total", "points", "teams", "standings"}`` (``teams``/``standings``
+    solo agrupando por grupo). En cada partido adjunta en memoria día/hora
+    locales de la sede y, si predijo, ``predicted_home``/``predicted_away``.
+    ``select_related`` evita N+1. ``attach_standings=False`` deja las
+    posiciones en ``None`` (la vista de grupos las sustituye por la tabla
+    acumulada sobre las 3 jornadas).
     """
     # Materializado: el loop y build_group_standings deben compartir
     # instancias (y evita re-ejecutar el queryset).
     matches = list(
-        Match.objects.filter(stage=stage).select_related(
+        Match.objects.filter(stage__in=stages).select_related(
             "home_team", "away_team", "stadium", "stage"
         )
     )
-    predictions = Prediction.objects.filter(user=user, match__stage=stage)
+    predictions = (
+        Prediction.objects.filter(
+            user=user, quiniela=quiniela, match__stage__in=stages)
+        .prefetch_related("rules")
+    )
     preds_by_match = {p.match_id: p for p in predictions}
-    return _build_sections(matches, preds_by_match, stage.is_group)
-
-
-def render_group_sections(user: User) -> list[dict]:
-    """Secciones de la sombrilla de grupos (las 3 sub-fases juntas).
-
-    A diferencia de ``render_stage_sections`` (una sub-fase), carga TODOS
-    los partidos ``stage__is_group=True`` para que la tabla de posiciones
-    sea **acumulada** sobre las 3 jornadas. La editabilidad por partido la
-    decide la vista (``groups_view``), no esta función.
-    """
-    matches = list(
-        Match.objects.filter(stage__is_group=True).select_related(
-            "home_team", "away_team", "stadium", "stage"
-        )
-    )
-    preds_by_match = {
-        p.match_id: p
-        for p in Prediction.objects.filter(
-            user=user, match__stage__is_group=True
-        )
-    }
-    return _build_sections(matches, preds_by_match, True)
+    return _build_sections(
+        matches, preds_by_match, is_group, attach_standings)
 
 
 def _build_sections(
     matches: list[Match],
     preds_by_match: dict[int, Prediction],
     is_group: bool,
+    attach_standings: bool = True,
 ) -> list[dict]:
     """Arma las secciones a partir de partidos ya cargados y predicciones.
 
-    Núcleo compartido por ``render_stage_sections`` (una fase) y
-    ``render_group_sections`` (sombrilla de grupos): agrupa, adjunta día/
-    hora locales y resultado en memoria, y calcula tablas de posiciones.
+    Agrupa por grupo (en grupos) o en una sección plana (eliminatoria),
+    adjunta día/hora locales y resultado en memoria, y calcula las tablas
+    de posiciones (salvo ``attach_standings=False``).
     """
     SectionKey = str | None
     grouped: dict[SectionKey, list[Match]] = defaultdict(list)
@@ -149,6 +137,7 @@ def _build_sections(
         if prediction is not None:
             match.predicted_home = prediction.home_goals
             match.predicted_away = prediction.away_goals
+            match.predicted_advancing_id = prediction.advancing_team_id
             filled[key] += 1
         annotate_result(match, prediction)
         if match.user_points is not None:
@@ -161,7 +150,8 @@ def _build_sections(
                     teams[key][team.id] = team
 
     standings = (
-        build_group_standings(matches, preds_by_match) if is_group else {}
+        build_group_standings(matches, preds_by_match)
+        if is_group and attach_standings else {}
     )
     keys = sorted(grouped) if is_group else list(grouped)
     return [
@@ -182,10 +172,12 @@ def _build_sections(
     ]
 
 
-# Placeholder de posición de grupo en eliminatoria: "1A", "2B". Los
-# terceros ("3A/B/C/D/F") y ganadores ("W74") no son resolubles aquí.
+# Placeholder de posición de grupo en eliminatoria: "1A", "2B". El tercero
+# ("3A/B/C/D/F") se resuelve aparte vía anexo C; los ganadores ("W74") no.
 GROUP_POS_RE = re.compile(r"^([12])([A-L])$")
+THIRD_RE = re.compile(r"^3[A-L](/[A-L])+$")
 VARIANTS = ("est", "mix", "real")
+ALL_GROUPS = "ABCDEFGHIJKL"
 
 
 def resolve_variant(value: str | None) -> str:
@@ -193,13 +185,14 @@ def resolve_variant(value: str | None) -> str:
     return value if value in VARIANTS else "mix"
 
 
-def resolve_group_placeholders(user: User, variant: str) -> dict[str, "Team"]:
-    """Mapa de placeholder de posición de grupo ('1A','2B') → equipo.
+def _load_group_standings(user: User, quiniela: Quiniela):
+    """Carga partidos de grupos y sus tablas de posiciones (dos queries).
 
-    Resuelve 1.º/2.º de cada grupo según la variante elegida, reusando las
-    posiciones que ya calcula ``build_group_standings``. En 'real' solo
-    incluye grupos cerrados (6 partidos FINISHED): el resto queda sin
-    resolver para que la tarjeta muestre el placeholder textual.
+    Tabla **acumulada** sobre las 3 jornadas (verdad del torneo),
+    independiente de la ventana; las variantes ``est``/``mix`` usan las
+    predicciones del usuario **en esta quiniela**. Compartido por la
+    resolución de placeholders ('1A'/'2B'), los terceros del anexo C y la
+    tabla que la vista de grupos cuelga en cada sección.
     """
     group_matches = list(
         Match.objects.filter(stage__is_group=True).select_related(
@@ -209,11 +202,13 @@ def resolve_group_placeholders(user: User, variant: str) -> dict[str, "Team"]:
     preds = {
         p.match_id: p
         for p in Prediction.objects.filter(
-            user=user, match__stage__is_group=True
+            user=user, quiniela=quiniela, match__stage__is_group=True
         )
     }
-    standings = build_group_standings(group_matches, preds)
+    return group_matches, build_group_standings(group_matches, preds)
 
+
+def _finished_per_group(group_matches: list[Match]) -> dict[str, int]:
     finished: dict[str, int] = defaultdict(int)
     for m in group_matches:
         if (
@@ -223,7 +218,15 @@ def resolve_group_placeholders(user: User, variant: str) -> dict[str, "Team"]:
             and m.home_team is not None
         ):
             finished[m.home_team.group_name] += 1
+    return finished
 
+
+def _group_placeholders(
+    standings: dict, finished: dict[str, int], variant: str
+) -> dict[str, Team]:
+    """Mapa de placeholder de posición ('1A','2B') → equipo según la variante.
+    En 'real' solo incluye grupos cerrados (6 FINISHED); el resto queda sin
+    resolver para que la tarjeta muestre el placeholder textual."""
     resolved: dict[str, Team] = {}
     for group, gs in standings.items():
         if variant == "real" and finished[group] < 6:
@@ -234,81 +237,173 @@ def resolve_group_placeholders(user: User, variant: str) -> dict[str, "Team"]:
     return resolved
 
 
-def _build_tabs(user: User) -> list[dict]:
-    """Arma los tabs (uno por fase visible), en orden de torneo.
+def _third_placeholders(
+    thirds: list, finished: dict[str, int], variant: str,
+    matches: list[Match],
+) -> dict[int, Team]:
+    """Mapa ``match_id`` → tercero visitante para los dieciseisavos, según el
+    anexo C. La clave del partido es su ganador local ('1I' → 'I'); el anexo
+    dice qué grupo aporta el tercero. En 'real' solo resuelve si los 12
+    grupos están cerrados (de lo contrario los 8 terceros no son firmes)."""
+    if variant == "real" and any(finished[g] < 6 for g in ALL_GROUPS):
+        return {}
+    mapping = assign_thirds({t.group for t in thirds if t.qualified})
+    if mapping is None:
+        return {}
+    third_team = {t.group: t.team for t in thirds}
+    resolved: dict[int, Team] = {}
+    for m in matches:
+        if not THIRD_RE.match(m.away_placeholder or ""):
+            continue
+        third_group = mapping.get((m.home_placeholder or "")[1:])
+        if third_group:
+            resolved[m.id] = third_team.get(third_group)
+    return resolved
 
-    Las 3 sub-fases ``is_group`` se colapsan en un único tab "Grupos" que
-    enlaza al alias ``/stage/grupos/``. Cada tab es ``{"key", "short_name"}``
-    (``key`` "grupos" para el bloque de grupos).
+
+def _build_thirds_simulator(
+    thirds: list, flat_matches: list[Match]
+) -> dict:
+    """Payload del simulador "¿qué pasaría si...?" de dieciseisavos.
+
+    El cliente (``thirds_sim.js``) replica el lookup del anexo C para que el
+    usuario explore cortes alternativos de los 8 mejores terceros sin recargar.
+    De paso fija ``ThirdRow.match_number`` del cruce por defecto (los 8
+    clasificados) para que la columna "No." salga ya pintada. ``flag_url`` se
+    resuelve aquí porque el JS no puede invocar ``{% static %}``.
+    """
+    sim_matches = [
+        {
+            "match_id": m.id,
+            "number": m.of_number,
+            "winner_group": (m.home_placeholder or "")[1:],
+            "away_placeholder": m.away_placeholder,
+        }
+        for m in flat_matches
+        if THIRD_RE.match(m.away_placeholder or "")
+    ]
+
+    mapping = assign_thirds({t.group for t in thirds if t.qualified})
+    if mapping is not None:
+        # Invertir el cruce (grupo del tercero -> No. de partido del ganador).
+        number_by_third = {
+            mapping[sm["winner_group"]]: sm["number"]
+            for sm in sim_matches
+            if sm["winner_group"] in mapping
+        }
+        for t in thirds:
+            if t.qualified:
+                t.match_number = number_by_third.get(t.group)
+
+    return {
+        "winner_slots": anexo_c.WINNER_SLOTS,
+        "combinations": anexo_c.COMBINATIONS,
+        "thirds": [
+            {
+                "group": t.group,
+                "name": t.team.name_es,
+                "flag_url": (
+                    static(t.team.flag_path) if t.team.flag_path else ""
+                ),
+                "qualified": t.qualified,
+            }
+            for t in thirds
+        ],
+        "matches": sim_matches,
+    }
+
+
+def _is_group_window(window: Window) -> bool:
+    """True si la ventana agrupa solo fases de grupo (``is_group``)."""
+    stages = list(window.stages.all())
+    return bool(stages) and all(s.is_group for s in stages)
+
+
+def _build_tabs(quiniela: Quiniela) -> list[dict]:
+    """Tabs de la quiniela, en orden, con los grupos colapsados en uno.
+
+    El tab es una unidad de **presentación**, no de envío: todas las
+    ventanas ``is_group`` (1 en sanginiela, 3 en bienestar) se colapsan en
+    un único tab "Grupos" (``key="grupos"``, ``is_groups=True`` → ruta
+    ``groups``). Cada ventana de eliminatoria queda 1:1 (``key=str(order)``,
+    ``is_groups=False`` → ruta ``window``). ``key`` se compara contra
+    ``tabs_active`` para marcar el activo.
     """
     tabs: list[dict] = []
-    group_done = False
-    for stage in Stage.objects.all():
-        if stage.is_group:
-            if group_done:
-                continue
-            group_done = True
-            tabs.append({"key": "grupos", "short_name": "Grupos"})
-        else:
-            tabs.append(
-                {"key": stage.key, "short_name": stage.short_name}
-            )
+    grupos_emitted = False
+    for w in quiniela.windows.prefetch_related("stages").order_by("order"):
+        if _is_group_window(w):
+            if not grupos_emitted:
+                tabs.append({
+                    "key": "grupos",
+                    "short_name": "Grupos",
+                    "is_groups": True,
+                })
+                grupos_emitted = True
+            continue
+        tabs.append({
+            "key": str(w.order),
+            "short_name": w.resolved_short_name(),
+            "is_groups": False,
+        })
     return tabs
 
 
-def current_group_stage(user: User) -> StageUser:
-    """``StageUser`` de la sub-fase de grupos vigente para el usuario.
-
-    Vigente = la sub-fase ``is_group`` abierta y sin vencer, de menor
-    ``order`` (la jornada en captura). Si ninguna está abierta, cae a la
-    primera no enviada (encabezado en solo lectura) o, en su defecto, a la
-    última. Igual que las vistas, materializa al vuelo un ``StageUser`` si
-    el usuario aún no tiene la fila.
-    """
-    substages = list(Stage.objects.filter(is_group=True))
-    states = {
-        su.stage_id: su
-        for su in StageUser.objects.select_related("stage").filter(
-            user=user, stage__is_group=True
-        )
-    }
-
-    def su_for(stage: Stage) -> StageUser:
-        return states.get(stage.id) or StageUser(user=user, stage=stage)
-
-    for stage in substages:
-        if stage.is_open and not stage.is_past_deadline:
-            return su_for(stage)
-    for stage in substages:
-        su = su_for(stage)
-        if su.state != StageUser.SENT:
-            return su
-    return su_for(substages[-1])
-
-
 @login_required
-def stage_view(request: HttpRequest, key: str) -> HttpResponse:
-    """Renderiza la página de una fase con el estado del usuario.
+@with_quiniela
+def window_view(request: HttpRequest, order: int) -> HttpResponse:
+    """Página de una ventana de predicción (1+ fases) de la quiniela.
 
-    ``get_or_create`` del ``StageUser`` blinda el caso de usuarios sin la
-    fila (creación perezosa, además del backfill por comando).
+    Generaliza las antiguas ``groups_view`` (3 sub-fases) y ``stage_view``
+    (una fase): tabs, editabilidad y envío son **por ventana** (un
+    ``WindowUser``); todas las tarjetas comparten su estado. En ventanas de
+    grupo la tabla de posiciones es acumulada sobre las 3 jornadas; en
+    eliminatoria se resuelven los placeholders 1A/2B y los terceros del
+    anexo C como antes (estructura del torneo, intacta).
     """
-    stage = get_object_or_404(Stage, key=key)
-    stage_user, _ = StageUser.objects.select_related("stage").get_or_create(
-        user=request.user, stage=stage
+    quiniela = request.quiniela
+    window = get_object_or_404(
+        Window.objects.prefetch_related("stages"),
+        quiniela=quiniela, order=order,
     )
-    sections = render_stage_sections(request.user, stage)
+    stages = list(window.stages.all())
+    is_group_window = bool(stages) and all(s.is_group for s in stages)
+    # Los grupos viven en su tab único canónico (``groups_view``), que
+    # colapsa las 1+ ventanas is_group; no se entra por ``order``.
+    if is_group_window:
+        return redirect("groups", quiniela.slug)
+    window_user, _ = WindowUser.objects.get_or_create(
+        user=request.user, window=window)
+
+    # Las posiciones se cuelgan aparte (acumuladas), así que las secciones
+    # se arman sin ellas.
+    sections = render_window_sections(
+        request.user, quiniela, stages, is_group_window,
+        attach_standings=False,
+    )
     flat_matches = [m for s in sections for m in s["matches"]]
 
-    # En eliminatoria, rellenar en memoria los equipos de primera ronda
-    # (placeholders "1A"/"2B") según la variante elegida; las tarjetas y el
-    # dialog comparten estas instancias. Terceros y ganadores quedan como
-    # placeholder textual.
-    is_group_stage = stage.is_group
     variant = resolve_variant(request.GET.get("variant"))
     derivable = False
-    if not is_group_stage:
-        resolved = resolve_group_placeholders(request.user, variant)
+    thirds = None
+    thirds_sim = None
+    if is_group_window:
+        # Tabla acumulada sobre las 3 jornadas, no solo las de esta ventana.
+        _, standings = _load_group_standings(request.user, quiniela)
+        for section in sections:
+            gs = standings.get(section["key"])
+            if gs is not None:
+                section["standings"] = gs
+                section["teams"] = gs.teams
+    else:
+        # Eliminatoria: rellenar en memoria los equipos de primera ronda
+        # (placeholders "1A"/"2B" y, en dieciseisavos, el tercero del anexo
+        # C) según la variante; tarjetas y dialog comparten instancias.
+        stage = stages[0]
+        group_matches, standings = _load_group_standings(
+            request.user, quiniela)
+        finished = _finished_per_group(group_matches)
+        resolved = _group_placeholders(standings, finished, variant)
         for m in flat_matches:
             if GROUP_POS_RE.match(m.home_placeholder or ""):
                 derivable = True
@@ -318,73 +413,148 @@ def stage_view(request: HttpRequest, key: str) -> HttpResponse:
                 derivable = True
                 if m.away_team is None:
                     m.away_team = resolved.get(m.away_placeholder)
+        if stage.key == "LAST_32":
+            thirds = build_thirds(standings)[variant]
+            third_teams = _third_placeholders(
+                thirds, finished, variant, flat_matches
+            )
+            for m in flat_matches:
+                if THIRD_RE.match(m.away_placeholder or ""):
+                    derivable = True
+                    if m.away_team is None:
+                        m.away_team = third_teams.get(m.id)
+            thirds_sim = _build_thirds_simulator(thirds, flat_matches)
 
     for m in flat_matches:
-        m.editable = stage_user.can_edit
+        m.editable = window_user.can_edit
 
+    deadline = window.resolved_send_deadline()
     context = {
-        "stage": stage,
-        "state": stage_user.state,
-        "can_edit": stage_user.can_edit,
+        "window": window,
+        # Solo para el match-card (``stage.key == 'FINAL'``); en ventanas de
+        # grupo no se usa (is_group_stage corta antes).
+        "stage": stages[0],
+        "state": window_user.state,
+        "can_edit": window_user.can_edit,
         "sections": sections,
         "match_dialog_data": build_match_dialog_payload(
-            flat_matches, request.user
+            flat_matches, request.user, quiniela
         ),
-        "is_group_stage": is_group_stage,
+        "is_group_stage": is_group_window,
         "variant": variant,
         "derivable": derivable,
-        "tabs": _build_tabs(request.user),
-        "tabs_active": stage.key,
-        "deadline_iso": (
-            stage.send_deadline.isoformat()
-            if stage.send_deadline
-            else ""
-        ),
+        "thirds": thirds,
+        "thirds_sim": thirds_sim,
+        "tabs": _build_tabs(quiniela),
+        "tabs_active": str(window.order),
+        "deadline_iso": deadline.isoformat() if deadline else "",
     }
     return render(request, "stage.html", context)
 
 
-@login_required
-def groups_view(request: HttpRequest) -> HttpResponse:
-    """Pestaña unificada de Grupos sobre las 3 sub-fases (``is_group``).
+def _active_group_window(
+    user: User, quiniela: Quiniela, group_windows: list[Window]
+) -> tuple[Window, WindowUser]:
+    """Ventana de grupo vigente y su ``WindowUser`` para el usuario.
 
-    Muestra todos los grupos A–L con la tabla de posiciones **acumulada**,
-    pero solo los partidos de la sub-fase vigente son editables; el resto
-    se ve en solo lectura. "Enviar" finaliza únicamente esa sub-fase: el
-    contexto (``stage``/``state``/``deadline_iso``) apunta a la vigente, y
-    su ``key`` viaja en ``data-stage`` para que ``/send/`` cierre la
-    jornada correcta.
+    Vigente = la ventana ``is_group`` abierta y sin vencer de menor
+    ``order`` (la jornada en captura). Si ninguna está abierta, la primera
+    no enviada (encabezado en solo lectura) o, en su defecto, la última.
+    Materializa el ``WindowUser`` perezosamente. Generaliza a 1 ventana
+    (sanginiela: grupos concentrados, siempre la activa) o N (bienestar:
+    una por jornada). ``group_windows`` debe venir ordenado por ``order``.
     """
-    active = current_group_stage(request.user)
-    stage = active.stage
-    sections = render_group_sections(request.user)
-    flat_matches = [m for s in sections for m in s["matches"]]
-    for m in flat_matches:
-        m.editable = m.stage_id == active.stage_id and active.can_edit
+    states = {
+        wu.window_id: wu
+        for wu in WindowUser.objects.filter(
+            user=user, window__in=group_windows)
+    }
 
+    def wu_for(window: Window) -> WindowUser:
+        wu = states.get(window.id)
+        if wu is None:
+            wu, _ = WindowUser.objects.get_or_create(user=user, window=window)
+            states[window.id] = wu
+        return wu
+
+    for window in group_windows:
+        if window.is_open and not window.is_past_deadline:
+            return window, wu_for(window)
+    for window in group_windows:
+        wu = wu_for(window)
+        if wu.state != WindowUser.SENT:
+            return window, wu
+    last = group_windows[-1]
+    return last, wu_for(last)
+
+
+@login_required
+@with_quiniela
+def groups_view(request: HttpRequest) -> HttpResponse:
+    """Tab único de Grupos sobre las ventanas ``is_group`` de la quiniela.
+
+    Muestra los 12 grupos A–L con la tabla de posiciones **acumulada**,
+    pero solo los partidos de la ventana (jornada) vigente son editables;
+    el resto en solo lectura. "Enviar" finaliza únicamente esa ventana: el
+    contexto (``window``/``state``/``deadline``) apunta a la vigente y su
+    ``order`` viaja en ``.content[data-window]`` para que ``/send/`` cierre
+    la jornada correcta. Generaliza a 1 ventana (sanginiela) o N
+    (bienestar). Desacopla el tab (presentación) de la ventana (envío).
+    """
+    quiniela = request.quiniela
+    group_windows = [
+        w for w in quiniela.windows.prefetch_related("stages").order_by("order")
+        if _is_group_window(w)
+    ]
+    if not group_windows:
+        raise Http404("La quiniela no tiene ventanas de grupo.")
+    active_window, active_wu = _active_group_window(
+        request.user, quiniela, group_windows)
+
+    group_stages = [s for w in group_windows for s in w.stages.all()]
+    sections = render_window_sections(
+        request.user, quiniela, group_stages, is_group=True,
+        attach_standings=False,
+    )
+    flat_matches = [m for s in sections for m in s["matches"]]
+
+    # Tabla acumulada sobre las 3 jornadas, no solo la ventana activa.
+    _, standings = _load_group_standings(request.user, quiniela)
+    for section in sections:
+        gs = standings.get(section["key"])
+        if gs is not None:
+            section["standings"] = gs
+            section["teams"] = gs.teams
+
+    # Editabilidad por partido: solo la jornada (ventana) vigente.
+    active_stage_ids = {s.id for s in active_window.stages.all()}
+    for m in flat_matches:
+        m.editable = m.stage_id in active_stage_ids and active_wu.can_edit
+
+    deadline = active_window.resolved_send_deadline()
     context = {
-        "stage": stage,
-        "state": active.state,
-        "can_edit": active.can_edit,
+        "window": active_window,
+        "stage": group_stages[0],
+        "state": active_wu.state,
+        "can_edit": active_wu.can_edit,
         "sections": sections,
         "match_dialog_data": build_match_dialog_payload(
-            flat_matches, request.user
+            flat_matches, request.user, quiniela
         ),
         "is_group_stage": True,
         "variant": resolve_variant(request.GET.get("variant")),
         "derivable": False,
-        "tabs": _build_tabs(request.user),
+        "thirds": None,
+        "thirds_sim": None,
+        "tabs": _build_tabs(quiniela),
         "tabs_active": "grupos",
-        "deadline_iso": (
-            stage.send_deadline.isoformat()
-            if stage.send_deadline
-            else ""
-        ),
+        "deadline_iso": deadline.isoformat() if deadline else "",
     }
     return render(request, "stage.html", context)
 
 
 @login_required
+@with_quiniela
 def por_fecha_view(request: HttpRequest) -> HttpResponse:
     """Calendario global de solo lectura: todos los partidos por fase.
 
@@ -402,7 +572,9 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
     )
     preds = {
         p.match_id: p
-        for p in Prediction.objects.filter(user=request.user)
+        for p in Prediction.objects.filter(
+            user=request.user, quiniela=request.quiniela
+        ).prefetch_related("rules")
     }
     sections: list[dict] = []
     section: dict | None = None
@@ -444,15 +616,31 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
             date_group["finished"] += 1
             date_group["points"] += match.user_points or 0
 
+    # Día al que la página hace scroll automático: el de hoy; si hoy no hay
+    # partidos, el próximo día con partidos; si todo quedó en el pasado, el
+    # último. Marca un solo date_group (ancla en el template).
+    today = timezone.localdate()
+    all_groups = [g for s in sections for g in s["date_groups"]]
+    target = next((g for g in all_groups if g["date"] == today), None)
+    if target is None:
+        target = next((g for g in all_groups if g["date"] > today), None)
+    if target is None and all_groups:
+        target = all_groups[-1]
+    if target is not None:
+        target["is_today"] = True
+
     context = {
         "sections": sections,
         "match_dialog_data": build_match_dialog_payload(
-            matches, request.user
+            matches, request.user, request.quiniela
         ),
-        "tabs": _build_tabs(request.user),
+        "tabs": _build_tabs(request.quiniela),
     }
     return render(request, "por_fecha.html", context)
 
 
+@login_required
+@with_quiniela
 def reglas(request: HttpRequest) -> HttpResponse:
-    return render(request, "reglas.html", {"tabs": _build_tabs(request.user)})
+    return render(
+        request, "reglas.html", {"tabs": _build_tabs(request.quiniela)})

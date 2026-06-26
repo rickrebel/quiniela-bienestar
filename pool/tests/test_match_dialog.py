@@ -1,18 +1,20 @@
 """Tests del payload del dialog de partido (agrupación y privacidad)."""
 
 from datetime import timedelta
+from decimal import Decimal
 
+from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
-from pool.models import Prediction, User
+from pool.models import Prediction, Quiniela, User
+from pool.services.evaluation import ScorelineEval
 from pool.services.match_dialog import (
     build_match_dialog_payload,
     diff_label,
     group_predictions,
     points_display,
 )
-from pool.services.scoring import score_detail
 from tournament.models import Match, Stadium, Stage, Team
 
 
@@ -62,24 +64,29 @@ class PointsDisplayTests(SimpleTestCase):
         self.assertIsNone(points_display(None))
 
     def test_miss(self):
-        display = points_display(score_detail(2, 0, 0, 2))
-        self.assertEqual(display, {"total": 0, "base": 0, "bonus": False,
-                                   "kind": "miss"})
+        display = points_display(
+            ScorelineEval(points=Decimal(0), base=0, codes=[]))
+        self.assertEqual(display, {"total": Decimal(0), "base": 0,
+                                   "bonus": False, "kind": "miss"})
 
     def test_hit_with_diff_bonus_splits_base(self):
-        display = points_display(score_detail(3, 2, 2, 1))
-        self.assertEqual(display, {"total": 4, "base": 3, "bonus": True,
-                                   "kind": "hit"})
+        display = points_display(ScorelineEval(
+            points=Decimal(4), base=4, codes=["RESULT", "DIFF"]))
+        self.assertEqual(display, {"total": Decimal(4), "base": 3,
+                                   "bonus": True, "kind": "hit"})
 
     def test_exact(self):
-        display = points_display(score_detail(2, 1, 2, 1))
-        self.assertEqual(display, {"total": 5, "base": 5, "bonus": False,
-                                   "kind": "exact"})
+        display = points_display(ScorelineEval(
+            points=Decimal(5), base=5, codes=["RESULT", "DIFF", "EXACT"]))
+        self.assertEqual(display, {"total": Decimal(5), "base": 5,
+                                   "bonus": False, "kind": "exact"})
 
 
 class DialogPayloadPrivacyTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        call_command("load_rules")
+        cls.bienestar = Quiniela.objects.get(slug="bienestar")
         now = timezone.now()
         cls.open_stage = Stage.objects.create(
             key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
@@ -121,6 +128,7 @@ class DialogPayloadPrivacyTests(TestCase):
             (cls.beto, cls.closed_match, 0, 1),
         ):
             Prediction.objects.create(user=user, match=match,
+                                      quiniela=cls.bienestar,
                                       home_goals=home, away_goals=away,
                                       date=now)
 
@@ -130,7 +138,7 @@ class DialogPayloadPrivacyTests(TestCase):
                 "stage", "stadium", "home_team", "away_team"
             )
         )
-        return build_match_dialog_payload(matches, self.ana)[0]
+        return build_match_dialog_payload(matches, self.ana, self.bienestar)[0]
 
     def test_open_stage_hides_predictions(self):
         payload = self._payload_for(self.open_match)

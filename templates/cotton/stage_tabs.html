@@ -3,15 +3,15 @@
 {# omitido = ninguna marcada (leaderboard/reglas). #}
 {# Uso: <c-stage-tabs :tabs="tabs" active="{{ stage.key }}" /> #}
 <c-vars active="" />
-{% with base="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-[7px] border px-3 py-1.5 text-xs font-bold uppercase tracking-[0.4px] no-underline transition-all duration-150" on="border-gold/50 bg-gold-soft text-[#c3a764]/80 shadow-[0_0_0_1px_rgba(212,175,55,0.25)]" off="border-white/30 bg-surface text-muted" %}
+{% with base="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-[7px] border px-3 py-1.5 text-xs font-bold uppercase tracking-[0.4px] no-underline transition-all duration-150" on="border-primary/50 bg-primary/15 text-accent/80 ring-1 ring-primary/25" off="border-base-content/30 bg-base-200 text-base-content/60" %}
 <nav class="sticky top-[52px] z-2 flex gap-2 overflow-x-auto border-b
-            border-white/5 bg-[#0f1115]/90 px-2.5 py-2 backdrop-blur-[10px]"
+            border-base-content/5 bg-base-100/90 px-2.5 py-2 backdrop-blur-[10px]"
      aria-label="Fases">
     <a class="{{ base }} {% if active == 'fecha' %}{{ on }}{% else %}{{ off }}{% endif %}"
-       href="{% url 'by_date' %}">por fecha</a>
+       href="{% url 'by_date' request.quiniela.slug %}">por fecha</a>
     {% for tab in tabs %}
     <a class="{{ base }} {% if tab.key == active %}{{ on }}{% else %}{{ off }}{% endif %}"
-       href="{% if tab.key == 'grupos' %}{% url 'groups' %}{% else %}{% url 'stage' tab.key %}{% endif %}">
+       href="{% if tab.is_groups %}{% url 'groups' request.quiniela.slug %}{% else %}{% url 'window' request.quiniela.slug tab.key %}{% endif %}">
         {{ tab.short_name }}
     </a>
     {% endfor %}

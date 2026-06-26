@@ -15,6 +15,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from tournament.models import Match, Stadium, Stage, Team
+from tournament.services.group_rounds import round_by_match
 
 JSONS = Path(settings.BASE_DIR) / "db" / "jsons"
 OF_PATH = JSONS / "of" / "worldcup.json"
@@ -52,13 +53,6 @@ def of_utc(date_str: str, time_str: str) -> datetime:
     return aware.astimezone(timezone.utc)
 
 
-def stage_key(round_name: str) -> str:
-    """Mapea el ``round`` de OF a una clave de Stage (6 fases)."""
-    if round_name.startswith("Matchday"):
-        return Stage.GROUP_STAGE
-    return STAGE_BY_ROUND[round_name]
-
-
 class Command(BaseCommand):
     help = "Carga partidos desde OF y mapea fd_id contra el snapshot FD."
 
@@ -89,9 +83,14 @@ class Command(BaseCommand):
             )
             fd = fd_index.get((dt, home_tla)) or fd_index.get((dt, None))
 
+            # Los de grupo van provisional a SUBGROUP_1; la 2.ª pasada
+            # (_assign_subgroup_rounds) los reparte por jornada.
+            stage = (stages["SUBGROUP_1"] if is_group
+                     else stages[STAGE_BY_ROUND[item["round"]]])
+
             defaults = {
                 "datetime": dt,
-                "stage": stages[stage_key(item["round"])],
+                "stage": stage,
                 "stadium": stadiums[item["ground"]],
                 "home_team": teams.get(home_name) if is_group else None,
                 "away_team": teams.get(away_name) if is_group else None,
@@ -108,10 +107,39 @@ class Command(BaseCommand):
             )
             created += was_created
 
+        moved = self._assign_subgroup_rounds(stages)
+
         self.stdout.write(self.style.SUCCESS(
             f"Partidos: {created} creados (de {len(of_matches)}); "
-            f"{mapped} mapeados a fd_id."
+            f"{mapped} mapeados a fd_id; {moved} repartidos por jornada."
         ))
+
+    @staticmethod
+    def _assign_subgroup_rounds(stages: dict) -> int:
+        """Reparte los partidos de grupo en SUBGROUP_1/2/3 por jornada.
+
+        Segunda pasada: ``round_by_match`` necesita los 6 partidos de cada
+        grupo ya persistidos (los ordena por ``datetime`` y los parte en
+        pares), así que la ronda no puede resolverse al crearlos. Devuelve
+        cuántos partidos cambiaron de sub-fase.
+        """
+        subgroup = {
+            1: stages["SUBGROUP_1"],
+            2: stages["SUBGROUP_2"],
+            3: stages["SUBGROUP_3"],
+        }
+        group_matches = list(
+            Match.objects.filter(stage__is_group=True)
+            .select_related("home_team"))
+        rounds = round_by_match(group_matches)
+        moved = 0
+        for match in group_matches:
+            target = subgroup[rounds[match.id]]
+            if match.stage_id != target.id:
+                match.stage = target
+                match.save(update_fields=["stage"])
+                moved += 1
+        return moved
 
     def _build_fd_index(self) -> dict:
         """Indexa el snapshot FD por (datetime, tla_local) y (datetime, None).

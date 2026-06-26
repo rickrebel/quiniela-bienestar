@@ -14,16 +14,17 @@
 <main class="content">
     {% for section in sections %}
     <div class="mx-2 mb-2.5 mt-4 flex items-center gap-3">
-        <span class="h-px flex-1 bg-gold/30"></span>
+        <span class="h-px flex-1 bg-primary/30"></span>
         <h2 class="text-[15px] font-bold uppercase tracking-[0.4px]
-                   text-[#c3a764]/80">{{ section.label }}</h2>
-        <span class="h-px flex-1 bg-gold/30"></span>
+                   text-accent/80">{{ section.label }}</h2>
+        <span class="h-px flex-1 bg-primary/30"></span>
     </div>
     {% for group in section.date_groups %}
-    <section class="mb-2 overflow-hidden rounded-[14px] border
-                    border-white/15 bg-surface">
+    <section {% if group.is_today %}id="today-anchor"{% endif %}
+             class="mb-2 overflow-hidden rounded-[14px] border
+                    border-base-content/15 bg-base-200">
         <h6 class="chip-title flex w-full items-center px-3.5 py-1.5
-                   text-[15px] font-medium">{{ group.label }}{% if group.finished %}<span class="ml-auto text-xs font-bold tracking-[0.3px] text-[#c3a764]/80">{{ group.points }} pts</span>{% endif %}</h6>
+                   text-[15px] font-medium">{{ group.label }}{% if group.finished %}<span class="ml-auto text-xs font-bold tracking-[0.3px] text-accent/80">{{ group.points|floatformat:"-1" }} pts</span>{% endif %}</h6>
         {% for m in group.matches %}
         <c-match-card :match="m" :stage="m.stage" state="locked"
                       :is_group_stage="m.is_group" :by_date="m.is_group" />
@@ -36,5 +37,19 @@
 {# El shell del match-dialog vive en header.html; aquí solo los datos de #}
 {# los partidos de esta página. #}
 {{ match_dialog_data|json_script:"match-dialog-data" }}
+
+{# Scroll automático al día actual (#today-anchor lo fija la vista). En #}
+{# 'load' para que las banderas ya hayan ocupado su alto y no corran el #}
+{# objetivo; el offset es el borde inferior de los stickies (header + tabs). #}
+<script>
+    window.addEventListener("load", () => {
+        const target = document.getElementById("today-anchor");
+        if (!target) return;
+        const tabs = document.querySelector('nav[aria-label="Fases"]');
+        const offset = (tabs ? tabs.getBoundingClientRect().bottom : 0) + 8;
+        const y = target.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({ top: y, behavior: "instant" });
+    });
+</script>
 
 {% endblock %}

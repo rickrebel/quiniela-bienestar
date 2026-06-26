@@ -2,5 +2,5 @@
 {# Uso: <c-field-errors :field="form.email" /> #}
 <c-vars field="" />
 {% for error in field.errors %}
-<span style="color: #c86b52;">[{{ error }}]</span>
+<span class="text-error">[{{ error }}]</span>
 {% endfor %}

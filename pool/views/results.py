@@ -14,6 +14,8 @@ from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from pool.services.evaluation import recompute_all
+from pool.views.scope import with_quiniela
 from tournament.models import Match
 
 FORBIDDEN = "No tienes permiso para capturar resultados."
@@ -45,12 +47,15 @@ def _as_score(value) -> int | None:
 
 
 @login_required
+@with_quiniela
 @require_POST
 def record_result(request: HttpRequest, match_id: int) -> JsonResponse:
     """Captura goles, tarjetas y penales; deja el partido FINISHED.
 
-    Inmutable: una vez terminado (capturado o sincronizado de FD) el
-    servidor rechaza recapturas aunque la UI muestre la opción.
+    El resultado es verdad del torneo (compartido entre quinielas): la
+    quiniela del path solo sirve para resolver la ruta; ``recompute_all``
+    reevalúa todas. Inmutable: una vez terminado (capturado o sincronizado
+    de FD) el servidor rechaza recapturas aunque la UI muestre la opción.
     """
     user = request.user
     if not (user.can_record_results or user.is_superuser):
@@ -104,4 +109,7 @@ def record_result(request: HttpRequest, match_id: int) -> JsonResponse:
         *REQUIRED_FIELDS, "status", "decided_by",
         "home_penalties", "away_penalties",
     ])
+    # Congela puntos y acumulados con el partido ya finalizado; el
+    # recálculo es completo (idempotente) para absorber correcciones.
+    recompute_all()
     return JsonResponse({"status": "ok"})

@@ -7,13 +7,13 @@
 
 <c-stage-tabs :tabs="tabs" active="{{ tabs_active }}" />
 
-<main class="content" data-stage="{{ stage.key }}" data-state="{{ state }}">
+<main class="content" data-window="{{ window.order }}" data-state="{{ state }}">
     {% if state == 'upcoming' %}
     <p class="mx-auto mb-3 mt-1 text-center text-[13px] font-medium
-              text-soft">Esta fase todavía no abre para predecir.</p>
+              text-secondary">Esta fase todavía no abre para predecir.</p>
     {% elif state == 'locked' %}
     <p class="mx-auto mb-3 mt-1 text-center text-[13px] font-medium
-              text-soft">El plazo de esta fase terminó.</p>
+              text-secondary">El plazo de esta fase terminó.</p>
     {% endif %}
 
     {% if derivable %}
@@ -21,7 +21,7 @@
     {# grupo). Recarga con ?variant=; el server resuelve 1.º/2.º según la #}
     {# elección. En grupos el selector es por tabla (cliente). #}
     <div class="mx-auto mb-2.5 mt-1.5 flex justify-center">
-        <nav class="flex w-fit gap-0.5 rounded-[10px] bg-surface-2 p-[3px]"
+        <nav class="flex w-fit gap-0.5 rounded-[10px] bg-base-300 p-[3px]"
              aria-label="Variante de equipos">
             <a class="view-opt{% if variant == 'est' %} active{% endif %}"
                href="?variant=est">Estimado</a>
@@ -41,32 +41,34 @@
     {# (chevron y banderas reaccionan al <details> abierto). #}
     {% if is_group_stage %}
     <details class="group mb-2 overflow-hidden rounded-[14px] border
-                    border-white/15 bg-surface">
+                    border-base-content/15 bg-base-200">
         <summary class="group-summary relative flex cursor-pointer
                         list-none items-center px-3.5 py-3 text-[15.8px]
                         font-medium [&::-webkit-details-marker]:hidden">
             <c-icon name="chevron_right"
-                    class="chevron mx-[5px] text-base text-gold opacity-80
+                    class="chevron mx-[5px] text-base text-primary opacity-80
                            transition-transform duration-300
                            group-open:rotate-90" />
             {{ section.label }}
             {# group-flags: hook de standings.js (reordena por style.order) #}
             {% if section.teams %}<span class="group-flags ml-10 inline-flex items-center gap-1 transition-opacity duration-300 group-open:opacity-40">{% for team in section.teams %}{% if team.flag_path %}<img class="h-[18px] w-auto max-w-[26px] rounded-sm" src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}" data-order-est="{{ team.order_est }}" data-order-mix="{{ team.order_mix }}" data-order-real="{{ team.order_real }}">{% endif %}{% endfor %}</span>{% endif %}
-            <c-section-count state="{{ state }}" points="{{ section.points }}"
+            <c-section-count state="{{ state }}"
+                             points="{{ section.points|floatformat:'-1' }}"
                              filled="{{ section.filled }}"
                              total="{{ section.total }}" />
         </summary>
     {% else %}
     <div class="knockout mb-2 overflow-hidden rounded-[14px] border
-                border-white/15 bg-surface pt-3">
+                border-base-content/15 bg-base-200 pt-3">
     {% endif %}
 
         {% if not is_group_stage %}
         <h6 class="chip-title flex w-full items-center px-3 py-2.5
                    text-[15px] font-bold tracking-[0.4px]
-                   text-[#c3a764]/70">
-            {{ stage.name|upper }}
-            <c-section-count state="{{ state }}" points="{{ section.points }}"
+                   text-accent/70">
+            {{ window.resolved_name|upper }}
+            <c-section-count state="{{ state }}"
+                             points="{{ section.points|floatformat:'-1' }}"
                              filled="{{ section.filled }}"
                              total="{{ section.total }}" />
         </h6>
@@ -78,12 +80,12 @@
         {% endfor %}
 
         {% if section.standings %}
-        <div class="border-t-[2.5px] border-white/20 px-3.5 pb-3 pt-2">
+        <div class="border-t-[2.5px] border-base-content/20 px-3.5 pb-3 pt-2">
             {# Selector de variante por grupo (antes era global, arriba de #}
             {# todo). standings.js sincroniza todos los navs y persiste la #}
             {# elección; .view-opt/.active viven en source.css. #}
             <nav class="mx-auto mb-2.5 flex w-fit gap-0.5 rounded-[10px]
-                        bg-surface-2 p-[3px]"
+                        bg-base-300 p-[3px]"
                  data-standings-switch aria-label="Variante de posiciones">
                 <button type="button" class="view-opt" data-variant="est">Estimado</button>
                 <button type="button" class="view-opt active" data-variant="mix">Est. + Real</button>
@@ -98,19 +100,45 @@
     {% if is_group_stage %}</details>{% else %}</div>{% endif %}
 
     {% endfor %}
+
+    {% if thirds %}
+    {# Solo en dieciseisavos: los 12 terceros para la variante vigente; las #}
+    {# 8 primeras filas clasifican. El selector de variante (?variant=) ya #}
+    {# está arriba (derivable), así que esta tabla no necesita JS. #}
+    <div class="knockout mb-2 overflow-hidden rounded-[14px] border
+                border-base-content/15 bg-base-200 pt-3">
+        <h6 class="chip-title flex w-full items-center px-3 py-2.5
+                   text-[15px] font-bold tracking-[0.4px]
+                   text-accent/70">MEJORES TERCEROS
+            <label class="ml-auto flex cursor-pointer items-center gap-2
+                          text-[11px] font-semibold uppercase
+                          tracking-[0.4px] text-secondary">
+                Simular cruces
+                <input type="checkbox" class="sim-switch"
+                       data-sim-toggle>
+            </label></h6>
+        <div class="px-3.5 pb-3 pt-1">
+            <c-thirds-table :rows="thirds" />
+        </div>
+    </div>
+    {% if thirds_sim %}
+    {{ thirds_sim|json_script:"thirds-sim-data" }}
+    <script src="{% static 'thirds_sim.js' %}" defer></script>
+    {% endif %}
+    {% endif %}
 </main>
 
 {# El footer solo se renderiza si tiene algo que mostrar: botón de envío, #}
 {# aviso "enviadas" (solo antes del cierre) o la nota de cuenta regresiva. #}
 {# Tras vencer el plazo de una fase ya enviada queda sin barra pegajosa. #}
-{% if state == 'editing' or state == 'sent' and not stage.is_past_deadline or deadline_iso and state != 'sent' %}
-<footer class="sticky bottom-0 z-[1000] border-t border-gold/40
-               bg-[#0f1115]/90 px-2 pt-2.5
+{% if state == 'editing' or state == 'sent' and not window.is_past_deadline or deadline_iso and state != 'sent' %}
+<footer class="sticky bottom-0 z-[1000] border-t border-primary/40
+               bg-base-100/90 px-2 pt-2.5
                pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
     <div class="mx-auto flex max-w-[900px] gap-2">
         {% if state == 'editing' %}
-        <button class="submit-btn" onclick="sendPredictions()">{% if is_group_stage %}Enviar {{ stage.short_name }}{% else %}Enviar{% endif %}</button>
-        {% elif state == 'sent' and not stage.is_past_deadline %}
+        <button class="submit-btn" onclick="sendPredictions()">Enviar {{ window.resolved_short_name }}</button>
+        {% elif state == 'sent' and not window.is_past_deadline %}
         <span class="mx-auto inline-flex h-11 items-center gap-2 px-4
                      text-[13px] font-bold uppercase tracking-[0.04em]
                      text-success">
@@ -125,7 +153,7 @@
     {# deadline-note (no "countdown"): daisyUI trae un componente #}
     {# .countdown que pisaría la clase. countdown.js usa este hook. #}
     <div class="deadline-note mx-auto mt-1.5 text-center text-xs
-                font-medium text-muted"
+                font-medium text-base-content/60"
          data-deadline="{{ deadline_iso }}"></div>
     {% endif %}
 </footer>
@@ -137,16 +165,16 @@
 </div>
 
 <div id="saving-overlay" class="fixed inset-0 z-[9999] flex flex-col
-     items-center justify-center gap-4 bg-[#121212]/85" hidden>
-    <span class="loading loading-spinner w-12 text-gold"></span>
-    <p class="text-[#e8dcc0]">Guardando predicciones...</p>
+     items-center justify-center gap-4 bg-base-200/85" hidden>
+    <span class="loading loading-spinner w-12 text-primary"></span>
+    <p class="text-base-content">Guardando predicciones...</p>
 </div>
 
 {# Resumen previo al envío; el cuerpo lo llena submit.js clonando .match-card. #}
 <dialog id="send-dialog" class="send-dialog">
     <div class="send-dialog-head">Revisa tus predicciones antes de enviar</div>
     <div id="send-dialog-body" class="send-dialog-body"></div>
-    <footer class="border-t border-gold/40 bg-[#0f1115]/90 px-2 py-2.5">
+    <footer class="border-t border-primary/40 bg-base-100/90 px-2 py-2.5">
         <div class="mx-auto flex max-w-[900px] gap-2">
             <button class="submit-btn" onclick="closeSendDialog()">Cerrar</button>
             <button class="submit-btn" onclick="confirmSend()">Confirmar envío</button>

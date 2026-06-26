@@ -1,0 +1,38 @@
+{% load static %}
+{# Tabla de los 12 terceros; las 8 primeras filas (qualified) clasifican y #}
+{# .cut traza la línea de corte tras la 8.ª. Reusa el CSS .standings-table. #}
+{# La casilla .third-check y la columna .third-match son hooks de #}
+{# thirds_sim.js (explorador "¿qué pasaría si...?": recalcula cruces y el #}
+{# No. de partido al cambiar quiénes clasifican). Uso: #}
+{# <c-thirds-table :rows="thirds" /> #}
+<table class="standings-table thirds-table">
+    <thead>
+        <tr>
+            <th></th>
+            <th class="st-team">3.er lugar</th>
+            <th>Gpo</th><th>No.</th><th>Pts</th>
+            <th>DG</th><th>GF</th><th>🟨</th><th>🟥</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr class="{% if row.qualified %}qualified{% endif %}{% if forloop.counter == 8 %} cut{% endif %}">
+            <td><input type="checkbox" class="third-check"
+                       data-group="{{ row.group }}"
+                       {% if row.qualified %}checked{% endif %}></td>
+            <td class="st-team">
+                <span class="st-pos">{{ forloop.counter }}</span>
+                {% if row.team.flag_path %}<img src="{% static row.team.flag_path %}" alt="">{% endif %}
+                <span class="st-name">{{ row.team.name_es }}</span>
+            </td>
+            <td>{{ row.group }}</td>
+            <td class="third-match" data-group="{{ row.group }}">{{ row.match_number|default:"" }}</td>
+            <td class="st-pts">{{ row.points }}</td>
+            <td>{{ row.goal_diff }}</td>
+            <td>{{ row.goals_for }}</td>
+            <td>{{ row.yellow }}</td>
+            <td>{{ row.red }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

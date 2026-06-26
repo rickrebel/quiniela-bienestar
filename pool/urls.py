@@ -1,31 +1,20 @@
-"""Rutas de la app pool (quiniela)."""
+"""Rutas de la app pool, montadas bajo ``/<slug>/`` (una quiniela).
+
+El slug lo resuelve ``with_quiniela`` (ver ``pool/views/scope.py``) en cada
+vista; aquí los patrones ya no lo mencionan. Una ventana de predicción se
+identifica por su ``order`` dentro de la quiniela.
+"""
 
 from django.urls import path
-from django.views.generic import RedirectView
 
-from pool.views import auth, leaderboard, predictions, results, stages
+from pool.views import leaderboard, predictions, results, stages
 
 urlpatterns = [
-    path("login/", auth.login_view, name="login"),
-    path("registro/", auth.register_view, name="register"),
-    path("logout/", auth.logout_view, name="logout"),
-    path(
-        "recuperar/",
-        auth.forgot_password_view,
-        name="forgot_password",
-    ),
-    path(
-        "recuperar/<uuid:key>/",
-        auth.reset_password_view,
-        name="reset_password",
-    ),
     path("reglas/", stages.reglas, name="reglas"),
     path("calendario/", stages.por_fecha_view, name="by_date"),
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
-    # El alias de grupos va antes que <key> para que no lo capture la ruta
-    # genérica de fase.
-    path("stage/grupos/", stages.groups_view, name="groups"),
-    path("stage/<str:key>/", stages.stage_view, name="stage"),
+    path("grupos/", stages.groups_view, name="groups"),
+    path("ventana/<int:order>/", stages.window_view, name="window"),
     path("save/", predictions.save_predictions, name="save"),
     path(
         "prediction/<int:match_id>/",
@@ -37,10 +26,5 @@ urlpatterns = [
         "match/<int:match_id>/result/",
         results.record_result,
         name="record_result",
-    ),
-    path(
-        "",
-        RedirectView.as_view(url="/stage/grupos/"),
-        name="root",
     ),
 ]

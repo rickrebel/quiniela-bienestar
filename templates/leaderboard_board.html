@@ -19,7 +19,7 @@
         <span class="board-name">
             {{ row.user.first_name|default:row.user.email }}
         </span>
-        <span class="board-pts">{{ row.points }}</span>
+        <span class="board-pts">{{ row.points|floatformat:"-1" }}</span>
         <span class="board-stat">{{ row.outcomes }}</span>
         <span class="board-stat">{{ row.diffs }}</span>
         <span class="board-stat">{{ row.exact }}</span>
@@ -35,4 +35,4 @@
            aria-label="Cambiar entre cambio por partido y por día">
     <span class="board-trend-opt" data-baseline="day">por día</span>
 </div>
-<p class="board-cap">{{ max_points }} puntos en juego hasta ahora</p>
+<p class="board-cap">{{ max_points|floatformat:"-1" }} puntos en juego hasta ahora</p>

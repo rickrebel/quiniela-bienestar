@@ -1,12 +1,59 @@
 from django.contrib import admin
 
-from .models import Prediction, StageUser, User
+from .models import (
+    Prediction, Quiniela, QuinielaRule, Rule, User,
+    UserQuiniela, Window, WindowUser)
 from django.contrib.auth.admin import UserAdmin
 
-@admin.register(StageUser)
-class StageUserAdmin(admin.ModelAdmin):
-    list_display = ("user", "stage", "sent_at")
-    list_filter = ("stage",)
+
+@admin.register(Rule)
+class RuleAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "short_name", "icon", "order")
+    ordering = ("order",)
+    search_fields = ("code", "name", "short_name")
+
+
+class QuinielaRuleInline(admin.TabularInline):
+    model = QuinielaRule
+    extra = 0
+    autocomplete_fields = ("rule",)
+
+
+@admin.register(Quiniela)
+class QuinielaAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "theme")
+    list_editable = ("theme",)
+    prepopulated_fields = {"slug": ("name",)}
+    search_fields = ("name", "slug")
+    inlines = [QuinielaRuleInline]
+
+
+@admin.register(Window)
+class WindowAdmin(admin.ModelAdmin):
+    list_display = (
+        "quiniela", "order", "window_name", "multiplier",
+        "opens_at", "send_deadline")
+    list_filter = ("quiniela",)
+    ordering = ("quiniela", "order")
+    filter_horizontal = ("stages",)
+
+    @admin.display(description="Nombre")
+    def window_name(self, obj: Window) -> str:
+        return obj.resolved_name()
+
+
+@admin.register(UserQuiniela)
+class UserQuinielaAdmin(admin.ModelAdmin):
+    list_display = ("user", "quiniela", "authorized", "joined_at")
+    list_editable = ("authorized",)
+    list_filter = ("quiniela", "authorized")
+    search_fields = ("user__email", "user__first_name")
+
+
+@admin.register(WindowUser)
+class WindowUserAdmin(admin.ModelAdmin):
+    list_display = ("user", "window", "sent_at")
+    list_filter = ("window__quiniela",)
 
 
 @admin.register(Prediction)
@@ -41,11 +88,10 @@ class PredictionAdmin(admin.ModelAdmin):
         return obj.match.away_team.name_es if obj.match.away_team else "—"
 
 
-class StageUserInline(admin.StackedInline):
-    model = StageUser
+class UserQuinielaInline(admin.TabularInline):
+    model = UserQuiniela
     extra = 0
-    can_delete = False
-    verbose_name_plural = "Etapas del usuario"
+    verbose_name_plural = "Quinielas del usuario"
 
 
 @admin.register(User)
@@ -66,10 +112,9 @@ class CustomUserAdmin(UserAdmin):
         "username",
         "first_name",
         "is_active",
-        "authorized",
         "can_record_results",
     )
     search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering = ('-is_active', 'email')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
-    inlines = [StageUserInline]
+    inlines = [UserQuinielaInline]

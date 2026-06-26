@@ -85,6 +85,36 @@ def calculate_points(
     return detail.points if detail else None
 
 
+def chips_from_codes(
+    codes, is_draw: bool, show_penalty: bool = False
+) -> list[dict]:
+    """Chips de desglose a partir de los códigos de regla atinados.
+
+    Lee lo guardado (``Prediction.rules``) en vez del ``ScoreDetail``
+    calculado al vuelo. La diferencia nunca cuenta en empates, así que en
+    empate **se omite** el chip "Dif" (no se pinta como ``na``). En
+    knockouts decididos por penales (``show_penalty``) se añade el chip
+    "Pen" con el acierto del equipo que avanza.
+    """
+    has = set(codes)
+    chips = [
+        {"label": "Res", "icon": "check",
+         "state": "on" if "RESULT" in has else "off"},
+    ]
+    if not is_draw:
+        chips.append(
+            {"label": "Dif", "icon": "",
+             "state": "on" if "DIFF" in has else "off"})
+    chips.append(
+        {"label": "", "icon": "mira",
+         "state": "on" if "EXACT" in has else "off"})
+    if show_penalty:
+        chips.append(
+            {"label": "Pen", "icon": "",
+             "state": "on" if "PENALTY" in has else "off"})
+    return chips
+
+
 def result_chips(detail: ScoreDetail, is_draw: bool) -> list[dict]:
     """Tres chips de desglose (Resultado, Diferencia, Exacto).
 

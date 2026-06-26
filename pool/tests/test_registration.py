@@ -3,7 +3,8 @@
 from django.test import TestCase
 from django.urls import reverse
 
-from pool.models import StageUser, User
+from pool.models import (
+    Quiniela, User, UserQuiniela, Window, WindowUser)
 from tournament.models import Stage
 
 
@@ -21,9 +22,11 @@ class RegisterViewTests(TestCase):
         return data
 
     def test_new_user_is_created_active_and_logged_in(self):
+        Quiniela.objects.create(name="Q", slug="q")
         response = self.client.post(self.url, self._payload())
         self.assertRedirects(
-            response, reverse("groups"),
+            response,
+            reverse("window", kwargs={"quiniela": "q", "order": 1}),
             fetch_redirect_response=False,
         )
         user = User.objects.get(email="ana@example.com")
@@ -33,16 +36,6 @@ class RegisterViewTests(TestCase):
         self.assertTrue(user.check_password("x"))
         self.assertEqual(
             int(self.client.session["_auth_user_id"]), user.id)
-
-    def test_new_user_gets_stageuser_for_every_stage(self):
-        Stage.objects.create(
-            key="GROUP_STAGE", name="Fase de grupos",
-            short_name="Grupos", order=1)
-        Stage.objects.create(
-            key="LAST_16", name="Octavos", short_name="Octavos", order=2)
-        self.client.post(self.url, self._payload())
-        user = User.objects.get(email="ana@example.com")
-        self.assertEqual(StageUser.objects.filter(user=user).count(), 2)
 
     def test_single_char_password_is_accepted(self):
         response = self.client.post(self.url, self._payload())
@@ -81,27 +74,59 @@ class RegisterViewTests(TestCase):
         response = self.client.post(self.url, self._payload())
         self.assertContains(response, "no tiene acceso")
 
-    def test_preregistered_user_is_completed_without_duplicating_stageusers(
-            self):
-        Stage.objects.create(
-            key="GROUP_STAGE", name="Fase de grupos",
-            short_name="Grupos", order=1)
-        # create_user dispara la señal que crea su StageUser.
+    def test_preregistered_user_is_completed(self):
         user = User.objects.create_user(
             email="ana@example.com", first_name="Preregistrada")
 
+        Quiniela.objects.create(name="Q", slug="q")
         response = self.client.post(
             self.url, self._payload(first_name="Ana"))
         self.assertRedirects(
-            response, reverse("groups"),
+            response,
+            reverse("window", kwargs={"quiniela": "q", "order": 1}),
             fetch_redirect_response=False,
         )
         user.refresh_from_db()
         self.assertTrue(user.is_active)
         self.assertEqual(user.first_name, "Ana")
         self.assertTrue(user.check_password("x"))
-        self.assertEqual(StageUser.objects.filter(user=user).count(), 1)
 
     def test_missing_name_rejected(self):
         response = self.client.post(self.url, self._payload(first_name=""))
         self.assertContains(response, "El nombre es requerido")
+
+
+class WindowUserSignalTests(TestCase):
+    """Inscribir a un usuario en una quiniela materializa sus WindowUser."""
+
+    def test_membership_creates_window_user_per_window(self):
+        quiniela = Quiniela.objects.create(name="Q", slug="q")
+        s1 = Stage.objects.create(
+            key="SUBGROUP_1", name="J1", short_name="J1", order=1,
+            is_group=True)
+        s2 = Stage.objects.create(
+            key="LAST_32", name="16avos", short_name="16avos", order=2)
+        w1 = Window.objects.create(quiniela=quiniela, order=1)
+        w1.stages.add(s1)
+        w2 = Window.objects.create(quiniela=quiniela, order=2)
+        w2.stages.add(s2)
+        user = User.objects.create_user("ana@x.com", first_name="Ana")
+
+        UserQuiniela.objects.create(user=user, quiniela=quiniela)
+
+        self.assertEqual(
+            set(WindowUser.objects.filter(user=user).values_list(
+                "window_id", flat=True)),
+            {w1.id, w2.id},
+        )
+
+    def test_membership_is_idempotent(self):
+        quiniela = Quiniela.objects.create(name="Q", slug="q")
+        w = Window.objects.create(quiniela=quiniela, order=1)
+        user = User.objects.create_user("ana@x.com", first_name="Ana")
+        WindowUser.objects.create(user=user, window=w)
+
+        UserQuiniela.objects.create(user=user, quiniela=quiniela)
+
+        self.assertEqual(
+            WindowUser.objects.filter(user=user, window=w).count(), 1)

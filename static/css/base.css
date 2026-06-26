@@ -2,30 +2,9 @@
 @import url("styles.css");
 @import url("forms.css");
 
-:root {
-  --bg: #04172c;
-  --surface: #232732;
-  --surface-2: #1f2430;
-
-  --text: #e7e7e7;
-  --muted: rgb(180, 180, 180);
-
-  --gold: #d4af37;
-  --gold-soft: rgba(212, 175, 55, 0.14);
-
-  /* Verde/rojo del tema (mismos valores que los tokens daisyUI
-     --color-success/--color-error en source.css). */
-  --success: #6bbf8a;
-  --error: #e57373;
-
-  --surface-light: #252525;
-  --gold-hover: #e5c55c;
-  --border: #353535;
-
-  --secundary: #B8C0CC
-}
-
+/* Las variables :root legacy se retiraron: header/styles/forms ya usan
+   los tokens daisyUI (--color-*), que conmutan con <html data-theme>. */
 body {
-    color: var(--text);
+    color: var(--color-base-content);
 }
 

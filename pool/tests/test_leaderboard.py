@@ -1,23 +1,43 @@
 """Tests del armado de la tabla de posiciones."""
 
+from django.core.management import call_command
 from django.test import TestCase
 from django.utils import timezone
 
-from pool.models import Prediction, User
+from pool.models import Prediction, Quiniela, User, UserQuiniela
+from pool.services.evaluation import recompute_all
 from pool.services.leaderboard import build_leaderboard
+from pool.services.membership import active_quiniela
 from tournament.models import Match, Stadium, Stage, Team
 
 
+def _enroll(user):
+    """Inscribe al usuario en bienestar (membresía requerida por el scoring)."""
+    UserQuiniela.objects.get_or_create(
+        user=user, quiniela=Quiniela.objects.get(slug="bienestar"))
+    return user
+
+
 def _prediction(user, match, home, away):
+    _enroll(user)
     return Prediction.objects.create(
-        user=user, match=match, home_goals=home, away_goals=away,
+        user=user, quiniela=Quiniela.objects.get(slug="bienestar"),
+        match=match, home_goals=home, away_goals=away,
         date=timezone.now(),
     )
+
+
+def evaluated_board():
+    """Congela los puntos (como en producción tras una captura) y arma la
+    tabla de bienestar: ``build_leaderboard`` ya solo lee lo guardado."""
+    recompute_all()
+    return build_leaderboard(Quiniela.objects.get(slug="bienestar"))
 
 
 class BuildLeaderboardTests(TestCase):
     @classmethod
     def setUpTestData(cls):
+        call_command("load_rules")
         cls.stage = Stage.objects.create(
             key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
             color="#4CAF50", order=1,
@@ -47,10 +67,10 @@ class BuildLeaderboardTests(TestCase):
                                status="FINISHED")
         cls.pending = match(3, status="TIMED")
 
-        cls.ana = User.objects.create_user("ana@x.com", first_name="Ana",
-                                           is_active=True)
-        cls.beto = User.objects.create_user("beto@x.com", first_name="Beto",
-                                            is_active=True)
+        cls.ana = _enroll(User.objects.create_user(
+            "ana@x.com", first_name="Ana", is_active=True))
+        cls.beto = _enroll(User.objects.create_user(
+            "beto@x.com", first_name="Beto", is_active=True))
         cls.inactive = User.objects.create_user("nadie@x.com",
                                                 first_name="Nadie")
 
@@ -58,7 +78,7 @@ class BuildLeaderboardTests(TestCase):
         _prediction(self.ana, self.pending, 5, 0)  # no debe sumar
         _prediction(self.ana, self.finished_1, 2, 1)  # exacto: 5
 
-        row = build_leaderboard().row_for(self.ana)
+        row = evaluated_board().row_for(self.ana)
         self.assertEqual(row.points, 5)
         self.assertEqual(row.outcomes, 1)
         self.assertEqual(row.exact, 1)
@@ -71,7 +91,7 @@ class BuildLeaderboardTests(TestCase):
         # 4 pts por empate exacto (0-0) no es bono de diferencia.
         _prediction(self.ana, self.finished_2, 0, 0)
 
-        row = build_leaderboard().row_for(self.ana)
+        row = evaluated_board().row_for(self.ana)
         self.assertEqual(row.points, 8)
         # outcomes no es disjunto: el exacto y la diferencia cuentan ambos.
         self.assertEqual(row.outcomes, 2)
@@ -82,7 +102,7 @@ class BuildLeaderboardTests(TestCase):
         _prediction(self.ana, self.finished_1, 1, 0)   # 3 pts
         _prediction(self.beto, self.finished_1, 1, 0)  # 3 pts
 
-        rows = build_leaderboard().rows
+        rows = evaluated_board().rows
         self.assertEqual([r.position for r in rows], [1, 1])
 
     def test_exact_orders_display_but_not_position(self):
@@ -91,7 +111,7 @@ class BuildLeaderboardTests(TestCase):
         _prediction(self.ana, self.finished_2, 0, 0)
         _prediction(self.beto, self.finished_1, 3, 2)
 
-        rows = build_leaderboard().rows
+        rows = evaluated_board().rows
         self.assertEqual(rows[0].user, self.ana)
         self.assertEqual([r.position for r in rows], [1, 1])
 
@@ -103,24 +123,24 @@ class BuildLeaderboardTests(TestCase):
         _prediction(self.beto, self.finished_1, 2, 1)  # 5 pts
         _prediction(caro, self.finished_1, 1, 0)       # 3 pts
 
-        rows = build_leaderboard().rows
+        rows = evaluated_board().rows
         self.assertEqual([r.position for r in rows], [1, 1, 2])
 
     def test_inactive_users_excluded_and_idle_users_included(self):
-        rows = build_leaderboard().rows
+        rows = evaluated_board().rows
         emails = {row.user.email for row in rows}
         self.assertEqual(emails, {"ana@x.com", "beto@x.com"})
         self.assertFalse(any(row.has_played for row in rows))
         self.assertTrue(all(row.points == 0 for row in rows))
 
     def test_virtual_user_included_despite_inactive(self):
-        virtual = User.objects.create_user(
+        virtual = _enroll(User.objects.create_user(
             "colectivo@x.com", first_name="Ignorancia colectiva",
             is_virtual=True,
-        )
+        ))
         self.assertFalse(virtual.is_active)
 
-        rows = build_leaderboard().rows
+        rows = evaluated_board().rows
         self.assertIn(virtual, [row.user for row in rows])
 
     def test_virtual_user_sorts_by_points_but_has_no_position(self):
@@ -132,7 +152,7 @@ class BuildLeaderboardTests(TestCase):
         _prediction(virtual, self.finished_1, 3, 2)       # 4 pts (diferencia)
         _prediction(self.beto, self.finished_1, 3, 1)     # 3 pts (solo resultado)
 
-        rows = build_leaderboard().rows
+        rows = evaluated_board().rows
         # Ordenado entre los reales por puntos, pero sin posición y sin
         # recorrer a nadie: Beto sigue siendo 2°.
         self.assertEqual([r.user for r in rows],
@@ -147,7 +167,7 @@ class BuildLeaderboardTests(TestCase):
         _prediction(virtual, self.finished_1, 2, 1)   # 5 pts
         _prediction(self.ana, self.finished_1, 1, 0)  # 3 pts
 
-        rows = build_leaderboard().rows
+        rows = evaluated_board().rows
         self.assertEqual(rows[0].user, virtual)
         self.assertEqual(rows[0].position, 0)
         self.assertEqual(rows[1].user, self.ana)
@@ -155,7 +175,7 @@ class BuildLeaderboardTests(TestCase):
 
     def test_max_points_sums_only_finished(self):
         # 5 por el 2-1 (ganador) + 4 por el 0-0 (empate); el TIMED no suma.
-        self.assertEqual(build_leaderboard().max_points, 9)
+        self.assertEqual(evaluated_board().max_points, 9)
 
 
 class LeaderboardTrendTests(TestCase):
@@ -165,6 +185,7 @@ class LeaderboardTrendTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
+        call_command("load_rules")
         cls.stage = Stage.objects.create(
             key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
             color="#4CAF50", order=1,
@@ -180,10 +201,10 @@ class LeaderboardTrendTests(TestCase):
             name="Canada", name_es="Canadá", fifa_code="CAN", group_name="A",
             confederation="concacaf",
         )
-        cls.ana = User.objects.create_user("ana@x.com", first_name="Ana",
-                                           is_active=True)
-        cls.beto = User.objects.create_user("beto@x.com", first_name="Beto",
-                                            is_active=True)
+        cls.ana = _enroll(User.objects.create_user(
+            "ana@x.com", first_name="Ana", is_active=True))
+        cls.beto = _enroll(User.objects.create_user(
+            "beto@x.com", first_name="Beto", is_active=True))
 
     def _match(self, of_number, dt, home, away):
         return Match.objects.create(
@@ -217,7 +238,7 @@ class LeaderboardTrendTests(TestCase):
 
     def test_day_baseline_reflects_swap_over_the_last_day(self):
         self._scenario()
-        rows = {r.user: r for r in build_leaderboard().rows}
+        rows = {r.user: r for r in evaluated_board().rows}
         # Antes del día 2: Ana 5 (1°), Beto 0 (2°). Ahora Beto 10 (1°),
         # Ana 5 (2°): Beto sube, Ana baja.
         self.assertEqual(rows[self.beto].trend_day, "up")
@@ -225,7 +246,7 @@ class LeaderboardTrendTests(TestCase):
 
     def test_batch_baseline_excludes_only_the_last_batch(self):
         self._scenario()
-        rows = {r.user: r for r in build_leaderboard().rows}
+        rows = {r.user: r for r in evaluated_board().rows}
         # Excluyendo solo m3: Ana 5, Beto 5 (empate, ambos 1°). Ahora Beto
         # es 1° y Ana cae a 2°: Ana baja, Beto sin cambio.
         self.assertEqual(rows[self.beto].trend_batch, None)
@@ -238,7 +259,7 @@ class LeaderboardTrendTests(TestCase):
             1, datetime(2026, 6, 11, 18, 0, tzinfo=dt_tz.utc), 1, 0,
         )
         _prediction(self.ana, m1, 1, 0)
-        rows = {r.user: r for r in build_leaderboard().rows}
+        rows = {r.user: r for r in evaluated_board().rows}
         self.assertIsNone(rows[self.ana].trend_batch)
         self.assertIsNone(rows[self.ana].trend_day)
 
@@ -250,6 +271,95 @@ class LeaderboardTrendTests(TestCase):
         m1, m2, m3 = self._scenario()
         _prediction(virtual, m1, 0, 0)
         _prediction(virtual, m3, 3, 0)
-        row = build_leaderboard().row_for(virtual)
+        row = evaluated_board().row_for(virtual)
         self.assertIsNone(row.trend_batch)
         self.assertIsNone(row.trend_day)
+
+
+class QuinielaScopeTests(TestCase):
+    """Cada board es independiente: solo cuenta a los miembros de la
+    quiniela y sus predicciones."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_rules")
+        cls.bienestar = Quiniela.objects.get(slug="bienestar")
+        cls.sanginiela = Quiniela.objects.get(slug="sanginiela")
+        cls.stage = Stage.objects.create(
+            key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
+            color="#4CAF50", order=1,
+        )
+        cls.stadium = Stadium.objects.create(
+            name="Estadio Azteca", city="CDMX", country="mx", utc_offset=-6,
+        )
+        cls.team_a = Team.objects.create(
+            name="Mexico", name_es="México", fifa_code="MEX", group_name="A",
+            confederation="concacaf",
+        )
+        cls.team_b = Team.objects.create(
+            name="Canada", name_es="Canadá", fifa_code="CAN", group_name="A",
+            confederation="concacaf",
+        )
+        cls.match = Match.objects.create(
+            datetime=timezone.now(), stage=cls.stage, stadium=cls.stadium,
+            home_team=cls.team_a, away_team=cls.team_b, of_number=1,
+            home_goals=2, away_goals=1, status="FINISHED",
+        )
+
+    def _pred(self, user, quiniela, home, away):
+        UserQuiniela.objects.get_or_create(user=user, quiniela=quiniela)
+        Prediction.objects.create(
+            user=user, quiniela=quiniela, match=self.match,
+            home_goals=home, away_goals=away, date=timezone.now(),
+        )
+
+    def test_board_excludes_other_quinielas_members_and_points(self):
+        ana = User.objects.create_user(
+            "ana@x.com", first_name="Ana", is_active=True)
+        beto = User.objects.create_user(
+            "beto@x.com", first_name="Beto", is_active=True)
+        # Ana en bienestar (exacto: 5); Beto solo en sanginiela.
+        self._pred(ana, self.bienestar, 2, 1)
+        self._pred(beto, self.sanginiela, 2, 1)
+        recompute_all()
+
+        bienestar_board = build_leaderboard(self.bienestar)
+        self.assertEqual(
+            {r.user for r in bienestar_board.rows}, {ana})
+        self.assertEqual(bienestar_board.row_for(ana).points, 5)
+
+        sanginiela_board = build_leaderboard(self.sanginiela)
+        self.assertEqual(
+            {r.user for r in sanginiela_board.rows}, {beto})
+
+    def test_same_user_different_points_per_quiniela(self):
+        # La misma usuaria, en ambas quinielas, con pronósticos distintos:
+        # cada board la puntúa por su propia predicción.
+        ana = User.objects.create_user(
+            "ana@x.com", first_name="Ana", is_active=True)
+        self._pred(ana, self.bienestar, 2, 1)   # exacto: 5
+        self._pred(ana, self.sanginiela, 3, 1)  # solo resultado: 3
+        recompute_all()
+
+        self.assertEqual(
+            build_leaderboard(self.bienestar).row_for(ana).points, 5)
+        self.assertEqual(
+            build_leaderboard(self.sanginiela).row_for(ana).points, 3)
+
+
+class ActiveQuinielaTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_rules")
+
+    def test_returns_first_membership(self):
+        user = User.objects.create_user(
+            "ana@x.com", first_name="Ana", is_active=True)
+        bienestar = Quiniela.objects.get(slug="bienestar")
+        UserQuiniela.objects.create(user=user, quiniela=bienestar)
+        self.assertEqual(active_quiniela(user), bienestar)
+
+    def test_none_without_membership(self):
+        user = User.objects.create_user(
+            "sola@x.com", first_name="Sola", is_active=True)
+        self.assertIsNone(active_quiniela(user))

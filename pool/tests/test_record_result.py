@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.test import TestCase
 from django.utils import timezone
 
-from pool.models import User
+from pool.models import Quiniela, User
 from tournament.models import Match, Stadium, Stage, Team
 
 VALID = {
@@ -20,6 +20,7 @@ class RecordResultTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         now = timezone.now()
+        cls.quiniela = Quiniela.objects.create(name="Q", slug="q")
         cls.group_stage = Stage.objects.create(
             key="GROUP_STAGE", name="Fase de grupos", short_name="grupos",
             color="#4CAF50", order=1, is_group=True,
@@ -62,7 +63,7 @@ class RecordResultTests(TestCase):
     def _post(self, match, payload, user=None):
         self.client.force_login(user or self.recorder)
         return self.client.post(
-            f"/match/{match.id}/result/",
+            f"/q/match/{match.id}/result/",
             json.dumps(payload), content_type="application/json",
         )
 
@@ -81,7 +82,7 @@ class RecordResultTests(TestCase):
     def test_unknown_match_404(self):
         self.client.force_login(self.recorder)
         response = self.client.post(
-            "/match/9999/result/", json.dumps(VALID),
+            "/q/match/9999/result/", json.dumps(VALID),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 404)

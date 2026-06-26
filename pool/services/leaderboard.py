@@ -8,19 +8,23 @@ partidos FINISHED con marcador.
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
+from decimal import Decimal
 
 from django.db.models import Q
 
-from pool.models import Prediction, User
-from pool.services.scoring import score_detail
+from pool.models import Prediction, Quiniela, User, UserQuiniela
+from pool.services.evaluation import multiplier_by_stage
 from tournament.models import Match
+
+ZERO = Decimal("0")
+ONE = Decimal("1")
 
 
 @dataclass
 class LeaderboardRow:
     position: int
     user: User
-    points: int
+    points: Decimal
     outcomes: int    # resultados atinados (incluye exactos y diferencias)
     exact: int       # marcadores exactos
     diffs: int       # bonos por diferencia (incluye los exactos no-empate)
@@ -65,35 +69,43 @@ def _trend(previous_position: int, current_position: int) -> str | None:
 class Leaderboard:
     rows: list[LeaderboardRow]
     # Alcanzables hasta ahora: 5 por partido con ganador, 4 por empate
-    # (en empate el bono de diferencia no aplica).
-    max_points: int
+    # (en empate el bono de diferencia no aplica), ya por el multiplier
+    # de cada fase.
+    max_points: Decimal
 
     def row_for(self, user: User) -> LeaderboardRow | None:
         return next((r for r in self.rows if r.user.id == user.id), None)
 
 
-def build_leaderboard() -> Leaderboard:
-    """Posiciones de todos los usuarios activos. La posición depende solo
+def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
+    """Posiciones de los miembros de ``quiniela``. La posición depende solo
     de los puntos, con ranking denso (1-2-2-3: los empates comparten lugar
     y no recorren al siguiente). Exactos y diferencias solo ordenan
     visualmente dentro de un empate, no cambian la posición.
 
-    El perfil virtual entra a la tabla (ordenado por sus puntos) pero
-    queda fuera del ranking: conserva ``position=0`` y no desplaza a
-    nadie."""
+    Cada quiniela es independiente: solo entran sus miembros
+    (``UserQuiniela``) y solo cuentan sus predicciones. El perfil virtual
+    entra a la tabla (ordenado por sus puntos) pero queda fuera del
+    ranking: conserva ``position=0`` y no desplaza a nadie."""
     finished = list(
         Match.objects.filter(
             status="FINISHED",
             home_goals__isnull=False,
             away_goals__isnull=False,
         ).values_list(
-            "id", "home_goals", "away_goals", "datetime", "stadium__utc_offset"
+            "id", "home_goals", "away_goals", "datetime",
+            "stadium__utc_offset", "stage_id",
         )
     )
-    results = {mid: (home, away) for mid, home, away, _, _ in finished}
+    results = {mid: (home, away) for mid, home, away, _, _, _ in finished}
+    # El peso de cada fase es por quiniela (la ventana que la cubre), no un
+    # atributo global del partido.
+    stage_multiplier = multiplier_by_stage(quiniela)
     max_points = sum(
-        4 if home == away else 5 for home, away in results.values()
-    )
+        (Decimal(4) if home == away else Decimal(5))
+        * stage_multiplier.get(stage_id, ONE)
+        for _, home, away, _, _, stage_id in finished
+    ) if finished else ZERO
 
     # Baselines para la flecha de tendencia. "batch" = última tanda (los
     # partidos que arrancaron a la misma hora UTC); "day" = última jornada
@@ -106,46 +118,59 @@ def build_leaderboard() -> Leaderboard:
     if finished:
         local_date = {
             mid: (dt + timedelta(hours=offset or 0)).date()
-            for mid, _, _, dt, offset in finished
+            for mid, _, _, dt, offset, _ in finished
         }
-        last_datetime = max(dt for _, _, _, dt, _ in finished)
+        last_datetime = max(dt for _, _, _, dt, _, _ in finished)
         last_day = max(local_date.values())
-        batch_ids = {mid for mid, _, _, dt, _ in finished if dt == last_datetime}
+        batch_ids = {
+            mid for mid, _, _, dt, _, _ in finished if dt == last_datetime
+        }
         day_ids = {mid for mid in results if local_date[mid] == last_day}
 
+    member_ids = UserQuiniela.objects.filter(
+        quiniela=quiniela).values_list("user_id", flat=True)
     rows = {
         user.id: LeaderboardRow(
-            position=0, user=user, points=0, outcomes=0, exact=0, diffs=0,
+            position=0, user=user, points=ZERO, outcomes=0, exact=0, diffs=0,
             has_played=False,
         )
-        for user in User.objects.filter(Q(is_active=True) | Q(is_virtual=True))
+        for user in User.objects.filter(id__in=member_ids).filter(
+            Q(is_active=True) | Q(is_virtual=True))
     }
 
     # Puntos "previos" por baseline: el total menos lo ganado en los partidos
     # excluidos. Sobre ellos se recalcula la posición previa.
-    prev_batch_points: dict[int, int] = defaultdict(int)
-    prev_day_points: dict[int, int] = defaultdict(int)
+    prev_batch_points: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    prev_day_points: dict[int, Decimal] = defaultdict(lambda: ZERO)
 
-    predictions = Prediction.objects.filter(
-        match_id__in=results, user_id__in=rows
-    ).values_list("user_id", "match_id", "home_goals", "away_goals")
-    for user_id, match_id, pred_home, pred_away in predictions:
-        actual_home, actual_away = results[match_id]
-        detail = score_detail(pred_home, pred_away, actual_home, actual_away)
-        if detail is None:
-            continue
+    # Lee los puntos ya congelados por la evaluación; points no nulo basta
+    # para "jugó" (un fallo evaluado vale 0, no None).
+    scored = Prediction.objects.filter(
+        quiniela=quiniela, match_id__in=results, user_id__in=rows,
+        points__isnull=False,
+    ).values_list("user_id", "match_id", "points")
+    for user_id, match_id, points in scored:
         row = rows[user_id]
-        row.points += detail.points
-        row.outcomes += detail.outcome
-        row.exact += detail.exact
-        # El exacto (salvo empate) también acertó la diferencia: cuenta
-        # como bono de diferencia aunque ``diff_bonus`` salga disjunto.
-        row.diffs += detail.diff_bonus or (detail.exact and actual_home != actual_away)
+        row.points += points
         row.has_played = True
         if match_id not in batch_ids:
-            prev_batch_points[user_id] += detail.points
+            prev_batch_points[user_id] += points
         if match_id not in day_ids:
-            prev_day_points[user_id] += detail.points
+            prev_day_points[user_id] += points
+
+    # Conteos de aciertos desde las reglas atinadas (M2M). RESULT marca
+    # todo acierto de resultado; DIFF ya incluye el exacto no-empate.
+    hits = Prediction.objects.filter(
+        quiniela=quiniela, match_id__in=results, user_id__in=rows
+    ).values_list("user_id", "rules__code")
+    for user_id, code in hits:
+        row = rows[user_id]
+        if code == "RESULT":
+            row.outcomes += 1
+        elif code == "EXACT":
+            row.exact += 1
+        elif code == "DIFF":
+            row.diffs += 1
 
     ordered = sorted(
         rows.values(),

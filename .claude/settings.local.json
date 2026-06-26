@@ -5,7 +5,9 @@
       "mcp__plugin_playwright_playwright__browser_snapshot",
       "mcp__plugin_playwright_playwright__browser_console_messages",
       "Bash(curl -s -L https://quiniela.yeeko.org/ -o /tmp/q_home.html -w \"HTTP %{http_code}\\\\n\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(../sanginiela/venv/bin/python manage.py check)",
+      "Bash(../sanginiela/venv/bin/python -c \"import ast,sys; ast.parse\\(open\\('pool/services/evaluation.py'\\).read\\(\\)\\); print\\('evaluation.py OK'\\)\")"
     ]
   }
 }

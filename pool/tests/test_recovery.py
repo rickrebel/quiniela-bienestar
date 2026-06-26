@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from pool.models import PasswordRecoveryToken, User
+from pool.models import PasswordRecoveryToken, Quiniela, User
 from pool.services.recovery import create_recovery_token
 
 
@@ -102,6 +102,7 @@ class ResetPasswordViewTests(TestCase):
         self.assertContains(response, "inválido o ya expiró")
 
     def test_confirm_sets_password_consumes_token_and_logs_in(self):
+        Quiniela.objects.create(name="Q", slug="q")
         user = make_user()
         token = create_recovery_token(user)
         payload = {
@@ -110,7 +111,8 @@ class ResetPasswordViewTests(TestCase):
         }
         response = self.client.post(self._url(token), payload)
         self.assertRedirects(
-            response, reverse("groups"),
+            response,
+            reverse("window", kwargs={"quiniela": "q", "order": 1}),
             fetch_redirect_response=False,
         )
         user.refresh_from_db()
