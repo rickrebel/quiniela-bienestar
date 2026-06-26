@@ -11,6 +11,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RemoveConstraint(
+            model_name='stageuser',
+            name='uq_stageuser_user_stage',
+        ),
         migrations.RemoveField(
             model_name='stageuser',
             name='stage',
