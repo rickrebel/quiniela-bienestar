@@ -102,29 +102,40 @@ def today_matches(request) -> dict:
             return {}
         today = timezone.localdate()
         now = timezone.now()
+        # Ventana amplia (hasta +14 d): si hoy no hay partidos hay que poder
+        # caer al siguiente día que sí tenga, y los huecos entre fases duran
+        # varios días.
         matches = Match.objects.select_related(
             "home_team", "away_team", "stadium", "stage"
         ).filter(
             datetime__date__gte=today - timedelta(days=1),
-            datetime__date__lte=today + timedelta(days=1),
+            datetime__date__lte=today + timedelta(days=14),
         )
-        preds = {
-            p.match_id: p
-            for p in Prediction.objects.filter(
-                user=user, quiniela=quiniela, match__in=matches
-            )
-        }
-        chips = []
-        # Objetos crudos que pasan el filtro de "hoy": alimentan el payload
-        # del match-dialog para que el chip sea clicleable como las tarjetas.
-        today_objs = []
+        # Agrupa por fecha LOCAL de la sede (Match.datetime es UTC).
+        by_local_date: dict = {}
         for match in matches:
             local_dt = match.datetime + timedelta(
                 hours=match.stadium.utc_offset
             )
-            if local_dt.date() != today:
-                continue
-            today_objs.append(match)
+            by_local_date.setdefault(local_dt.date(), []).append(match)
+        # Hoy si tiene partidos; si no, el primer día futuro que tenga.
+        if today in by_local_date:
+            target = today
+        else:
+            future = sorted(d for d in by_local_date if d > today)
+            target = future[0] if future else None
+        if target is None:
+            return {}
+        day_matches = sorted(by_local_date[target], key=lambda m: m.datetime)
+
+        preds = {
+            p.match_id: p
+            for p in Prediction.objects.filter(
+                user=user, quiniela=quiniela, match__in=day_matches
+            )
+        }
+        chips = []
+        for match in day_matches:
             pred = preds.get(match.id)
             finished = (
                 match.status == "FINISHED"
@@ -150,8 +161,12 @@ def today_matches(request) -> dict:
             })
         return {
             "today_matches": chips,
+            "matches_are_today": target == today,
+            "matches_day_label": (
+                None if target == today else _day_label(target, today)
+            ),
             "today_dialog_data": build_match_dialog_payload(
-                today_objs, user, quiniela
+                day_matches, user, quiniela
             ),
         }
     except Exception:
@@ -181,6 +196,18 @@ def quinielas(request) -> dict:
     except Exception:
         logger.exception("No se pudieron calcular las quinielas del usuario")
         return {}
+
+
+# Abreviaturas en español por weekday() (lunes=0); en código para no
+# depender del locale del servidor.
+_WEEKDAYS_ES = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+
+
+def _day_label(target, today) -> str:
+    """Etiqueta corta del día de los partidos cuando no son de hoy."""
+    if target == today + timedelta(days=1):
+        return "Mañana"
+    return f"{_WEEKDAYS_ES[target.weekday()]} {target.day}"
 
 
 def _team_chip(team, placeholder: str) -> dict:

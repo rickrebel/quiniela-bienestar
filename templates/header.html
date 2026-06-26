@@ -1,42 +1,35 @@
 {% load static %}
 <header class="header">
-    {% if my_standing %}
-    {# rank-chip: navega a la vista completa de posiciones. Solo la #}
-    {# posición; los puntos se quitaron a pedido. #}
-    <a class="rank-chip" href="{% url 'standings' request.quiniela.slug %}"
-       title="Tabla de posiciones">
-        <span class="rank-icon">🏆</span>
-        <span class="rank-pos">{{ my_standing.position }}°</span>
-    </a>
-    {% else %}
-    <span>🏆</span>
-    {% endif %}
-
-    {% if today_matches %}
-    {# Partidos del día: clicleables (abren el match-dialog como las #}
-    {# tarjetas). Marcador real arriba y predicción debajo en una sola #}
-    {# columna; barrita de carga si el partido está en juego. #}
-    <div class="today-chips" aria-label="Partidos de hoy">
-        {% for m in today_matches %}
-        <button class="today-chip{% if m.is_live %} today-chip--live{% endif %}"
-                type="button" data-dialog-match="{{ m.id }}">
-            <span class="tc-team">{{ m.home.code }}{% if m.home.flag %}<img src="{% static m.home.flag %}" alt="">{% endif %}</span>
-            <span class="tc-scores">
-                {% if m.real %}<span class="tc-real">{{ m.real.0 }}-{{ m.real.1 }}</span>{% if m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% endif %}{% elif m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% else %}<span class="tc-vs">vs</span>{% endif %}
-            </span>
-            <span class="tc-team">{% if m.away.flag %}<img src="{% static m.away.flag %}" alt="">{% endif %}{{ m.away.code }}</span>
-        </button>
-        {% endfor %}
+  <div class="header-top">
+    {# Fila superior: posición + historia | nombre quiniela | cuenta. #}
+    <div class="header-left">
+        {% if my_standing %}
+        {# rank-chip: navega a la vista completa de posiciones. Solo la #}
+        {# posición; los puntos se quitaron a pedido. #}
+        <a class="hdr-btn rank-chip" href="{% url 'standings' request.quiniela.slug %}"
+           title="Tabla de posiciones">
+            <span class="rank-icon">🏆</span>
+            <span class="rank-pos">{{ my_standing.position }}°</span>
+        </a>
+        {% else %}
+        <span class="hdr-btn rank-chip rank-chip--empty">🏆</span>
+        {% endif %}
     </div>
-    {% else %}
-    <h1 class="title"><span>⚽</span>quiniela</h1>
-    {% endif %}
 
+    <h1 class="header-title">{{ request.quiniela.name }}</h1>
+
+    <div class="header-actions">
+    {% if request.quiniela %}
+    <a class="hdr-btn history-link" href="{% url 'history' request.quiniela.slug %}"
+       title="Evolución" aria-label="Evolución">
+        <c-icon name="timeline" />
+    </a>
+    {% endif %}
     {# Menú de cuenta: dropdown daisyUI (<details>), único trigger en el #}
     {# ícono de persona. Agrupa saludo, cambio de quiniela, reglas y salir. #}
     {# El cierre (fuera/al elegir) lo maneja app.js. #}
     <details class="dropdown dropdown-end user-menu">
-    <summary class="user-chip" aria-label="Menú de usuario">
+    <summary class="hdr-btn user-chip" aria-label="Menú de usuario">
     <span class="user-icon">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path
@@ -85,7 +78,34 @@
         </li>
     </ul>
     </details>
+    </div>
+  </div>
 
+  <div class="header-bottom">
+    {# Fila inferior: partidos del día (o del próximo día con partidos). #}
+    {% if today_matches %}
+    {% if matches_day_label %}
+    <span class="day-label">{{ matches_day_label }}</span>
+    {% endif %}
+    {# Chips clicleables (abren el match-dialog como las tarjetas). Marcador #}
+    {# real arriba y predicción debajo en una sola columna; barrita de carga #}
+    {# si el partido está en juego. #}
+    <div class="today-chips" aria-label="Partidos">
+        {% for m in today_matches %}
+        <button class="today-chip{% if m.is_live %} today-chip--live{% endif %}"
+                type="button" data-dialog-match="{{ m.id }}">
+            <span class="tc-team">{{ m.home.code }}{% if m.home.flag %}<img src="{% static m.home.flag %}" alt="">{% endif %}</span>
+            <span class="tc-scores">
+                {% if m.real %}<span class="tc-real">{{ m.real.0 }}-{{ m.real.1 }}</span>{% if m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% endif %}{% elif m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% else %}<span class="tc-vs">vs</span>{% endif %}
+            </span>
+            <span class="tc-team">{% if m.away.flag %}<img src="{% static m.away.flag %}" alt="">{% endif %}{{ m.away.code }}</span>
+        </button>
+        {% endfor %}
+    </div>
+    {% else %}
+    <span class="no-matches">Sin partidos próximos</span>
+    {% endif %}
+  </div>
 </header>
 
 {# Shell del match-dialog (en todas las páginas) + datos de los partidos #}

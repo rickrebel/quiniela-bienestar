@@ -319,6 +319,29 @@
   width: 100%;
   height: clamp(360px, 64vh, 620px);
 }
+/* Pie de la página: única salida hacia la vista por fecha. */
+.history-foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+.history-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background 180ms ease;
+}
+.history-back:hover {
+  background: color-mix(in srgb, var(--color-primary) 25%, transparent);
+}
+
 .hist-svg { display: block; }
 .hist-grid {
   stroke: color-mix(in srgb, var(--color-base-content) 10%, transparent);

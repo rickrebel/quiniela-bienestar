@@ -4,7 +4,7 @@
 {# Uso: <c-stage-tabs :tabs="tabs" active="{{ stage.key }}" /> #}
 <c-vars active="" />
 {% with base="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-[7px] border px-3 py-1.5 text-xs font-bold uppercase tracking-[0.4px] no-underline transition-all duration-150" on="border-primary/50 bg-primary/15 text-accent/80 ring-1 ring-primary/25" off="border-base-content/30 bg-base-200 text-base-content/60" %}
-<nav class="sticky top-[52px] z-2 flex gap-2 overflow-x-auto border-b
+<nav class="sticky top-[88px] z-2 flex gap-2 overflow-x-auto border-b
             border-base-content/5 bg-base-100/90 px-2.5 py-2 backdrop-blur-[10px]"
      aria-label="Fases">
     <a class="{{ base }} {% if active == 'fecha' %}{{ on }}{% else %}{{ off }}{% endif %}"

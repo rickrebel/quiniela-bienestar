@@ -28,6 +28,12 @@
     <div id="history-chart" class="history-chart"></div>
 
     {{ progress|json_script:"history-data" }}
+
+    <footer class="history-foot">
+        <a class="history-back" href="{% url 'by_date' request.quiniela.slug %}">
+            ← Regresar a Fechas
+        </a>
+    </footer>
 </main>
 
 {% endblock %}
