@@ -1,0 +1,7 @@
+{% load static %}
+{# Banderas del header de grupo, en orden mix; cada una lleva su #}
+{# posición por variante (data-order-*) para que standings.js las #}
+{# reordene con style.order al conmutar est/mix/real. Reusada por #}
+{# stage.html (render inicial) y el fragmento de refresco en vivo. #}
+{# Uso: <c-group-flags :teams="section.teams" /> #}
+{% if teams %}<span class="group-flags ml-10 inline-flex items-center gap-1 transition-opacity duration-300 group-open:opacity-40">{% for team in teams %}{% if team.flag_path %}<img class="h-[18px] w-auto max-w-[26px] rounded-sm" src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}" data-order-est="{{ team.order_est }}" data-order-mix="{{ team.order_mix }}" data-order-real="{{ team.order_real }}">{% endif %}{% endfor %}</span>{% endif %}

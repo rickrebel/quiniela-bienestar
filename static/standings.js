@@ -53,5 +53,10 @@
         } catch {}
     });
 
+    // El autosave reemplaza las tablas/banderas de un grupo y emite esto
+    // para reordenarlas según la variante vigente (los elementos nuevos
+    // llegan en orden mix, sin style.order).
+    document.addEventListener("standings:refresh", () => apply(stored()));
+
     apply(stored());
 })();

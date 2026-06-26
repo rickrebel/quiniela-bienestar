@@ -1,0 +1,19 @@
+{# Bloque de posiciones de un grupo: selector de variante + las 3 #}
+{# tablas (est/mix/real) pre-renderizadas. standings.js conmuta cuál #}
+{# se ve y sincroniza el nav. data-standings-block es el hook que el #}
+{# autosave reemplaza al refrescar en vivo. Reusada por stage.html y #}
+{# el fragmento de refresco. #}
+{# Uso: <c-group-standings :standings="section.standings" /> #}
+<div data-standings-block
+     class="border-t-[2.5px] border-base-content/20 px-3.5 pb-3 pt-2">
+    <nav class="mx-auto mb-2.5 flex w-fit gap-0.5 rounded-[10px]
+                bg-base-300 p-[3px]"
+         data-standings-switch aria-label="Variante de posiciones">
+        <button type="button" class="view-opt" data-variant="est">Estimado</button>
+        <button type="button" class="view-opt active" data-variant="mix">Est. + Real</button>
+        <button type="button" class="view-opt" data-variant="real">Real</button>
+    </nav>
+    {% for table in standings.tables %}
+    <c-standings-table :table="table" />
+    {% endfor %}
+</div>

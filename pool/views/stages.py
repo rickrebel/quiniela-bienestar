@@ -5,7 +5,12 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, HttpRequest, HttpResponse
+from django.http import (
+    Http404,
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBadRequest,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.utils import timezone
@@ -206,6 +211,26 @@ def _load_group_standings(user: User, quiniela: Quiniela):
         )
     }
     return group_matches, build_group_standings(group_matches, preds)
+
+
+@login_required
+@with_quiniela
+def group_standings(request: HttpRequest) -> HttpResponse:
+    """Fragmento HTML de la tabla de un grupo, recalculada desde la BD
+    actual. Lo pide el autosave (``submit.js``) para refrescar en vivo las
+    variantes ``est``/``mix`` tras guardar una predicción, sin recargar."""
+    group = request.GET.get("group", "")
+    if group not in ALL_GROUPS:
+        return HttpResponseBadRequest("grupo inválido")
+    _, standings = _load_group_standings(request.user, request.quiniela)
+    gs = standings.get(group)
+    if gs is None:
+        return HttpResponseBadRequest("grupo sin datos")
+    return render(
+        request,
+        "_group_standings_fragment.html",
+        {"standings": gs, "teams": gs.teams},
+    )
 
 
 def _finished_per_group(group_matches: list[Match]) -> dict[str, int]:

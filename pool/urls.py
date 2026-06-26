@@ -15,6 +15,11 @@ urlpatterns = [
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
     path("historia/", progress.history_view, name="history"),
     path("grupos/", stages.groups_view, name="groups"),
+    path(
+        "grupos/standings/",
+        stages.group_standings,
+        name="group_standings",
+    ),
     path("ventana/<int:order>/", stages.window_view, name="window"),
     path("save/", predictions.save_predictions, name="save"),
     path(

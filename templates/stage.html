@@ -40,7 +40,8 @@
     {# group además habilita las variantes group-open: de Tailwind #}
     {# (chevron y banderas reaccionan al <details> abierto). #}
     {% if is_group_stage %}
-    <details class="group mb-2 overflow-hidden rounded-[14px] border
+    <details data-group="{{ section.key }}"
+             class="group mb-2 overflow-hidden rounded-[14px] border
                     border-base-content/15 bg-base-200">
         <summary class="group-summary relative flex cursor-pointer
                         list-none items-center px-3.5 py-3 text-[15.8px]
@@ -51,7 +52,7 @@
                            group-open:rotate-90" />
             {{ section.label }}
             {# group-flags: hook de standings.js (reordena por style.order) #}
-            {% if section.teams %}<span class="group-flags ml-10 inline-flex items-center gap-1 transition-opacity duration-300 group-open:opacity-40">{% for team in section.teams %}{% if team.flag_path %}<img class="h-[18px] w-auto max-w-[26px] rounded-sm" src="{% static team.flag_path %}" alt="{{ team.name_es }}" title="{{ team.name_es }}" data-order-est="{{ team.order_est }}" data-order-mix="{{ team.order_mix }}" data-order-real="{{ team.order_real }}">{% endif %}{% endfor %}</span>{% endif %}
+            <c-group-flags :teams="section.teams" />
             <c-section-count state="{{ state }}"
                              points="{{ section.points|floatformat:'-1' }}"
                              filled="{{ section.filled }}"
@@ -80,21 +81,7 @@
         {% endfor %}
 
         {% if section.standings %}
-        <div class="border-t-[2.5px] border-base-content/20 px-3.5 pb-3 pt-2">
-            {# Selector de variante por grupo (antes era global, arriba de #}
-            {# todo). standings.js sincroniza todos los navs y persiste la #}
-            {# elección; .view-opt/.active viven en source.css. #}
-            <nav class="mx-auto mb-2.5 flex w-fit gap-0.5 rounded-[10px]
-                        bg-base-300 p-[3px]"
-                 data-standings-switch aria-label="Variante de posiciones">
-                <button type="button" class="view-opt" data-variant="est">Estimado</button>
-                <button type="button" class="view-opt active" data-variant="mix">Est. + Real</button>
-                <button type="button" class="view-opt" data-variant="real">Real</button>
-            </nav>
-            {% for table in section.standings.tables %}
-            <c-standings-table :table="table" />
-            {% endfor %}
-        </div>
+        <c-group-standings :standings="section.standings" />
         {% endif %}
 
     {% if is_group_stage %}</details>{% else %}</div>{% endif %}

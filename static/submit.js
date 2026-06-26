@@ -181,6 +181,29 @@ function syncAdvancing(matchEl) {
     }
 }
 
+// Refresco en vivo de la tabla de un grupo tras guardar. Pide el
+// fragmento recalculado al servidor (única fuente de verdad) y cambia
+// banderas + tablas del <details> vivo. El contador por grupo descarta
+// respuestas que lleguen fuera de orden (no pisan datos más nuevos).
+const standingsSeq = {};
+
+async function refreshGroupStandings(group) {
+    const seq = (standingsSeq[group] = (standingsSeq[group] || 0) + 1);
+    const url = `${apiBase}/grupos/standings/?group=${group}`;
+    const res = await fetch(url);
+    if (!res.ok || seq !== standingsSeq[group]) return;
+    const html = await res.text();
+    const frag = document.createRange().createContextualFragment(html);
+    const live = document.querySelector(`.group[data-group="${group}"]`);
+    if (!live) return;
+    live.querySelector(".group-flags")
+        .replaceWith(frag.querySelector(".group-flags"));
+    live.querySelector("[data-standings-block]")
+        .replaceWith(frag.querySelector("[data-standings-block]"));
+    // standings.js reordena lo recién insertado según la variante vigente.
+    document.dispatchEvent(new Event("standings:refresh"));
+}
+
 async function saveMatch(matchEl) {
     const home = matchEl.querySelector('[data-field="home_goals"]').value;
     const away = matchEl.querySelector('[data-field="away_goals"]').value;
@@ -196,6 +219,10 @@ async function saveMatch(matchEl) {
         // Solo se avisa cuando el partido quedó completo (guardado real);
         // un input suelto al salir del campo no debe gritar "Guardado".
         if (data.complete) showSnack("Guardado");
+        // Solo en grupos: las eliminatorias viven en .knockout y no tocan
+        // tablas de grupo, así que el ?. corta y no se refresca nada.
+        const group = matchEl.closest(".group[data-group]")?.dataset.group;
+        if (group) void refreshGroupStandings(group);
     } catch (err) {
         showSnack(err.message, true);
     }
