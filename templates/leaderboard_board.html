@@ -36,3 +36,6 @@
     <span class="board-trend-opt" data-baseline="day">por día</span>
 </div>
 <p class="board-cap">{{ max_points|floatformat:"-1" }} puntos en juego hasta ahora</p>
+{% if request.quiniela %}
+<a class="board-history-link" href="{% url 'history' quiniela=request.quiniela.slug %}">📈 Ver la historia</a>
+{% endif %}

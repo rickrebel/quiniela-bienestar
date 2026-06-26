@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+{# Tom Select: selector múltiple con búsqueda y muestras de color. #}
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/tom-select@2/dist/css/tom-select.css">
+{% endblock %}
+
+{% block content %}
+
+{% include 'header.html' %}
+
+<main class="history">
+    <header class="history-top">
+        <div class="history-controls">
+            <select id="history-users" multiple
+                    placeholder="Comparar participantes…" autocomplete="off"></select>
+            <div class="history-xmode" data-xmode-switch>
+                <button type="button" data-xmode="batch" class="active">Tanda</button>
+                <button type="button" data-xmode="day">Día</button>
+                <button type="button" data-xmode="match">Partido</button>
+            </div>
+        </div>
+        <div id="history-legend" class="history-legend"></div>
+    </header>
+
+    <div id="history-chart" class="history-chart"></div>
+
+    {{ progress|json_script:"history-data" }}
+</main>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2/dist/js/tom-select.complete.min.js"></script>
+<script src="{% static 'progress.js' %}" defer></script>
+{% endblock %}

@@ -17,6 +17,7 @@
     {# gana los empates contra el preflight de Tailwind. #}
     <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    {% block extra_head %}{% endblock %}
 </head>
 <body>
 
@@ -35,5 +36,6 @@
 <script src="{% static 'countdown.js' %}"></script>
 <script src="{% static 'leaderboard.js' %}" defer></script>
 <script src="{% static 'match_dialog.js' %}" defer></script>
+{% block extra_scripts %}{% endblock %}
 </body>
 </html>
