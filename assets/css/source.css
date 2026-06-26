@@ -294,16 +294,12 @@
   outline: 1px solid color-mix(in srgb, var(--chart-me) 55%, transparent);
 }
 .hist-chip-dot {
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
   flex: none;
 }
 .hist-chip-name { font-weight: 600; }
-.hist-chip-pts {
-  font-variant-numeric: tabular-nums;
-  color: color-mix(in srgb, var(--color-base-content) 65%, transparent);
-}
 .hist-chip-x {
   cursor: pointer;
   border: 0;
@@ -425,11 +421,17 @@
   height: 14px;
   flex: none;
 }
-/* Chips de los seleccionados en el control. */
-.history .ts-control > .item {
-  background: color-mix(in srgb, var(--color-base-content) 14%, transparent);
-  color: var(--color-base-content);
-}
-.history .ts-control > .item.active {
-  background: color-mix(in srgb, var(--color-primary) 32%, transparent);
+/* Los chips del control sobran: la leyenda de abajo ya lista a los
+   seleccionados con su color. Se ocultan y en su lugar el control
+   muestra el conteo "N seleccionados" (data-label lo fija el JS;
+   vacío en cero, para que se vea el placeholder). */
+/* !important para ganarle a la regla del CDN
+   `.ts-wrapper.plugin-remove_button .item{display:inline-flex}` (misma
+   especificidad pero carga después en el <head>). */
+.history .ts-control > .item { display: none !important; }
+.history .ts-control[data-label]:not([data-label=""])::after {
+  content: attr(data-label);
+  align-self: center;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
 }

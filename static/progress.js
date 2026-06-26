@@ -182,14 +182,22 @@
     }
 
     function chip(s, color, removable) {
-        const last = s.points[s.points.length - 1];
         const rm = removable
             ? `<button class="hist-chip-x" data-remove="${s.id}" aria-label="Quitar">×</button>`
             : "";
         return `<span class="hist-chip"${s.me ? ' data-me="1"' : ""}>
             <span class="hist-chip-dot" style="background:${color}"></span>
-            <span class="hist-chip-name">${s.name}</span>
-            <span class="hist-chip-pts">${(+last).toLocaleString("es")}</span>${rm}</span>`;
+            <span class="hist-chip-name">${s.name}</span>${rm}</span>`;
+    }
+
+    // Conteo "N seleccionados" en el control (los chips se ocultan por
+    // CSS; el dato se expone como data-label y el ::after lo pinta).
+    function updateCount() {
+        const ctrl = document.querySelector(".history .ts-control");
+        if (!ctrl) return;
+        const n = ctrl.querySelectorAll(".item").length;
+        ctrl.dataset.label = n === 0 ? ""
+            : (n === 1 ? "1 seleccionado" : `${n} seleccionados`);
     }
 
     // ----- Selección (Tom Select) ------------------------------------
@@ -241,6 +249,7 @@
 
     function refresh() {
         renderLegend();
+        updateCount();
         render();
     }
 
