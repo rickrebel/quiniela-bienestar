@@ -238,10 +238,29 @@
 
 /* Las reglas van sin @layer: así ganan los empates contra el preflight
    de Tailwind (botones, svg) sin pelear con especificidad. */
+/* Página dedicada: columna a toda la altura del viewport para que la
+   gráfica crezca y el botón de regreso quede siempre visible (sin scroll
+   de página). El header del sitio toma su alto; .history ocupa el resto. */
+body.history-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
 .history {
-  max-width: 1100px;
   margin: 0 auto;
   padding: 0.75rem 0.75rem 1.5rem;
+}
+body.history-page .history {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+/* En pantallas anchas, un respiro lateral para que los trazos no peguen
+   al borde; el ancho sigue siendo el 100% de la ventana. */
+@media (min-width: 1400px) {
+  body.history-page .history { padding-inline: 1.5rem; }
 }
 .history-controls {
   display: flex;
@@ -312,12 +331,14 @@
 }
 .hist-chip-x:hover { opacity: 1; }
 
-/* Contenedor de la gráfica: altura explícita (ResizeObserver la lee) y
-   ancho completo. En celular ocupa todo el ancho. */
+/* Contenedor de la gráfica: crece por flex hasta llenar el espacio que
+   sobra (ResizeObserver lee clientHeight y redibuja), con un piso de
+   360px. Ancho completo de la ventana. */
 .history-chart {
   position: relative;
   width: 100%;
-  height: clamp(360px, 64vh, 620px);
+  flex: 1;
+  min-height: 360px;
 }
 /* Pie de la página: única salida hacia la vista por fecha. */
 .history-foot {

@@ -74,10 +74,12 @@
         1, ...SERIES.map(s => s.points.length ? Math.max(...s.points) : 0)
     );
 
-    // Adelgaza las etiquetas del eje X a ~8 visibles para que no se
-    // encimen en celular (la gráfica ocupa todo el ancho).
-    function labelEvery(n) {
-        return Math.max(1, Math.ceil(n / 8));
+    // Adelgaza las etiquetas del eje X según el ancho disponible (~una
+    // cada 110px): en celular ~6-8, en pantallas anchas (4K) muchas más,
+    // así no se enciman pero tampoco quedan ralas al expandirse.
+    function labelEvery(n, width) {
+        const target = Math.max(6, Math.floor(width / 110));
+        return Math.max(1, Math.ceil(n / target));
     }
 
     // ----- Render ----------------------------------------------------
@@ -124,7 +126,7 @@
         }
 
         // Etiquetas X adelgazadas.
-        const step = labelEvery(cols.length);
+        const step = labelEvery(cols.length, plotW);
         let xlabels = "";
         cols.forEach((c, i) => {
             if (i % step && i !== cols.length - 1) return;
