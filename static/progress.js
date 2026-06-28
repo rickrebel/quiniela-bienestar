@@ -80,11 +80,20 @@
     // izquierdo). Los partidos simultáneos comparten tick → mismo acumulado
     // → tramo plano, ya ponderado por el multiplicador.
     function buildCols() {
-        const cols = [{ label: "0", tick: 0, weight: 0, phase: "Salida" }];
+        const cols = [{ label: "0", vtick: 0, weight: 0, phase: "Salida" }];
         TICKS.forEach((t, ti) => {
             if (ti === 0) return;
-            t.matches.forEach(mt => cols.push(
-                { match: mt, tick: ti, weight: t.multiplier, phase: t.phase }));
+            const last = t.matches.length - 1;
+            t.matches.forEach((mt, mi) => cols.push({
+                match: mt,
+                // Los partidos simultáneos comparten acumulado; para que el
+                // salto se alinee con la ÚLTIMA bandera de la tanda (y no con
+                // la primera), las columnas previas leen el valor de la tanda
+                // anterior (``ti - 1``) y sólo la última sube al de ésta.
+                vtick: mi === last ? ti : ti - 1,
+                weight: t.multiplier,
+                phase: t.phase,
+            }));
         });
         return cols;
     }
@@ -167,9 +176,9 @@
             // Contorno de TODA la nube por columna: el más bajo y el más
             // alto de todos los participantes en cada momento.
             const loPt = cols.map(c =>
-                Math.min(...SERIES.map(s => s.points[c.tick])));
+                Math.min(...SERIES.map(s => s.points[c.vtick])));
             const hiPt = cols.map(c =>
-                Math.max(...SERIES.map(s => s.points[c.tick])));
+                Math.max(...SERIES.map(s => s.points[c.vtick])));
             // Marco del cono: dos rectas continuas (mínimos cuadrados) entre
             // las que flota la nube. No se fuerza el ajuste columna a
             // columna, por eso la escala cambia suave y un anotador parejo
@@ -209,7 +218,7 @@
         }
 
         const dFor = s => cols.map(
-            (c, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(s.points[c.tick], i).toFixed(1)}`
+            (c, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(s.points[c.vtick], i).toFixed(1)}`
         ).join(" ");
 
         // Rejilla y etiquetas Y (puntos): 4 niveles. El nivel 0 es el eje
