@@ -10,19 +10,68 @@ predicho, así que no hay huecos: cada tick trae valor para todos.
 
 from datetime import timedelta
 
-from pool.models import Quiniela, ScoreSnapshot, User
+from django.templatetags.static import static
+
+from pool.models import Prediction, Quiniela, ScoreSnapshot, User
+from pool.services.evaluation import multiplier_by_stage
 from pool.services.leaderboard import build_leaderboard
 from tournament.models import Match
 
 
-def _match_label(match: Match) -> str:
-    """Etiqueta corta del partido (códigos FIFA, o placeholder en
-    eliminatorias sin equipos resueltos)."""
-    home = match.home_team.fifa_code if match.home_team_id else (
-        match.home_placeholder or "?")
-    away = match.away_team.fifa_code if match.away_team_id else (
-        match.away_placeholder or "?")
-    return f"{home}–{away}"
+def _match_entry(match: Match) -> dict:
+    """Datos del partido para el eje X: códigos FIFA (o placeholder en
+    eliminatorias sin equipos resueltos) y la URL estática de cada bandera
+    (vacía si no hay), que el modo "partido" apila local sobre visitante."""
+    def code(team, placeholder):
+        return team.fifa_code if team else (placeholder or "?")
+
+    def flag(team):
+        return static(team.flag_path) if team and team.flag_path else ""
+
+    return {
+        "home": code(match.home_team if match.home_team_id else None,
+                     match.home_placeholder),
+        "away": code(match.away_team if match.away_team_id else None,
+                     match.away_placeholder),
+        "home_flag": flag(match.home_team if match.home_team_id else None),
+        "away_flag": flag(match.away_team if match.away_team_id else None),
+    }
+
+
+def _start_cutoff(quiniela: Quiniela):
+    """``datetime`` del primer partido terminado de la primera ventana (por
+    ``order``) en la que la quiniela ya tiene predicciones.
+
+    Recorta el tramo plano inicial de las ventanas que nacieron cerradas:
+    bienestar, por ejemplo, arrancó en la Jornada 2 (nadie predijo la 1),
+    así que la gráfica debe empezar ahí y no en el saque del torneo. La
+    ``resolved_opens_at`` no sirve como señal porque cae al ``Stage``
+    compartido y todas las jornadas resuelven una fecha. ``None`` si la
+    quiniela aún no tiene ninguna predicción (no se recorta nada).
+    """
+    predicted_stage_ids = set(
+        Prediction.objects.filter(quiniela=quiniela)
+        .values_list("match__stage_id", flat=True)
+    )
+    if not predicted_stage_ids:
+        return None
+    windows = quiniela.windows.order_by("order").prefetch_related("stages")
+    for window in windows:
+        stage_ids = [s.id for s in window.stages.all()]
+        if not predicted_stage_ids.intersection(stage_ids):
+            continue
+        return (
+            Match.objects.filter(
+                stage_id__in=stage_ids,
+                status="FINISHED",
+                home_goals__isnull=False,
+                away_goals__isnull=False,
+            )
+            .order_by("datetime")
+            .values_list("datetime", flat=True)
+            .first()
+        )
+    return None
 
 
 def build_progress(quiniela: Quiniela, me: User) -> dict:
@@ -36,20 +85,28 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
     - ``defaults``: ids preseleccionados (top 1, top 2 y peor real); el
       usuario activo se dibuja siempre aparte, no entra aquí.
     """
+    cutoff = _start_cutoff(quiniela)
+    match_qs = Match.objects.filter(
+        status="FINISHED",
+        home_goals__isnull=False,
+        away_goals__isnull=False,
+    )
+    if cutoff is not None:
+        match_qs = match_qs.filter(datetime__gte=cutoff)
     finished = list(
-        Match.objects.filter(
-            status="FINISHED",
-            home_goals__isnull=False,
-            away_goals__isnull=False,
-        )
+        match_qs
         .select_related("home_team", "away_team", "stage", "stadium")
         .order_by("datetime", "of_number")
     )
 
     # Tandas: partidos con el mismo ``datetime`` comparten tick (el
-    # acumulado es por tanda, no por partido).
+    # acumulado es por tanda, no por partido). El ``multiplier`` de la
+    # ventana pondera el ancho del bloque en el eje X (resuelto por fase).
+    mult_by_stage = multiplier_by_stage(quiniela)
     tick_of_dt: dict = {}
-    ticks: list[dict] = [{"date": "", "stage": "Salida", "matches": []}]
+    ticks: list[dict] = [
+        {"date": "", "stage": "Salida", "matches": [], "multiplier": 1}
+    ]
     for m in finished:
         if m.datetime not in tick_of_dt:
             tick_of_dt[m.datetime] = len(ticks)
@@ -59,8 +116,9 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
                 "date": local.isoformat(),
                 "stage": m.stage.short_name,
                 "matches": [],
+                "multiplier": float(mult_by_stage.get(m.stage_id, 1)),
             })
-        ticks[tick_of_dt[m.datetime]]["matches"].append(_match_label(m))
+        ticks[tick_of_dt[m.datetime]]["matches"].append(_match_entry(m))
 
     board = build_leaderboard(quiniela)
     players = [r for r in board.rows if r.has_played]

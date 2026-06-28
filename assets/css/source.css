@@ -365,8 +365,26 @@ body.history-page .history {
 
 .hist-svg { display: block; }
 .hist-grid {
-  stroke: color-mix(in srgb, var(--color-base-content) 10%, transparent);
+  stroke: color-mix(in srgb, var(--color-base-content) 8%, transparent);
   stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.hist-axis {
+  stroke: color-mix(in srgb, var(--color-base-content) 22%, transparent);
+  stroke-width: 1;
+}
+/* Marco del cono (las dos rectas envolventes) y la línea diagonal del 0,
+   sólo en modo Cono. Tenues para no competir con las líneas de datos. */
+.hist-envelope {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-base-content) 20%, transparent);
+  stroke-width: 1;
+}
+.hist-zero {
+  fill: none;
+  stroke: color-mix(in srgb, var(--color-base-content) 28%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
 }
 .hist-ylabel {
   fill: color-mix(in srgb, var(--color-base-content) 55%, transparent);
@@ -391,7 +409,7 @@ body.history-page .history {
   stroke-opacity: 1;
 }
 .hist-line.is-me {
-  stroke-width: 3.4;
+  stroke-width: 2.4;
   stroke-opacity: 1;
   filter: url(#hist-glow);
 }

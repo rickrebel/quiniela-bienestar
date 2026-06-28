@@ -19,9 +19,13 @@
             <select id="history-users" multiple
                     placeholder="Comparar participantes…" autocomplete="off"></select>
             <div class="history-xmode" data-xmode-switch>
-                <button type="button" data-xmode="batch" class="active">Tanda</button>
+                <button type="button" data-xmode="match" class="active">Partido</button>
+                <button type="button" data-xmode="batch">Tanda</button>
                 <button type="button" data-xmode="day">Día</button>
-                <button type="button" data-xmode="match">Partido</button>
+            </div>
+            <div class="history-xmode" data-view-switch>
+                <button type="button" data-view="abs" class="active">Absoluta</button>
+                <button type="button" data-view="cono">Cono</button>
             </div>
         </div>
         <div id="history-legend" class="history-legend"></div>
