@@ -1,5 +1,8 @@
 {# Contenido de reglas reutilizable: la página /reglas/ (respaldo) y el #}
-{# dialog del menú de usuario (header.html) lo incluyen. #}
+{# dialog del menú de usuario (header.html) lo incluyen. El texto varía #}
+{# por quiniela (q = slug activo); bienestar suma penales y #}
+{# multiplicadores, y reparte el premio distinto. #}
+{% with q=request.quiniela.slug %}
 <section class="rules-block">
     <h6 class="rules-title">Puntaje por partido</h6>
     <ul class="rules-list">
@@ -19,6 +22,13 @@
             <c-chip state="on" class="mt-0.5 shrink-0 self-start"><svg viewBox="0 0 24 24" aria-hidden="true" class="h-3 w-3 fill-none stroke-current [stroke-width:2.5]"><circle cx="12" cy="12" r="6"/><line x1="12" y1="2" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="22"/><line x1="2" y1="12" x2="7" y2="12"/><line x1="17" y1="12" x2="22" y2="12"/></svg>&nbsp;+1</c-chip>
             <span>Resultado exacto: <b>1 punto extra</b>.</span>
         </li>
+        {% if q == 'bienestar' %}
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">Pen&nbsp;+1</c-chip>
+            <span>En eliminatoria, si atinas qué selección gana la tanda
+            de penales y avanza: <b>1 punto extra</b> (ver abajo).</span>
+        </li>
+        {% endif %}
     </ul>
     <p class="rules-note">
         Es decir, por un resultado exacto te llevas <b>5 puntos</b>
@@ -30,14 +40,54 @@
         calcula tu resultado pensando en que el partido puede durar
         hasta 120 minutos (los goles en tiempos extras sí cuentan).
     </p>
+    {% if q == 'bienestar' %}
     <p class="rules-note">
         <b>Empates en eliminatoria:</b> si pronosticas un empate al
         término del tiempo extra (120'), podrás señalar además qué
         selección crees que ganará la tanda de penales y avanzará.
-        Acertar ese desenlace sumará puntos extra; las reglas exactas
-        se anunciarán antes de que empiecen las eliminatorias.
+        Acertar ese desenlace suma <b>1 punto extra</b>.
+    </p>
+    {% endif %}
+</section>
+
+{% if q == 'bienestar' %}
+<section class="rules-block">
+    <h6 class="rules-title">Multiplicadores por fase</h6>
+    <p class="rules-note">
+        En las eliminatorias, los puntos de cada partido se multiplican
+        según la ronda:
+    </p>
+    <ul class="rules-list">
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">×1.5</c-chip>
+            <span>Dieciseisavos de final.</span>
+        </li>
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">×2</c-chip>
+            <span>Octavos de final.</span>
+        </li>
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">×3</c-chip>
+            <span>Cuartos de final.</span>
+        </li>
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">×4</c-chip>
+            <span>Semifinales.</span>
+        </li>
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">×3</c-chip>
+            <span>Partido por el tercer lugar.</span>
+        </li>
+        <li class="rule-row">
+            <c-chip state="on" class="mt-0.5 shrink-0 self-start">×6</c-chip>
+            <span>Final.</span>
+        </li>
+    </ul>
+    <p class="rules-note">
+        La fase de grupos no lleva multiplicador (cuenta tal cual, ×1).
     </p>
 </section>
+{% endif %}
 
 <section class="rules-block">
     <h6 class="rules-title">Cierre de cada fase</h6>
@@ -51,6 +101,14 @@
 <section class="rules-block">
     <h6 class="rules-title">Entrada y premios</h6>
     <p class="rules-note">Entrada: <b>$200 pesos</b>.</p>
+    {% if q == 'bienestar' %}
+    <ul class="prizes">
+        <li class="prize-row">
+            <span class="prize-place">1er lugar</span>
+            <span>Se lleva <b>todo lo recaudado</b>.</span>
+        </li>
+    </ul>
+    {% else %}
     <ul class="prizes">
         <li class="prize-row">
             <span class="prize-place">1er lugar</span>
@@ -74,4 +132,6 @@
         empataron: por ejemplo, dos terceros lugares se llevan $100
         cada uno.
     </p>
+    {% endif %}
 </section>
+{% endwith %}
