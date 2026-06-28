@@ -11,8 +11,10 @@
  * hasta 8 comparados con colores destacados (paleta --chart-1..8, asignada
  * por orden de selección vía Tom Select).
  *
- * El eje X no es uniforme: el ancho de cada bloque (tanda, día o partido)
- * es proporcional a su nº de partidos × el multiplicador de su ventana.
+ * El eje X no es uniforme: una columna por partido, con ancho proporcional
+ * a su multiplicador de ventana; los partidos simultáneos comparten tanda
+ * (acumulado) y dejan un tramo plano. Líneas verticales tenues separan las
+ * fases (Grupos | 16avos | …).
  */
 (function () {
     const root = document.getElementById("history-chart");
@@ -38,21 +40,14 @@
 
     const MAX_COMPARE = PALETTE.length; // 8
 
-    // Estado: id -> índice de color (0..7) de cada comparado, y modo de
-    // eje X. El usuario activo va aparte (blanco), no consume color.
+    // Estado: id -> índice de color (0..7) de cada comparado. El usuario
+    // activo va aparte (blanco), no consume color.
     const colorIndex = new Map();
     const freeColors = PALETTE.map((_, i) => i);
-    let xmode = "match";
     let view = "abs"; // "abs" eje fijo · "cono" eje elástico por columna
     let pinnedId = null; // línea "fijada" por clic/tap (tooltip persistente)
 
-    // ----- Datos derivados por modo de eje X -------------------------
-
-    function fmtDate(iso) {
-        if (!iso) return "0";
-        const [, m, d] = iso.split("-");
-        return `${+d}/${+m}`;
-    }
+    // ----- Datos derivados del eje X ---------------------------------
 
     // Ajuste de recta por mínimos cuadrados: dados xs/ys devuelve la
     // pendiente (m) y el intercepto (b) de y = m·x + b que minimiza el
@@ -79,48 +74,19 @@
         return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * pow;
     }
 
-    // Columnas del eje X. Cada una apunta a un tick cuyo valor leer y
-    // lleva un ``weight``: el ancho relativo del tramo que entra en ella,
-    // = nº de partidos × multiplicador de su ventana. El origen pesa 0
-    // (queda pegado al borde izquierdo). Varias columnas pueden compartir
-    // tick (modo "partido": los simultáneos comparten acumulado → tramo
-    // plano, ya ponderado por el multiplicador).
+    // Columnas del eje X: una por partido. Cada una apunta a su tick (de
+    // donde leer el acumulado) y lleva un ``weight`` = multiplicador de su
+    // ventana (ancho relativo del tramo). El origen pesa 0 (pegado al borde
+    // izquierdo). Los partidos simultáneos comparten tick → mismo acumulado
+    // → tramo plano, ya ponderado por el multiplicador.
     function buildCols() {
-        if (xmode === "match") {
-            const cols = [{ label: "0", tick: 0, weight: 0 }];
-            TICKS.forEach((t, ti) => {
-                if (ti === 0) return;
-                t.matches.forEach(mt =>
-                    cols.push({ match: mt, tick: ti, weight: t.multiplier }));
-            });
-            return cols;
-        }
-        if (xmode === "day") {
-            // Por fecha: último tick (para leer el acumulado del día),
-            // total de partidos del día y su multiplicador (uno solo por
-            // día, garantizado por dominio).
-            const byDate = new Map();
-            TICKS.forEach((t, ti) => {
-                if (!ti) return;
-                const d = byDate.get(t.date)
-                    || { tick: ti, matches: 0, mult: t.multiplier };
-                d.tick = ti;
-                d.matches += t.matches.length;
-                byDate.set(t.date, d);
-            });
-            const cols = [{ label: "0", tick: 0, weight: 0 }];
-            for (const [date, d] of byDate) {
-                cols.push({
-                    label: fmtDate(date), tick: d.tick,
-                    weight: d.matches * d.mult,
-                });
-            }
-            return cols;
-        }
-        return TICKS.map((t, ti) => ({
-            label: fmtDate(t.date), tick: ti,
-            weight: t.matches.length * t.multiplier,
-        }));
+        const cols = [{ label: "0", tick: 0, weight: 0, phase: "Salida" }];
+        TICKS.forEach((t, ti) => {
+            if (ti === 0) return;
+            t.matches.forEach(mt => cols.push(
+                { match: mt, tick: ti, weight: t.multiplier, phase: t.phase }));
+        });
+        return cols;
     }
 
     const maxVal = Math.max(
@@ -168,10 +134,14 @@
         if (!w || !h) return;
 
         const cols = buildCols();
-        // En modo "partido" el canalón inferior crece para las dos banderas
-        // apiladas (local sobre visitante); en los demás basta una fila.
-        const pad = { top: 12, right: 14,
-            bottom: xmode === "match" ? 42 : 26, left: 34 };
+        // El canalón inferior aloja las dos banderas apiladas (local sobre
+        // visitante). Los márgenes laterales: en "abs" dejan sitio a las
+        // etiquetas numéricas del eje Y (izq) y un respiro a la derecha; en
+        // "cono" no hay etiquetas de borde, así que basta el medio ancho de
+        // bandera para que la primera/última no se recorten.
+        const pad = view === "cono"
+            ? { top: 12, right: 12, bottom: 42, left: 12 }
+            : { top: 12, right: 14, bottom: 42, left: 34 };
         const plotW = w - pad.left - pad.right;
         const plotH = h - pad.top - pad.bottom;
         // Posiciones X por suma acumulada de pesos: el ancho de cada
@@ -260,21 +230,36 @@
 
         // Etiquetas X adelgazadas por posición (no por índice): con anchos
         // desiguales el espaciado deja de ser uniforme, así que sólo se
-        // dibuja una etiqueta si dista ≥44px de la última (primera y última
-        // siempre). Cada etiqueta visible lleva su línea vertical de rejilla
-        // (mismo estilo punteado y tenue que las horizontales).
+        // dibuja una etiqueta si dista ≥``LABEL_GAP`` de la última (primera
+        // y última siempre). El umbral ronda el ancho de bandera + aire, así
+        // que cuando hay holgura caben más banderas (y sus líneas
+        // verticales); las zonas densas siguen colapsando. Cada etiqueta
+        // visible lleva su línea vertical de rejilla (punteada, como las
+        // horizontales).
+        const LABEL_GAP = FLAG_W + 6;
         const yTickTop = h - pad.bottom;
         let xlabels = "", xgrid = "";
         let lastLabelX = -Infinity;
         cols.forEach((c, i) => {
             const x = X(i);
             const isEnd = i === 0 || i === cols.length - 1;
-            if (!isEnd && x - lastLabelX < 44) return;
+            if (!isEnd && x - lastLabelX < LABEL_GAP) return;
             lastLabelX = x;
             const xr = x.toFixed(1);
             xlabels += xLabel(c, x, yTickTop);
             xgrid += `<line class="hist-grid" x1="${xr}" x2="${xr}" y1="${pad.top}" y2="${yTickTop}"/>`;
         });
+
+        // Divisores de fase: línea vertical tenue en la frontera donde cambia
+        // la fase (las 3 jornadas de grupos van colapsadas en "Grupos"), en
+        // el punto medio entre columnas. Se arranca en i=2 para ignorar el
+        // origen sintético (Salida→Grupos no separa fases).
+        let phaseDiv = "";
+        for (let i = 2; i < cols.length; i++) {
+            if (cols[i].phase === cols[i - 1].phase) continue;
+            const xm = ((X(i) + X(i - 1)) / 2).toFixed(1);
+            phaseDiv += `<line class="hist-phase" stroke="${COLOR_AXIS}" stroke-opacity=".16" x1="${xm}" x2="${xm}" y1="${pad.top}" y2="${yTickTop}"/>`;
+        }
 
         // Adornos del modo Cono: el marco (las dos rectas envolventes,
         // rectas en pantalla → basta unir extremos) y la línea diagonal del
@@ -288,34 +273,48 @@
             // del eje fijo se vuelve curva con el eje elástico). Recortada.
             const isoPath = v => cols.map((c, i) =>
                 `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v, i).toFixed(1)}`).join(" ");
-            // Vértice visible más alto / más bajo de una iso: los extremos
-            // por donde la curva entra (cerca del borde superior) y sale
-            // (cerca del inferior). Ahí van sus números, arriba y abajo.
-            const isoEnd = (v, lowest) => {
-                let best = null;
-                cols.forEach((c, i) => {
-                    const y = Y(v, i);
-                    const vis = y >= top(bands[i]) - 0.5 && y <= bot(bands[i]) + 0.5;
-                    if (vis && (!best || (lowest ? y > best.y : y < best.y)))
-                        best = { i, y };
-                });
-                return best;
+            // Punto exacto donde la iso cruza una recta envolvente:
+            // interpolación lineal entre las dos columnas vecinas donde
+            // ``Y(v,·) - borde`` cambia de signo. Devuelve {x, y} justo sobre
+            // la recta (no la columna "casi dentro"), para que todas las
+            // etiquetas queden pegadas a su cruce con un desplazamiento
+            // uniforme y no dispares. ``null`` si la iso nunca toca ese borde
+            // (p. ej. un valor alto que jamás baja hasta la recta inferior):
+            // esa etiqueta se omite en vez de pegarse al borde derecho. Se
+            // ignora el origen (desde i=1).
+            const crossEdge = (v, edge) => {
+                let p0 = Y(v, 1) - edge(bands[1]);
+                for (let i = 2; i < cols.length; i++) {
+                    const p1 = Y(v, i) - edge(bands[i]);
+                    if ((p0 < 0) !== (p1 < 0)) {
+                        const t = p0 / (p0 - p1); // fracción del cruce
+                        return {
+                            x: X(i - 1) + t * (X(i) - X(i - 1)),
+                            y: Y(v, i - 1) + t * (Y(v, i) - Y(v, i - 1)),
+                        };
+                    }
+                    p0 = p1;
+                }
+                return null;
             };
             // Mantiene la etiqueta dentro del área (sin invadir el canalón de
             // banderas abajo ni salirse por arriba).
             const clampY = y =>
                 Math.max(pad.top + 8, Math.min(y, pad.top + plotH - 2));
-            const label = (x, y, txt) =>
-                `<text font-size="10" text-anchor="start" fill="${COLOR_AXIS}" fill-opacity=".7" x="${x.toFixed(1)}" y="${clampY(y).toFixed(1)}">${txt}</text>`;
-            // Etiquetas de una iso: abajo (siempre) y arriba (sólo las > 0; la
-            // del 0 va únicamente abajo, "junto a las demás"). Pegadas a la
-            // derecha de la curva, no centradas en la columna.
+            const label = (x, y, txt, anchor) =>
+                `<text font-size="10" text-anchor="${anchor}" fill="${COLOR_AXIS}" fill-opacity=".7" x="${x.toFixed(1)}" y="${clampY(y).toFixed(1)}">${txt}</text>`;
+            // Etiquetas de una iso, pegadas a su cruce con desplazamiento
+            // constante: arriba-derecha del cruce con la recta superior,
+            // abajo-izquierda del cruce con la inferior; cada una sólo si ese
+            // cruce existe. El 0 lleva sólo la de abajo.
             const isoLabels = (v, txt, withTop) => {
                 let s = "";
-                const b = isoEnd(v, true);
-                if (b) s += label(X(b.i) + 2, b.y + 13, txt);
-                const t = withTop && isoEnd(v, false);
-                if (t) s += label(X(t.i) + 2, t.y - 5, txt);
+                const b = crossEdge(v, bot);
+                if (b) s += label(b.x - 3, b.y + 11, txt, "end");
+                if (withTop) {
+                    const t = crossEdge(v, top);
+                    if (t) s += label(t.x + 3, t.y - 4, txt, "start");
+                }
                 return s;
             };
 
@@ -343,7 +342,7 @@
 
             // 4) Línea del 0 (punteada); su "0" va sólo abajo, junto a las
             //    demás etiquetas inferiores.
-            cono += `<path class="hist-zero" fill="none" stroke="${COLOR_AXIS}" stroke-opacity=".28" stroke-dasharray="2 5" d="${isoPath(0)}" clip-path="url(#hist-clip)"/>`;
+            cono += `<path class="hist-zero" fill="none" stroke="${COLOR_AXIS}" stroke-opacity=".55" stroke-width="1.2" stroke-dasharray="6 4" d="${isoPath(0)}" clip-path="url(#hist-clip)"/>`;
             cono += isoLabels(0, "0", false);
         }
 
@@ -368,7 +367,7 @@
                     <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
                 </filter>
                 <clipPath id="hist-clip"><rect x="${pad.left}" y="${pad.top}" width="${plotW}" height="${plotH}"/></clipPath></defs>
-                ${grid}${cono}${xgrid}${xlabels}
+                ${grid}${cono}${xgrid}${phaseDiv}${xlabels}
                 <g clip-path="url(#hist-clip)">
                     ${mePath}
                     <g class="hist-dim">${dim.join("")}</g>
@@ -479,16 +478,6 @@
     document.getElementById("history-legend").addEventListener("click", e => {
         const id = e.target.closest("[data-remove]")?.dataset.remove;
         if (id) select.removeItem(id);
-    });
-
-    // Toggle de modo de eje X.
-    document.querySelector("[data-xmode-switch]").addEventListener("click", e => {
-        const btn = e.target.closest("[data-xmode]");
-        if (!btn) return;
-        xmode = btn.dataset.xmode;
-        document.querySelectorAll("[data-xmode]").forEach(
-            b => b.classList.toggle("active", b === btn));
-        render();
     });
 
     // Toggle de vista: eje fijo (Absoluta) vs eje elástico (Cono).

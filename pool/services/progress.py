@@ -79,8 +79,9 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
 
     - ``ticks``: tandas en orden; el tick 0 es la salida (todos en cero)
       para que las líneas nazcan de un origen común. Cada tick trae su
-      fecha local, la fase y los partidos que lo componen (para los
-      modos de eje X: tanda, día y partido).
+      fecha local, el ``stage`` (nombre corto), la ``phase`` gruesa (las 3
+      jornadas de grupos colapsan en "Grupos"; sirve para el divisor de
+      fases) y los partidos que lo componen (eje X por partido).
     - ``series``: una por jugador con sus puntos acumulados por tick.
     - ``defaults``: ids preseleccionados (top 1, top 2 y peor real); el
       usuario activo se dibuja siempre aparte, no entra aquí.
@@ -105,16 +106,22 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
     mult_by_stage = multiplier_by_stage(quiniela)
     tick_of_dt: dict = {}
     ticks: list[dict] = [
-        {"date": "", "stage": "Salida", "matches": [], "multiplier": 1}
+        {"date": "", "stage": "Salida", "phase": "Salida",
+         "matches": [], "multiplier": 1}
     ]
     for m in finished:
         if m.datetime not in tick_of_dt:
             tick_of_dt[m.datetime] = len(ticks)
             offset = m.stadium.utc_offset if m.stadium_id else 0
             local = (m.datetime + timedelta(hours=offset or 0)).date()
+            # ``phase`` agrupa las 3 jornadas de grupos bajo una sola fase
+            # para el divisor vertical del eje X (las eliminatorias ya son
+            # una fase cada una).
+            phase = "Grupos" if m.stage.is_group else m.stage.short_name
             ticks.append({
                 "date": local.isoformat(),
                 "stage": m.stage.short_name,
+                "phase": phase,
                 "matches": [],
                 "multiplier": float(mult_by_stage.get(m.stage_id, 1)),
             })

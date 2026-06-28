@@ -380,11 +380,21 @@ body.history-page .history {
   stroke: color-mix(in srgb, var(--color-base-content) 20%, transparent);
   stroke-width: 1;
 }
+/* Línea del 0 (umbral de equilibrio): debe destacar claramente sobre las
+   demás iso-líneas. Opacidad en ``stroke-opacity`` (no horneada en el color)
+   para no atenuarla dos veces con el atributo inline de respaldo. */
 .hist-zero {
   fill: none;
-  stroke: color-mix(in srgb, var(--color-base-content) 28%, transparent);
+  stroke: var(--color-base-content);
+  stroke-opacity: 0.55;
+  stroke-width: 1.2;
+  stroke-dasharray: 6 4;
+}
+/* Divisor vertical entre fases (Grupos | 16avos | …): sólido y algo más
+   marcado que la rejilla punteada, pero por debajo de las líneas de datos. */
+.hist-phase {
+  stroke: color-mix(in srgb, var(--color-base-content) 16%, transparent);
   stroke-width: 1;
-  stroke-dasharray: 2 5;
 }
 .hist-ylabel {
   fill: color-mix(in srgb, var(--color-base-content) 55%, transparent);
