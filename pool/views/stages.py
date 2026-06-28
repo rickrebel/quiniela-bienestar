@@ -451,7 +451,7 @@ def window_view(request: HttpRequest, order: int) -> HttpResponse:
             thirds_sim = _build_thirds_simulator(thirds, flat_matches)
 
     for m in flat_matches:
-        m.editable = window_user.can_edit
+        m.editable = window_user.can_edit and not m.has_started
 
     deadline = window.resolved_send_deadline()
     context = {
@@ -554,7 +554,11 @@ def groups_view(request: HttpRequest) -> HttpResponse:
     # Editabilidad por partido: solo la jornada (ventana) vigente.
     active_stage_ids = {s.id for s in active_window.stages.all()}
     for m in flat_matches:
-        m.editable = m.stage_id in active_stage_ids and active_wu.can_edit
+        m.editable = (
+            m.stage_id in active_stage_ids
+            and active_wu.can_edit
+            and not m.has_started
+        )
 
     deadline = active_window.resolved_send_deadline()
     context = {

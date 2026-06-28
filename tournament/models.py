@@ -275,3 +275,8 @@ class Match(models.Model):
     @property
     def is_third_place(self) -> bool:
         return self.of_number == self.THIRD_PLACE_NUMBER
+
+    @property
+    def has_started(self) -> bool:
+        """True si ya pasó el kickoff (UTC). Cierra la edición del pronóstico."""
+        return timezone.now() >= self.datetime

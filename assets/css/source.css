@@ -334,11 +334,33 @@ body.history-page .history {
 /* Contenedor de la gráfica: crece por flex hasta llenar el espacio que
    sobra (ResizeObserver lee clientHeight y redibuja), con un piso de
    360px. Ancho completo de la ventana. */
+/* Envoltorio de la gráfica: ocupa el hueco del flex vertical y sirve de
+   ancla (position: relative) al switch de zoom, que flota encima sin
+   entrar en el contenedor con scroll. */
+.history-plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .history-chart {
   position: relative;
   width: 100%;
   flex: 1;
   min-height: 360px;
+  /* Scroll horizontal cuando el SVG es más ancho que la ventana (2x/full);
+     sin scroll vertical (el alto siempre encaja). */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* Switch de zoom: misma píldora que Cono/Absoluta (hereda .history-xmode),
+   solo superpuesto arriba-izquierda y fijo aunque la gráfica se desplace. */
+.history-zoom {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 5;
 }
 /* Pie de la página: única salida hacia la vista por fecha. */
 .history-foot {
@@ -391,9 +413,12 @@ body.history-page .history {
   stroke-dasharray: 6 4;
 }
 /* Divisor vertical entre fases (Grupos | 16avos | …): sólido y algo más
-   marcado que la rejilla punteada, pero por debajo de las líneas de datos. */
+   marcado que la rejilla punteada, pero por debajo de las líneas de datos.
+   Opacidad sólo en ``stroke-opacity`` (no horneada en el color) para no
+   atenuarla dos veces con el atributo inline de respaldo. */
 .hist-phase {
-  stroke: color-mix(in srgb, var(--color-base-content) 16%, transparent);
+  stroke: var(--color-base-content);
+  stroke-opacity: 0.22;
   stroke-width: 1;
 }
 .hist-ylabel {

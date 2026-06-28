@@ -44,8 +44,19 @@
     // activo va aparte (blanco), no consume color.
     const colorIndex = new Map();
     const freeColors = PALETTE.map((_, i) => i);
-    let view = "abs"; // "abs" eje fijo · "cono" eje elástico por columna
+    let view = "cono"; // "cono" eje elástico por columna · "abs" eje fijo
+    let zoom = "1x"; // ancho del lienzo: "1x" cabe · "2x" doble · "full" todo
     let pinnedId = null; // línea "fijada" por clic/tap (tooltip persistente)
+
+    // Zoom horizontal: en "full" la columna más angosta recibe
+    // PX_PER_MATCH px (suficiente para una bandera de 20px con aire), así
+    // caben TODAS. Se reparte por peso (multiplicador de ventana), no por
+    // número de partidos: con multiplicadores las columnas no son iguales.
+    // LABEL_GAP (umbral para pintar etiqueta) va 2px por debajo como margen
+    // de seguridad, para que ninguna se descarte por redondeo.
+    const PX_PER_MATCH = 28;
+    const LABEL_GAP = PX_PER_MATCH - 2;
+    const zoomSwitch = document.querySelector("[data-zoom-switch]");
 
     // ----- Datos derivados del eje X ---------------------------------
 
@@ -138,9 +149,9 @@
     }
 
     function render() {
-        const w = root.clientWidth;
+        const baseW = root.clientWidth;
         const h = root.clientHeight;
-        if (!w || !h) return;
+        if (!baseW || !h) return;
 
         const cols = buildCols();
         // El canalón inferior aloja las dos banderas apiladas (local sobre
@@ -151,12 +162,31 @@
         const pad = view === "cono"
             ? { top: 12, right: 12, bottom: 42, left: 12 }
             : { top: 12, right: 14, bottom: 42, left: 34 };
+
+        // Ancho "full": el área de trazado debe ser tan ancha que la columna
+        // de MENOR peso reciba PX_PER_MATCH px (cada columna ocupa
+        // plotW·weight/totalW). Despejando minW·plotW/totalW = PX_PER_MATCH.
+        // Se le suman los márgenes para obtener el ancho del lienzo. El switch
+        // solo aparece si ese ancho supera al de la ventana (a 1x no cabe).
+        const totalW = cols.reduce((a, c) => a + c.weight, 0);
+        const weights = cols.filter(c => c.weight > 0).map(c => c.weight);
+        const minW = weights.length ? Math.min(...weights) : 1;
+        const fullW = totalW
+            ? PX_PER_MATCH * totalW / minW + pad.left + pad.right
+            : baseW;
+        const showZoom = fullW > baseW;
+        zoomSwitch.style.display = showZoom ? "" : "none";
+        let w = baseW;
+        if (showZoom) {
+            if (zoom === "2x") w = baseW * 2;
+            else if (zoom === "full") w = Math.max(baseW, fullW);
+        }
+
         const plotW = w - pad.left - pad.right;
         const plotH = h - pad.top - pad.bottom;
         // Posiciones X por suma acumulada de pesos: el ancho de cada
         // tramo es proporcional a su ``weight``. El origen (peso 0) cae en
         // ``pad.left`` y la última columna en el borde derecho del área.
-        const totalW = cols.reduce((a, c) => a + c.weight, 0);
         let acc = 0;
         const xPos = cols.map(c => {
             acc += c.weight;
@@ -244,8 +274,8 @@
         // que cuando hay holgura caben más banderas (y sus líneas
         // verticales); las zonas densas siguen colapsando. Cada etiqueta
         // visible lleva su línea vertical de rejilla (punteada, como las
-        // horizontales).
-        const LABEL_GAP = FLAG_W + 6;
+        // horizontales). El umbral ``LABEL_GAP`` está definido arriba, ligado
+        // a ``PX_PER_MATCH`` para que en "full" se muestren todas.
         const yTickTop = h - pad.bottom;
         let xlabels = "", xgrid = "";
         let lastLabelX = -Infinity;
@@ -267,7 +297,7 @@
         for (let i = 2; i < cols.length; i++) {
             if (cols[i].phase === cols[i - 1].phase) continue;
             const xm = ((X(i) + X(i - 1)) / 2).toFixed(1);
-            phaseDiv += `<line class="hist-phase" stroke="${COLOR_AXIS}" stroke-opacity=".16" x1="${xm}" x2="${xm}" y1="${pad.top}" y2="${yTickTop}"/>`;
+            phaseDiv += `<line class="hist-phase" stroke="${COLOR_AXIS}" stroke-opacity=".22" x1="${xm}" x2="${xm}" y1="${pad.top}" y2="${yTickTop}"/>`;
         }
 
         // Adornos del modo Cono: el marco (las dos rectas envolventes,
@@ -430,6 +460,33 @@
 
     // ----- Selección (Tom Select) ------------------------------------
 
+    // Persistencia de la selección en UserQuiniela: la última comparación
+    // se recuerda por usuario y quiniela. Se autoguarda con debounce al
+    // agregar/quitar (espejo del autoguardado por partido de submit.js).
+    function getCookie(name) {
+        const m = document.cookie.match(
+            new RegExp("(?:^|; )" + name + "=([^;]*)"));
+        return m ? decodeURIComponent(m[1]) : null;
+    }
+    const csrftoken = getCookie("csrftoken");
+    const saveUrl = `/${window.QUINIELA_SLUG || ""}/historia/seleccion/`;
+    let ready = false; // evita persistir los items iniciales (defaults)
+    let saveTimer = null;
+    function persistSelection() {
+        if (!ready) return;
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+            fetch(saveUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrftoken,
+                },
+                body: JSON.stringify({ ids: select.getValue().map(Number) }),
+            }).catch(() => {}); // best-effort: una preferencia de UI
+        }, 500);
+    }
+
     function assignColor(id) {
         if (colorIndex.has(id) || !freeColors.length) return;
         colorIndex.set(id, freeColors.shift());
@@ -468,12 +525,15 @@
             option: (d, esc) =>
                 `<div class="hist-opt"><span class="hist-opt-pos">${esc(d.pos)}</span>${esc(d.name)}</div>`,
         },
-        onItemAdd: id => { assignColor(+id); refresh(); },
-        onItemRemove: id => { releaseColor(+id); refresh(); },
+        onItemAdd: id => { assignColor(+id); refresh(); persistSelection(); },
+        onItemRemove: id => {
+            releaseColor(+id); refresh(); persistSelection();
+        },
     });
 
     // Colores de los defaults antes del primer render.
     select.getValue().forEach(id => assignColor(+id));
+    ready = true; // a partir de aquí, los cambios del usuario sí se guardan
 
     function refresh() {
         renderLegend();
@@ -499,6 +559,18 @@
         render();
     });
 
+    // Toggle de zoom horizontal: 1x · 2x · full. Al cambiar se vuelve al
+    // inicio (sin desplazamiento residual).
+    zoomSwitch.addEventListener("click", e => {
+        const btn = e.target.closest("[data-zoom]");
+        if (!btn) return;
+        zoom = btn.dataset.zoom;
+        zoomSwitch.querySelectorAll("[data-zoom]").forEach(
+            b => b.classList.toggle("active", b === btn));
+        root.scrollLeft = 0;
+        render();
+    });
+
     // Tooltip: al señalar (hover) o al hacer clic/tap aparece el nombre y
     // los puntos. El clic "fija" la línea (clave en móvil, sin hover);
     // otro clic en vacío la suelta.
@@ -517,7 +589,9 @@
         const r = root.getBoundingClientRect();
         const last = s.points[s.points.length - 1];
         tip.textContent = `${s.name} · ${(+last).toLocaleString("es")}`;
-        tip.style.left = `${e.clientX - r.left}px`;
+        // El tip vive dentro del contenedor scrolleable; se suma scrollLeft
+        // para que no se desfase cuando la gráfica está desplazada (2x/full).
+        tip.style.left = `${e.clientX - r.left + root.scrollLeft}px`;
         tip.style.top = `${e.clientY - r.top}px`;
         tip.hidden = false;
     }

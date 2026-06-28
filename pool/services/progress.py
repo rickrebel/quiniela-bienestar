@@ -12,10 +12,15 @@ from datetime import timedelta
 
 from django.templatetags.static import static
 
-from pool.models import Prediction, Quiniela, ScoreSnapshot, User
+from pool.models import (
+    Prediction, Quiniela, ScoreSnapshot, User, UserQuiniela)
 from pool.services.evaluation import multiplier_by_stage
 from pool.services.leaderboard import build_leaderboard
 from tournament.models import Match
+
+# Tope de líneas comparadas: igual al tamaño de la paleta del front
+# (--chart-1..8, MAX_COMPARE en progress.js).
+MAX_COMPARE = 8
 
 
 def _match_entry(match: Match) -> dict:
@@ -83,8 +88,10 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
       jornadas de grupos colapsan en "Grupos"; sirve para el divisor de
       fases) y los partidos que lo componen (eje X por partido).
     - ``series``: una por jugador con sus puntos acumulados por tick.
-    - ``defaults``: ids preseleccionados (top 1, top 2 y peor real); el
-      usuario activo se dibuja siempre aparte, no entra aquí.
+    - ``defaults``: ids preseleccionados. Si ``me`` ya guardó su
+      comparación en ``UserQuiniela.history_compare`` se usa esa (saneada
+      y en su orden); si no (``None``), se calculan (top 1, top 2 y peor
+      real). El usuario activo se dibuja siempre aparte, no entra aquí.
     """
     cutoff = _start_cutoff(quiniela)
     match_qs = Match.objects.filter(
@@ -154,12 +161,35 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
         for r, row in zip(players, points)
     ]
 
-    # Preselección: top 1, top 2 y el peor real (la virtual queda fuera
-    # de los defaults pero seleccionable; el activo se pinta aparte).
-    reals = [r for r in players if not r.user.is_virtual]
-    defaults: list[int] = []
-    for row in (reals[:1] + reals[1:2] + reals[-1:]):
-        if row.user.id != me.id and row.user.id not in defaults:
-            defaults.append(row.user.id)
+    # Preselección guardada (``UserQuiniela.history_compare``) o, si nunca
+    # se personalizó (``None``), el cálculo por defecto. ``[]`` guardado
+    # es una elección deliberada (no comparar a nadie) y se respeta.
+    saved = _saved_selection(me, quiniela)
+    if saved is not None:
+        selectable = {s["id"] for s in series if not s["me"]}
+        defaults = [uid for uid in dict.fromkeys(saved)
+                    if uid in selectable][:MAX_COMPARE]
+    else:
+        # Top 1, top 2 y el peor real (la virtual queda fuera de los
+        # defaults pero seleccionable; el activo se pinta aparte).
+        reals = [r for r in players if not r.user.is_virtual]
+        defaults = []
+        for row in (reals[:1] + reals[1:2] + reals[-1:]):
+            if row.user.id != me.id and row.user.id not in defaults:
+                defaults.append(row.user.id)
 
     return {"ticks": ticks, "series": series, "defaults": defaults}
+
+
+def _saved_selection(me: User, quiniela: Quiniela) -> list[int] | None:
+    """Selección comparada que ``me`` guardó para esta quiniela.
+
+    ``None`` si no hay membresía o nunca se personalizó (cae a defaults);
+    una lista (posiblemente vacía) si el usuario la fijó.
+    """
+    membership = (
+        UserQuiniela.objects.filter(user=me, quiniela=quiniela)
+        .values_list("history_compare", flat=True)
+        .first()
+    )
+    return membership

@@ -19,14 +19,27 @@
             <select id="history-users" multiple
                     placeholder="Comparar participantes…" autocomplete="off"></select>
             <div class="history-xmode" data-view-switch>
-                <button type="button" data-view="abs" class="active">Absoluta</button>
-                <button type="button" data-view="cono">Cono</button>
+                <button type="button" data-view="cono" class="active">Cono</button>
+                <button type="button" data-view="abs">Absoluta</button>
             </div>
         </div>
         <div id="history-legend" class="history-legend"></div>
     </header>
 
-    <div id="history-chart" class="history-chart"></div>
+    <div class="history-plot">
+        {% comment %}
+        Zoom horizontal: 1x (cabe), 2x (móvil) y full (26px/partido). Fijo
+        arriba-izquierda, no se desplaza con el scroll. JS lo muestra solo
+        si no cabe todo a 1x.
+        {% endcomment %}
+        <div class="history-xmode history-zoom" data-zoom-switch
+             style="display:none">
+            <button type="button" data-zoom="1x" class="active">1x</button>
+            <button type="button" data-zoom="2x">2x</button>
+            <button type="button" data-zoom="full">full</button>
+        </div>
+        <div id="history-chart" class="history-chart"></div>
+    </div>
 
     {{ progress|json_script:"history-data" }}
 

@@ -163,8 +163,12 @@ class GroupTabCollapseTests(TestCase):
             stage = Stage.objects.create(
                 key=key, name=f"Jornada {i}", short_name=f"J{i}", order=i,
                 is_group=True, opens_at=opens, send_deadline=deadline)
+            # El kickoff cae al cierre de la ventana, no a su apertura: un
+            # partido ya iniciado se bloquea aunque su ventana siga viva
+            # (candado por partido), así que la jornada viva necesita un
+            # partido todavía futuro para seguir siendo editable.
             Match.objects.create(
-                datetime=opens, stage=stage, stadium=cls.stadium,
+                datetime=deadline, stage=stage, stadium=cls.stadium,
                 home_team=cls.a1, away_team=cls.a2, of_number=i)
             window = Window.objects.create(quiniela=cls.quiniela, order=i)
             window.stages.add(stage)

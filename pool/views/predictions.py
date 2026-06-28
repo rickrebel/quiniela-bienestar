@@ -23,6 +23,7 @@ from tournament.models import Match, Stage
 WINDOW_NOT_FOUND = "No existe esa ventana para tu usuario."
 MATCH_NOT_FOUND = "No existe ese partido."
 LOCKED = "Esta ventana ya no admite cambios."
+MATCH_STARTED = "Ese partido ya comenzó; no admite cambios."
 INCOMPLETE = "Faltan partidos por llenar."
 
 
@@ -42,12 +43,17 @@ def _window_for_stage(quiniela: Quiniela, stage: Stage) -> Window | None:
     return Window.objects.filter(quiniela=quiniela, stages=stage).first()
 
 
-def _valid_match_ids(window: Window) -> set[int]:
-    """IDs de partidos de la ventana (acota qué se puede escribir)."""
+def _editable_match_ids(window: Window) -> set[int]:
+    """Partidos de la ventana cuyo kickoff aún no llega (editables).
+
+    Candado por partido: aunque la ventana siga abierta, un partido ya
+    iniciado deja de admitir cambios. ``datetime`` está en UTC.
+    """
     return set(
-        Match.objects.filter(stage__in=window.stages.all()).values_list(
-            "id", flat=True
-        )
+        Match.objects.filter(
+            stage__in=window.stages.all(),
+            datetime__gt=timezone.now(),
+        ).values_list("id", flat=True)
     )
 
 
@@ -106,7 +112,8 @@ def save_predictions(request: HttpRequest) -> JsonResponse:
     if not window_user.can_edit:
         return JsonResponse({"error": LOCKED}, status=403)
 
-    valid_ids = _valid_match_ids(window_user.window)
+    # Solo partidos no iniciados son escribibles (candado por partido).
+    valid_ids = _editable_match_ids(window_user.window)
     with transaction.atomic():
         _upsert(
             request.user, request.quiniela, data["predictions"], valid_ids)
@@ -143,6 +150,8 @@ def save_prediction(
         return JsonResponse({"error": WINDOW_NOT_FOUND}, status=404)
     if not window_user.can_edit:
         return JsonResponse({"error": LOCKED}, status=403)
+    if match.has_started:
+        return JsonResponse({"error": MATCH_STARTED}, status=403)
 
     home = data.get("home_goals")
     away = data.get("away_goals")
@@ -191,9 +200,11 @@ def send_predictions(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": LOCKED}, status=403)
 
     window = window_user.window
-    valid_ids = _valid_match_ids(window)
+    # La completitud solo exige los partidos no iniciados: uno ya comenzado
+    # y sin llenar no bloquea el envío (cuenta 0).
+    required_ids = _editable_match_ids(window)
     saved_ids = _saved_match_ids(request.user, request.quiniela, window)
-    if valid_ids - saved_ids:
+    if required_ids - saved_ids:
         return JsonResponse({"error": INCOMPLETE}, status=400)
 
     with transaction.atomic():

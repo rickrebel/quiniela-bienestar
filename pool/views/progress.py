@@ -1,17 +1,41 @@
 """Vista "Historia": gráfica de la evolución del acumulado por tanda."""
 
-from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
-from django.shortcuts import render
+import json
 
-from pool.services.progress import build_progress
+from django.contrib.auth.decorators import login_required
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import render
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
+
+from pool.models import UserQuiniela
+from pool.services.progress import MAX_COMPARE, build_progress
 from pool.views.scope import with_quiniela
 
 
 @login_required
 @with_quiniela
+@ensure_csrf_cookie
 def history_view(request: HttpRequest) -> HttpResponse:
     """Página dedicada con la gráfica de líneas de avance. Los datos van
-    incrustados (``json_script``); no hay endpoint aparte."""
+    incrustados (``json_script``). ``ensure_csrf_cookie`` garantiza la
+    cookie para el autoguardado de la selección (la página no carga
+    ``submit.js``)."""
     data = build_progress(request.quiniela, request.user)
     return render(request, "historia.html", {"progress": data})
+
+
+@login_required
+@with_quiniela
+@require_POST
+def save_history_compare(request: HttpRequest) -> JsonResponse:
+    """Autoguarda (con debounce desde el front) la selección de
+    participantes comparados en la gráfica, en su membresía de la
+    quiniela activa. Se guardan IDs de usuario en orden de selección;
+    ``[]`` es válido (no comparar a nadie)."""
+    data = json.loads(request.body)
+    ids = [i for i in data.get("ids", []) if isinstance(i, int)][:MAX_COMPARE]
+    UserQuiniela.objects.filter(
+        user=request.user, quiniela=request.quiniela
+    ).update(history_compare=ids)
+    return JsonResponse({"status": "ok"})

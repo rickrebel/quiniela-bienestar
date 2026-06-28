@@ -225,6 +225,11 @@ class UserQuiniela(models.Model):
         default=False,
         help_text="Pagó y envió a tiempo; se marca a mano.",
     )
+    history_compare = models.JSONField(
+        null=True, blank=True,
+        help_text="IDs de usuario comparados en la gráfica Historia, en "
+                  "orden de selección. null = sin personalizar.",
+    )
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

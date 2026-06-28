@@ -14,6 +14,11 @@ urlpatterns = [
     path("calendario/", stages.por_fecha_view, name="by_date"),
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
     path("historia/", progress.history_view, name="history"),
+    path(
+        "historia/seleccion/",
+        progress.save_history_compare,
+        name="save_history_compare",
+    ),
     path("grupos/", stages.groups_view, name="groups"),
     path(
         "grupos/standings/",
