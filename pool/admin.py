@@ -53,7 +53,7 @@ class UserQuinielaAdmin(admin.ModelAdmin):
 @admin.register(WindowUser)
 class WindowUserAdmin(admin.ModelAdmin):
     list_display = ("user", "window", "sent_at")
-    list_filter = ("window__quiniela",)
+    list_filter = ("window__quiniela", "window__stages")
 
 
 @admin.register(Prediction)
