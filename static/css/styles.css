@@ -665,6 +665,28 @@
   cursor: pointer;
 }
 
+.submit-btn:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.submit-btn.is-loading::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: submit-spin 0.7s linear infinite;
+}
+
+@keyframes submit-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Diálogo de confirmación de envío. Reusa .match-card, .group-summary
    y .submit-btn; aquí solo va el armazón del modal. */
 .send-dialog {

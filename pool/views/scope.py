@@ -11,6 +11,7 @@ from functools import wraps
 from django.conf import settings
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from pool.models import Quiniela
 from pool.services.membership import active_quiniela
@@ -61,6 +62,27 @@ def home_slug(request: HttpRequest) -> str | None:
 def root_redirect(request: HttpRequest) -> HttpResponse:
     """Dominio pelón → ventana 1 de la quiniela del usuario o del dominio."""
     slug = home_slug(request)
+    if slug is None:
+        return redirect("login")
+    return redirect("window", quiniela=slug, order=1)
+
+
+def post_auth_redirect(
+    request: HttpRequest, slug: str | None = None
+) -> HttpResponse:
+    """Destino tras login/registro/reset: ``next`` seguro o la quiniela.
+
+    Si la petición trae un ``next`` (de un enlace protegido) que apunta al
+    mismo host, manda ahí. Si no, usa ``slug`` (cuando el llamador sabe a
+    qué quiniela acaba de inscribir) o ``home_slug`` (primera membresía).
+    Sin slug resoluble (p. ej. superusuario sin membresía) cae a login.
+    """
+    nxt = request.POST.get("next") or request.GET.get("next")
+    if nxt and url_has_allowed_host_and_scheme(
+        nxt, {request.get_host()}, request.is_secure()
+    ):
+        return redirect(nxt)
+    slug = slug or home_slug(request)
     if slug is None:
         return redirect("login")
     return redirect("window", quiniela=slug, order=1)

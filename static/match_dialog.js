@@ -354,7 +354,12 @@
         }
 
         async function submitResult(v, btn) {
+            // El POST dispara recompute_all (varios segundos): feedback
+            // de espera y bloqueo del botón hasta el reload.
             btn.disabled = true;
+            btn.classList.add("is-loading");
+            const label = btn.textContent;
+            btn.textContent = "Guardando…";
             try {
                 const slug = window.QUINIELA_SLUG || "";
                 const response = await fetch(
@@ -377,6 +382,8 @@
                 location.reload();
             } catch (err) {
                 btn.disabled = false;
+                btn.classList.remove("is-loading");
+                btn.textContent = label;
                 backToForm();
                 showError(err.message);
             }

@@ -3,6 +3,7 @@
 {% block content %}
 <form class="form-body" action="" method="post" novalidate>
     {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
     <h1 class="login-title"><span>⚽</span>quiniela</h1>
     <div class="inputs-layout" >
         <p>

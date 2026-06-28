@@ -9,10 +9,10 @@ from django.shortcuts import redirect, render
 from pool.forms import (
     EmailAccessForm, RecoveryConfirmForm, RecoveryRequestForm,
     RegistrationForm)
-from pool.models import PasswordRecoveryToken
+from pool.models import PasswordRecoveryToken, UserQuiniela
 from pool.services.recovery import (
     create_recovery_token, recovery_url, send_recovery_email)
-from pool.views.scope import home_slug
+from pool.views.scope import post_auth_redirect
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -53,8 +53,7 @@ def login_view(request: HttpRequest) -> HttpResponse:
                 if user.is_active:
                     if user.check_password(form.cleaned_data["password"]):
                         login(request, user, backend=_AUTH_BACKEND)
-                        return redirect(
-                            "window", quiniela=home_slug(request), order=1)
+                        return post_auth_redirect(request)
                     else:
                         form.add_error("password", "Contraseña incorrecta")
                 else:
@@ -62,12 +61,13 @@ def login_view(request: HttpRequest) -> HttpResponse:
                     user.is_active = True
                     user.save()
                     login(request, user, backend=_AUTH_BACKEND)
-                    return redirect(
-                        "window", quiniela=home_slug(request), order=1)
+                    return post_auth_redirect(request)
     else:
         form = EmailAccessForm()
 
-    return render(request, "auth/login.html", {"form": form})
+    nxt = request.POST.get("next") or request.GET.get("next", "")
+    context = {"form": form, "next": nxt}
+    return render(request, "auth/login.html", context)
 
 
 def register_view(request: HttpRequest) -> HttpResponse:
@@ -100,13 +100,21 @@ def register_view(request: HttpRequest) -> HttpResponse:
                 user.set_password(form.cleaned_data["password"])
                 user.is_active = True
                 user.save()
+                # Una membresía por quiniela elegida; el signal de
+                # UserQuiniela materializa sus WindowUser (idempotente, como
+                # en preregister). Sin esto el usuario quedaba sin quiniela.
+                quinielas = list(form.cleaned_data["quinielas"])
+                for quiniela in quinielas:
+                    UserQuiniela.objects.get_or_create(
+                        user=user, quiniela=quiniela)
                 login(request, user, backend=_AUTH_BACKEND)
-                return redirect(
-                    "window", quiniela=home_slug(request), order=1)
+                return post_auth_redirect(request, slug=quinielas[0].slug)
     else:
         form = RegistrationForm()
 
-    return render(request, "auth/register.html", {"form": form})
+    nxt = request.POST.get("next") or request.GET.get("next", "")
+    context = {"form": form, "next": nxt}
+    return render(request, "auth/register.html", context)
 
 
 def logout_view(request: HttpRequest) -> HttpResponse:
@@ -176,8 +184,7 @@ def reset_password_view(request: HttpRequest, key) -> HttpResponse:
             user.save()
             token.mark_used()
             login(request, user, backend=_AUTH_BACKEND)
-            return redirect(
-                "window", quiniela=home_slug(request), order=1)
+            return post_auth_redirect(request)
     else:
         form = RecoveryConfirmForm()
 

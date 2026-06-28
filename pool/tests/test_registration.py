@@ -11,18 +11,21 @@ from tournament.models import Stage
 class RegisterViewTests(TestCase):
     url = reverse("register")
 
+    def setUp(self) -> None:
+        self.quiniela = Quiniela.objects.create(name="Q", slug="q")
+
     def _payload(self, **overrides) -> dict:
         data = {
             "first_name": "Ana",
             "email": "ana@example.com",
             "password": "x",
             "password_confirm": "x",
+            "quinielas": [self.quiniela.id],
         }
         data.update(overrides)
         return data
 
     def test_new_user_is_created_active_and_logged_in(self):
-        Quiniela.objects.create(name="Q", slug="q")
         response = self.client.post(self.url, self._payload())
         self.assertRedirects(
             response,
@@ -36,6 +39,26 @@ class RegisterViewTests(TestCase):
         self.assertTrue(user.check_password("x"))
         self.assertEqual(
             int(self.client.session["_auth_user_id"]), user.id)
+        self.assertTrue(
+            UserQuiniela.objects.filter(
+                user=user, quiniela=self.quiniela).exists())
+
+    def test_membership_created_for_each_selected_quiniela(self):
+        other = Quiniela.objects.create(name="Otra", slug="otra")
+        self.client.post(
+            self.url, self._payload(quinielas=[self.quiniela.id, other.id]))
+        user = User.objects.get(email="ana@example.com")
+        self.assertEqual(
+            set(UserQuiniela.objects.filter(user=user).values_list(
+                "quiniela_id", flat=True)),
+            {self.quiniela.id, other.id},
+        )
+
+    def test_no_quiniela_selected_rejected(self):
+        response = self.client.post(self.url, self._payload(quinielas=[]))
+        self.assertContains(response, "Elige al menos una quiniela")
+        self.assertFalse(
+            User.objects.filter(email="ana@example.com").exists())
 
     def test_single_char_password_is_accepted(self):
         response = self.client.post(self.url, self._payload())
@@ -78,7 +101,6 @@ class RegisterViewTests(TestCase):
         user = User.objects.create_user(
             email="ana@example.com", first_name="Preregistrada")
 
-        Quiniela.objects.create(name="Q", slug="q")
         response = self.client.post(
             self.url, self._payload(first_name="Ana"))
         self.assertRedirects(

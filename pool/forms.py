@@ -2,6 +2,8 @@
 
 from django import forms
 
+from pool.models import Quiniela
+
 
 class EmailAccessForm(forms.Form):
     """Formulario de acceso por correo, sin contraseña.
@@ -66,6 +68,12 @@ class RegistrationForm(forms.Form):
             attrs={"autocomplete": "new-password"}
         ),
         error_messages={"required": "Confirma la contraseña"},
+    )
+    quinielas = forms.ModelMultipleChoiceField(
+        label="¿A qué quinielas te inscribes?",
+        queryset=Quiniela.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        error_messages={"required": "Elige al menos una quiniela"},
     )
 
     def clean_first_name(self) -> str:
