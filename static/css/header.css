@@ -84,7 +84,7 @@
 /* Botones-ícono de la derecha (historia y cuenta): cuadrados e iguales. */
 .history-link,
 .user-chip {
-    min-width: 40px;
+    min-width: 36px;
     padding: 0;
 }
 .history-link:hover {

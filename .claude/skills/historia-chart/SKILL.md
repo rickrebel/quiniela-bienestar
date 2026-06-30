@@ -1,10 +1,10 @@
 ---
 name: historia-chart
 description: How the /historia progress chart is built — the cumulative-points
-  line chart per player, tick by tick, in two views (an absolute fixed axis and
+  line chart per player, tick by tick, in two views (an absolute (simple) fixed axis and
   the "cono"/funnel/megaphone elastic-Y view). Use whenever working on the
   history / progress / "Historia" graph, the build_progress service, progress.js
-  renderer, the X-axis modes (partido/tanda/día) or the Absoluta/Cono switch,
+  renderer, the X-axis modes (partido/tanda/día) or the Cono/Simple switch,
   the cone / funnel view with its least-squares envelope and iso-value curves,
   the start cutoff, or its TomSelect / legend / tooltip behavior.
 ---
@@ -89,7 +89,7 @@ Self-invoking IIFE; bails if `#history-chart` or `#history-data` is missing.
     → flat segment. Labels are two stacked flags (home over away).
   - `batch` ("Tanda"): one column per tick.
   - `day` ("Día"): one column per local date (aggregates ticks of that date).
-- **Y-axis** (absolute view): 4 grid levels; level 0 is the solid axis, the
+- **Y-axis** (simple view): 4 grid levels; level 0 is the solid axis, the
   rest dotted so they don't read as uncolored grey lines. `maxVal` is the max
   cumulative across all series (min 1). The **cono** view replaces this with an
   elastic per-column axis — see *The Cono view* below.
@@ -97,12 +97,23 @@ Self-invoking IIFE; bails if `#history-chart` or `#history-data` is missing.
   because unequal widths break uniform spacing.
 - **Selection** via TomSelect (`remove_button` + `checkbox_options` plugins,
   accent-insensitive search). Adding/removing assigns/releases a palette slot
-  (`assignColor`/`releaseColor`) and calls `refresh()` (legend + count +
-  render). Defaults are applied as initial `items`.
+  (`assignColor`/`releaseColor`) and calls `refresh()` (legend + render).
+  Defaults are applied as initial `items`. The control's chips are hidden and
+  there is **no "N seleccionados" count** — the legend below is the reference.
 - **Tooltip**: hover highlights a line and shows `name · points`; click "pins"
   a line (essential on mobile, no hover); click on empty space unpins.
 - **Responsive**: `new ResizeObserver(() => render()).observe(root)` redraws on
-  resize at native pixel size (no stretched viewBox).
+  resize at native pixel size (no stretched viewBox). `render()` toggles
+  `.is-short` on the chart when `clientHeight < 580` → CSS thins every line
+  (immersive/short phones).
+- **Immersive (mobile)**: `[data-immersive-open]` (button `open_in_full`,
+  bottom-left, shown only ≤820px) opens a fullscreen landscape overlay
+  (`body.history-immersive`); `[data-immersive-close]` (`clear`, beside the
+  switch) exits. **Hybrid orientation**: tries `requestFullscreen` +
+  `screen.orientation.lock("landscape")`; if unsupported (iOS) falls back to a
+  CSS rotation (`body.is-rotated`, applied only while portrait, reactive to
+  `orientation` change) plus a "rotate your phone" hint (`.history-hint`).
+  Native fullscreen exit (system gesture) also closes the overlay.
 
 ## The Cono view (elastic Y-axis)
 
@@ -176,10 +187,15 @@ any breaks the chart:
   active button gets `.active`. `[data-view-switch]` wrapper and
   `[data-view="abs|cono"]` buttons (same `.active` convention) flip the view.
 - Runtime-toggled classes with real CSS: `.hist-line` + `.is-hi`/`.is-me`/
-  `.is-hover`, `.hist-chip[data-me]`, `.history-xmode button.active`. Cono
-  chrome: `.hist-envelope` (frame) and `.hist-zero` (zero line) in
-  `source.css`, but their critical styling is duplicated inline (see *The Cono
-  view*).
+  `.is-hover`, `.hist-chip[data-me]`, `.history-xmode button.active`,
+  `.history-chart.is-short` (thin lines). Cono chrome: `.hist-envelope` (frame)
+  and `.hist-zero` (zero line) in `source.css`, but their critical styling is
+  duplicated inline (see *The Cono view*).
+- Immersive hooks: `[data-immersive-open]`/`[data-immersive-close]` buttons,
+  `.history-back` (`chevron_left`, links to `{% url 'root' %}`), `.history-expand`,
+  `.history-close`; body classes `history-immersive` + `is-rotated` drive the
+  fullscreen-landscape CSS in `source.css`. New Material Symbols added to the
+  `base.html` subset: `chevron_left`, `open_in_full`, `clear`.
 - Palette/theme tokens live only in `source.css` (`--chart-*`); never hardcode
   colors in JS or the template.
 

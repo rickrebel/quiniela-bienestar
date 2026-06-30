@@ -153,6 +153,10 @@
         const h = root.clientHeight;
         if (!baseW || !h) return;
 
+        // Líneas más finas cuando hay poco alto (inmersivo/móvil): el CSS
+        // ``.is-short`` adelgaza los trazos para que no se empasten.
+        root.classList.toggle("is-short", h < 580);
+
         const cols = buildCols();
         // El canalón inferior aloja las dos banderas apiladas (local sobre
         // visitante). Los márgenes laterales: en "abs" dejan sitio a las
@@ -448,16 +452,6 @@
             <span class="hist-chip-name">${s.name}</span>${rm}</span>`;
     }
 
-    // Conteo "N seleccionados" en el control (los chips se ocultan por
-    // CSS; el dato se expone como data-label y el ::after lo pinta).
-    function updateCount() {
-        const ctrl = document.querySelector(".history .ts-control");
-        if (!ctrl) return;
-        const n = ctrl.querySelectorAll(".item").length;
-        ctrl.dataset.label = n === 0 ? ""
-            : (n === 1 ? "1 seleccionado" : `${n} seleccionados`);
-    }
-
     // ----- Selección (Tom Select) ------------------------------------
 
     // Persistencia de la selección en UserQuiniela: la última comparación
@@ -537,7 +531,6 @@
 
     function refresh() {
         renderLegend();
-        updateCount();
         render();
     }
 
@@ -549,7 +542,7 @@
         if (id) select.removeItem(id);
     });
 
-    // Toggle de vista: eje fijo (Absoluta) vs eje elástico (Cono).
+    // Toggle de vista: eje fijo (Simple) vs eje elástico (Cono).
     document.querySelector("[data-view-switch]").addEventListener("click", e => {
         const btn = e.target.closest("[data-view]");
         if (!btn) return;
@@ -613,6 +606,86 @@
         pinnedId = hit[1].id;
         highlight(hit[0], hit[1], e);
     });
+
+    // ----- Modo inmersivo (móvil): horizontal a pantalla completa ----
+
+    // Híbrido: intenta Fullscreen API + bloqueo nativo de orientación; si el
+    // dispositivo no lo soporta (p. ej. iOS Safari) cae a una rotación por
+    // CSS y avisa al usuario que gire el teléfono. La rotación se aplica de
+    // forma reactiva (clase ``is-rotated`` según la orientación real), así
+    // que la vista siempre se ve horizontal sin "doble giro".
+    const body = document.body;
+    const portraitMQ = window.matchMedia("(orientation: portrait)");
+    let nativeLock = false; // true si el lock nativo de orientación funcionó
+
+    function immersive() {
+        return body.classList.contains("history-immersive");
+    }
+    // Con lock nativo el SO ya pone horizontal; sólo rotamos por CSS en el
+    // respaldo y únicamente mientras el aparato siga en vertical.
+    function applyRotation() {
+        if (!immersive()) return;
+        body.classList.toggle("is-rotated", !nativeLock && portraitMQ.matches);
+        render();
+    }
+
+    let hintTimer = null;
+    function showRotateHint() {
+        const plot = document.querySelector(".history-plot");
+        let hint = document.getElementById("history-rotate-hint");
+        if (!hint) {
+            hint = document.createElement("div");
+            hint.id = "history-rotate-hint";
+            hint.className = "history-hint";
+            hint.textContent =
+                "Gira tu teléfono a horizontal para aprovechar la pantalla.";
+            plot.appendChild(hint);
+        }
+        hint.classList.add("show");
+        clearTimeout(hintTimer);
+        hintTimer = setTimeout(() => hint.classList.remove("show"), 4500);
+    }
+
+    async function enterImmersive() {
+        body.classList.add("history-immersive");
+        nativeLock = false;
+        try {
+            if (document.documentElement.requestFullscreen) {
+                await document.documentElement.requestFullscreen();
+            }
+            if (screen.orientation && screen.orientation.lock) {
+                await screen.orientation.lock("landscape");
+                nativeLock = true;
+            }
+        } catch (_) { /* no soportado: seguimos con la rotación CSS */ }
+        applyRotation();
+        if (!nativeLock && portraitMQ.matches) showRotateHint();
+    }
+
+    function exitImmersive() {
+        body.classList.remove("history-immersive", "is-rotated");
+        nativeLock = false;
+        try {
+            if (screen.orientation && screen.orientation.unlock) {
+                screen.orientation.unlock();
+            }
+            if (document.fullscreenElement) document.exitFullscreen();
+        } catch (_) { /* nada que deshacer */ }
+        render();
+    }
+
+    document.querySelector("[data-immersive-open]")
+        ?.addEventListener("click", enterImmersive);
+    document.querySelector("[data-immersive-close]")
+        ?.addEventListener("click", exitImmersive);
+    // Salir del fullscreen nativo (gesto/tecla del sistema) cierra también
+    // el overlay. En el modo CSS no hay fullscreenElement, así que este
+    // evento no se dispara y no interfiere.
+    document.addEventListener("fullscreenchange", () => {
+        if (!document.fullscreenElement && immersive()) exitImmersive();
+    });
+    // Reajusta la rotación al girar físicamente el aparato.
+    portraitMQ.addEventListener("change", applyRotation);
 
     new ResizeObserver(() => render()).observe(root);
     refresh();
