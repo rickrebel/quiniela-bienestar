@@ -9,12 +9,14 @@ dominio define a qué quiniela manda el dominio pelón y el post-login.
 from functools import wraps
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from pool.models import Quiniela
 from pool.services.membership import active_quiniela
+from pool.services.navigation import current_window, window_route
 
 
 def with_quiniela(view):
@@ -59,12 +61,36 @@ def home_slug(request: HttpRequest) -> str | None:
     return quiniela_for_host(request.get_host())
 
 
-def root_redirect(request: HttpRequest) -> HttpResponse:
-    """Dominio pelón → ventana 1 de la quiniela del usuario o del dominio."""
-    slug = home_slug(request)
+def _current_window_redirect(slug: str | None) -> HttpResponse:
+    """Redirige al destino de ``slug``: su ventana vigente (la fase de hoy).
+
+    Centraliza la decisión a partir de un slug (raíz con slug, dominio pelón
+    y post-login la comparten). Sin slug resoluble o quiniela sin ventanas,
+    cae a login.
+    """
     if slug is None:
         return redirect("login")
-    return redirect("window", quiniela=slug, order=1)
+    quiniela = Quiniela.objects.filter(slug=slug).first()
+    route = window_route(current_window(quiniela)) if quiniela else None
+    if route is None:
+        return redirect("login")
+    name, kwargs = route
+    return redirect(name, **kwargs)
+
+
+@login_required
+def quiniela_root(request: HttpRequest, quiniela: str) -> HttpResponse:
+    """Raíz de la quiniela (``/<slug>/``) → ventana vigente (la fase de hoy).
+
+    El slug llega como kwarg ``quiniela`` desde el include de ``pool.urls``
+    (ya es el string), así que no necesita ``with_quiniela``.
+    """
+    return _current_window_redirect(quiniela)
+
+
+def root_redirect(request: HttpRequest) -> HttpResponse:
+    """Dominio pelón → ventana vigente de la quiniela del usuario/dominio."""
+    return _current_window_redirect(home_slug(request))
 
 
 def post_auth_redirect(
@@ -82,10 +108,7 @@ def post_auth_redirect(
         nxt, {request.get_host()}, request.is_secure()
     ):
         return redirect(nxt)
-    slug = slug or home_slug(request)
-    if slug is None:
-        return redirect("login")
-    return redirect("window", quiniela=slug, order=1)
+    return _current_window_redirect(slug or home_slug(request))
 
 
 def legacy_redirect(to_name: str, **extra):

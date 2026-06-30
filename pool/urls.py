@@ -7,7 +7,7 @@ identifica por su ``order`` dentro de la quiniela.
 
 from django.urls import path
 
-from pool.views import leaderboard, predictions, progress, results, stages
+from pool.views import leaderboard, predictions, progress, results, scope, stages
 
 urlpatterns = [
     path("reglas/", stages.reglas, name="reglas"),
@@ -38,4 +38,7 @@ urlpatterns = [
         results.record_result,
         name="record_result",
     ),
+    # Raíz de la quiniela → ventana vigente. Va al final: el path vacío no
+    # debe ensombrecer los patrones anteriores.
+    path("", scope.quiniela_root, name="quiniela_root"),
 ]
