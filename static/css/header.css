@@ -172,6 +172,16 @@
     height: auto;
     border-radius: 2px;
 }
+/* Ganador de un partido terminado de eliminatoria (por marcador o penales).
+   Mismo lenguaje que .pick-win de las tarjetas: subrayado primario. */
+.today-chip .tc-team.tc-winner {
+    color: var(--color-primary);
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-color: var(--color-primary);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
 /* Las dos filas de marcador (real arriba, predicción debajo) en una sola
    columna, para que equipos y banderas queden centrados a su alrededor. */
 .today-chip .tc-scores {

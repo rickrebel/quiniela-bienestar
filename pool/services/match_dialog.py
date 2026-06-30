@@ -188,7 +188,7 @@ def _match_payload(match: Match, finished: bool, can_record: bool) -> dict:
 def _annotate_subgroup(
     sub: dict, match: Match, points_by_code: dict, is_draw: bool,
     advancing_id: int | None = None, show_penalty: bool = False,
-    label: str | None = None, multiplier: Decimal = ONE,
+    multiplier: Decimal = ONE,
 ) -> dict:
     """Calcula puntos y chips de un subgrupo (un marcador, opcionalmente
     acotado a un equipo que avanza)."""
@@ -198,46 +198,59 @@ def _annotate_subgroup(
     sub["points"] = points_display(evaluation)
     codes = evaluation.codes if evaluation else []
     sub["chips"] = chips_from_codes(codes, is_draw, show_penalty)
-    if label:
-        sub["advancing_label"] = label
     return sub
 
 
-def _split_by_advancing(
-    sub: dict, match: Match, points_by_code: dict, multiplier: Decimal = ONE,
+def _advancing_groups(
+    draw_group: dict, match: Match, points_by_code: dict,
+    multiplier: Decimal = ONE, finished: bool = True,
 ) -> list[dict]:
-    """Parte un subgrupo de empate en una línea por equipo que avanza.
+    """Parte el grupo de empate en un grupo grande por equipo que avanza.
 
-    Solo aplica a knockouts decididos por penales: el bono PENALTY depende
-    del ``advancing_team`` de cada jugador, así que un único puntaje por
-    marcador no representa a todos. Cada rama se evalúa con su equipo y se
-    rotula 'avanza <código>'; los que no eligieron quedan en su propia
-    línea sin penal.
+    El reparto va en el ENCABEZADO del grupo ('Empate pasa <code>'), no por
+    subgrupo: cada grupo conserva sus subgrupos por marcador exacto. Orden:
+    local, visitante y, al final, quienes no eligieron. Los puntos solo se
+    calculan si el partido terminó (el chip ``Pen`` solo si fue tanda). El
+    bono PENALTY depende del ``advancing_team``, por eso se evalúa por rama.
     """
-    code_by_id = {}
-    if match.home_team_id:
-        code_by_id[match.home_team_id] = match.home_team.fifa_code
-    if match.away_team_id:
-        code_by_id[match.away_team_id] = match.away_team.fifa_code
+    home_id, away_id = match.home_team_id, match.away_team_id
+    code_by_id = {
+        home_id: match.home_team.fifa_code,
+        away_id: match.away_team.fifa_code,
+    }
+    # side -> subgrupos (por marcador) de quienes eligieron ese equipo.
+    subs_by_side: dict = {home_id: [], away_id: [], None: []}
+    for sub in draw_group["subgroups"]:
+        names_by_side: dict = {home_id: [], away_id: [], None: []}
+        for person in sub["names"]:
+            adv = person.get("advancing")
+            names_by_side[adv if adv in names_by_side else None].append(person)
+        for side, names in names_by_side.items():
+            if names:
+                subs_by_side[side].append({
+                    "home": sub["home"], "away": sub["away"],
+                    "names": names, "points": None, "chips": None})
 
-    by_advancing = defaultdict(list)
-    for person in sub["names"]:
-        by_advancing[person.get("advancing")].append(person)
-
+    show_penalty = match.decided_by == Match.PENALTY_SHOOTOUT
     result = []
-    for adv_id in (match.home_team_id, match.away_team_id, None):
-        people = by_advancing.get(adv_id)
-        if not people:
+    for side in (home_id, away_id, None):
+        subs = subs_by_side[side]
+        if not subs:
             continue
-        label = (f"avanza {code_by_id[adv_id]}" if adv_id in code_by_id
-                 else "sin elección")
-        split = {"home": sub["home"], "away": sub["away"], "names": people,
-                 "points": None, "chips": None}
-        _annotate_subgroup(
-            split, match, points_by_code, is_draw=True,
-            advancing_id=adv_id, show_penalty=True, label=label,
-            multiplier=multiplier)
-        result.append(split)
+        if finished:
+            for sub in subs:
+                _annotate_subgroup(
+                    sub, match, points_by_code, is_draw=True,
+                    advancing_id=side, show_penalty=show_penalty,
+                    multiplier=multiplier)
+        if side is None:
+            result.append({"diff": 0, "label": "Empate · sin elección",
+                           "advancing_side": None, "subgroups": subs})
+        else:
+            result.append({
+                "diff": 0, "label": "Empate",
+                "advancing_side": "home" if side == home_id else "away",
+                "advancing_code": code_by_id[side], "subgroups": subs})
     return result
 
 
@@ -274,6 +287,7 @@ def build_match_dialog_payload(
 
     records = user.can_record_results or user.is_superuser
     points_by_code = rule_maps(quiniela)[0]
+    quiniela_has_penalty = "PENALTY" in points_by_code
     mult_by_stage = multiplier_by_stage(quiniela)
     result = []
     for match in matches:
@@ -286,33 +300,34 @@ def build_match_dialog_payload(
         if payload["revealed"]:
             multiplier = mult_by_stage.get(match.stage_id, ONE)
             is_draw = finished and match.home_goals == match.away_goals
-            penalty = (
-                finished and not match.stage.is_group
-                and match.decided_by == Match.PENALTY_SHOOTOUT
+            # El empate se parte en un grupo grande por equipo que avanza
+            # (encabezado 'Empate pasa <code>') si la quiniela tiene la regla
+            # y es eliminatoria con ambos equipos definidos; haya jugado o no
+            # (el reparto se ve antes del resultado; los puntos, después).
+            penalty_split = (
+                quiniela_has_penalty and not match.stage.is_group
+                and match.home_team_id and match.away_team_id
             )
             groups = group_predictions(rows_by_match.get(match.id, []))
+            final_groups = []
             for group in groups:
+                if penalty_split and group["diff"] == 0:
+                    final_groups.extend(_advancing_groups(
+                        group, match, points_by_code, multiplier, finished))
+                    continue
                 group["label"] = diff_label(
                     group["diff"],
-                    payload["home"]["fifa_code"], payload["away"]["fifa_code"],
+                    payload["home"]["fifa_code"],
+                    payload["away"]["fifa_code"],
                 )
-                if not finished:
-                    continue
                 # Mismo marcador en todo el subgrupo: el desglose se calcula
-                # una vez, no por persona. Excepción: el empate de un penal
-                # se parte por equipo que avanza (el bono PENALTY es por
-                # jugador, no por marcador).
-                new_subs = []
-                for sub in group["subgroups"]:
-                    if penalty and group["diff"] == 0:
-                        new_subs.extend(_split_by_advancing(
-                            sub, match, points_by_code, multiplier))
-                    else:
+                # una vez, no por persona.
+                if finished:
+                    for sub in group["subgroups"]:
                         _annotate_subgroup(
                             sub, match, points_by_code, is_draw,
                             multiplier=multiplier)
-                        new_subs.append(sub)
-                group["subgroups"] = new_subs
-            payload["groups"] = groups
+                final_groups.append(group)
+            payload["groups"] = final_groups
         result.append(payload)
     return result

@@ -164,3 +164,22 @@ class RecordResultTests(TestCase):
         self.assertEqual(response.status_code, 409)
         self.group_match.refresh_from_db()
         self.assertEqual(self.group_match.home_goals, 2)
+
+    def test_winner_and_loser_propagate_to_next_phase(self):
+        # Semifinal (of_number 73) que alimenta la final por el ganador
+        # ("W73") y el partido por el 3.er lugar por el perdedor ("L73").
+        final = Match.objects.create(
+            datetime=timezone.now() + timedelta(days=2), stage=self.knockout,
+            stadium=self.stadium, of_number=104, home_placeholder="W73",
+        )
+        third = Match.objects.create(
+            datetime=timezone.now() + timedelta(days=1), stage=self.knockout,
+            stadium=self.stadium, of_number=103, away_placeholder="L73",
+        )
+        # MEX (local) gana 2-1 a CAN.
+        response = self._post(self.knockout_match, VALID)
+        self.assertEqual(response.status_code, 200)
+        final.refresh_from_db()
+        third.refresh_from_db()
+        self.assertEqual(final.home_team, self.team_a)   # ganador → final
+        self.assertEqual(third.away_team, self.team_b)   # perdedor → 3.er

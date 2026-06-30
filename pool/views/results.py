@@ -14,6 +14,7 @@ from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from pool.services.bracket import propagate_result
 from pool.services.evaluation import recompute_all
 from pool.views.scope import with_quiniela
 from tournament.models import Match
@@ -61,7 +62,8 @@ def record_result(request: HttpRequest, match_id: int) -> JsonResponse:
     if not (user.can_record_results or user.is_superuser):
         return JsonResponse({"error": FORBIDDEN}, status=403)
     match = (
-        Match.objects.select_related("stage").filter(id=match_id).first()
+        Match.objects.select_related("stage", "home_team", "away_team")
+        .filter(id=match_id).first()
     )
     if match is None:
         return JsonResponse({"error": MATCH_NOT_FOUND}, status=404)
@@ -109,6 +111,9 @@ def record_result(request: HttpRequest, match_id: int) -> JsonResponse:
         *REQUIRED_FIELDS, "status", "decided_by",
         "home_penalties", "away_penalties",
     ])
+    # Materializa el cruce: el ganador (y el perdedor, para el 3.er lugar)
+    # ocupa su ranura en la fase siguiente. No-op fuera de eliminatoria.
+    propagate_result(match)
     # Congela puntos y acumulados con el partido ya finalizado; el
     # recálculo es completo (idempotente) para absorber correcciones.
     recompute_all()

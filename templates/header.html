@@ -94,11 +94,11 @@
         {% for m in today_matches %}
         <button class="today-chip{% if m.is_live %} today-chip--live{% endif %}"
                 type="button" data-dialog-match="{{ m.id }}">
-            <span class="tc-team">{{ m.home.code }}{% if m.home.flag %}<img src="{% static m.home.flag %}" alt="">{% endif %}</span>
+            <span class="tc-team{% if m.winner == 'home' %} tc-winner{% endif %}">{{ m.home.code }}{% if m.home.flag %}<img src="{% static m.home.flag %}" alt="">{% endif %}</span>
             <span class="tc-scores">
                 {% if m.real %}<span class="tc-real">{{ m.real.0 }}-{{ m.real.1 }}</span>{% if m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% endif %}{% elif m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% else %}<span class="tc-vs">vs</span>{% endif %}
             </span>
-            <span class="tc-team">{% if m.away.flag %}<img src="{% static m.away.flag %}" alt="">{% endif %}{{ m.away.code }}</span>
+            <span class="tc-team{% if m.winner == 'away' %} tc-winner{% endif %}">{% if m.away.flag %}<img src="{% static m.away.flag %}" alt="">{% endif %}{{ m.away.code }}</span>
         </button>
         {% endfor %}
     </div>

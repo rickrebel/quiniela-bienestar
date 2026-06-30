@@ -17,6 +17,7 @@ from django.utils import timezone
 
 from pool.models import Prediction, Quiniela, User, Window, WindowUser
 from pool.services import anexo_c
+from pool.services.bracket import resolve_sources
 from pool.services.anexo_c import assign_thirds
 from pool.services.match_dialog import build_match_dialog_payload
 from pool.services.scoring import chips_from_codes
@@ -53,6 +54,12 @@ def annotate_result(match: Match, prediction: Prediction | None) -> None:
     match.user_points = None
     match.points_kind = "none"
     match.chips = None
+    # Equipo que el usuario cree que avanza por penales (solo si predijo
+    # empate en eliminatoria); la tarjeta lo muestra a todos, con o sin la
+    # regla activa en la quiniela.
+    match.predicted_advancing_id = (
+        prediction.advancing_team_id if prediction else None
+    )
     if not match.is_finished:
         return
 
@@ -142,7 +149,6 @@ def _build_sections(
         if prediction is not None:
             match.predicted_home = prediction.home_goals
             match.predicted_away = prediction.away_goals
-            match.predicted_advancing_id = prediction.advancing_team_id
             filled[key] += 1
         annotate_result(match, prediction)
         if match.user_points is not None:
@@ -178,7 +184,8 @@ def _build_sections(
 
 
 # Placeholder de posición de grupo en eliminatoria: "1A", "2B". El tercero
-# ("3A/B/C/D/F") se resuelve aparte vía anexo C; los ganadores ("W74") no.
+# ("3A/B/C/D/F") se resuelve aparte vía anexo C; los ganadores/perdedores
+# ("W74"/"L101") en ``services/bracket.py`` (ganador real o contendientes).
 GROUP_POS_RE = re.compile(r"^([12])([A-L])$")
 THIRD_RE = re.compile(r"^3[A-L](/[A-L])+$")
 VARIANTS = ("est", "mix", "real")
@@ -449,6 +456,9 @@ def window_view(request: HttpRequest, order: int) -> HttpResponse:
                     if m.away_team is None:
                         m.away_team = third_teams.get(m.id)
             thirds_sim = _build_thirds_simulator(thirds, flat_matches)
+        # Octavos en adelante: ganador real o contendientes del cruce
+        # origen ("W74"/"L101"). No-op en LAST_32 (placeholders de grupo).
+        resolve_sources(flat_matches, request.user, quiniela)
 
     for m in flat_matches:
         m.editable = window_user.can_edit and not m.has_started
@@ -644,6 +654,14 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
         if match.is_finished:
             date_group["finished"] += 1
             date_group["points"] += match.user_points or 0
+
+    # Ganador/contendientes del cruce origen, reutilizando los partidos y
+    # predicciones ya cargados (sin queries extra).
+    resolve_sources(
+        matches, request.user, request.quiniela,
+        source_by_number={m.of_number: m for m in matches},
+        preds_by_match=preds,
+    )
 
     # Día al que la página hace scroll automático: el de hoy; si hoy no hay
     # partidos, el próximo día con partidos; si todo quedó en el pasado, el

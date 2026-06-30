@@ -20,19 +20,35 @@
                 border-base-content/20 py-2.5 pl-10 pr-8{% if not match.editable %} cursor-pointer{% endif %}"
          {% if not match.editable %}data-dialog-match="{{ match.id }}"{% endif %}>
     {% if stage.key == 'FINAL' %}
-    <div class="flex items-baseline gap-2 text-[0.82rem]">
+    <div class="flex flex-col items-center gap-0.5 text-[0.82rem]">
         <span class="font-bold uppercase tracking-[0.04em]
                      text-accent/85">{{ match.name }}</span>
+        {% if match.is_finished and match.decided_by == 'PENALTY_SHOOTOUT' %}
+        <span class="text-[0.95rem] font-extrabold leading-none tabular-nums
+                     text-primary/75">({{ match.home_penalties }} -
+            {{ match.away_penalties }})</span>
+        {% endif %}
     </div>
     {% elif not is_group_stage %}
     <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[0.8rem]
                  tabular-nums text-accent/85">{{ match.of_number }}</span>
     {% if match.home_placeholder and match.away_placeholder %}
-    {# Origen del cruce siempre visible (1A · 2B): ubica de dónde sale #}
-    {# cada equipo aunque ya esté derivado/decidido. #}
-    <div class="text-[0.72rem] font-semibold tabular-nums
-                text-accent/60">{{ match.home_placeholder }} ·
-        {{ match.away_placeholder }}</div>
+    {# Origen del cruce siempre visible (1A · 2B); en un partido decidido por #}
+    {# penales el separador pasa a ser el marcador de la tanda: W78 (4-3) W74. #}
+    {# Misma rejilla que el marcador real (1fr auto 1fr): los penales quedan #}
+    {# centrados, alineados con el marcador real de abajo. #}
+    <div class="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]
+                items-baseline gap-[7px] text-[0.72rem] font-semibold
+                tabular-nums text-base-content">
+        <span class="text-right">{{ match.home_placeholder }}</span>
+        {% if match.is_finished and match.decided_by == 'PENALTY_SHOOTOUT' %}
+        <span class="text-center text-[0.95rem] font-extrabold leading-none
+                     text-primary/75">({{ match.home_penalties }} - {{ match.away_penalties }})</span>
+        {% else %}
+        <span class="text-center text-base-content/40">·</span>
+        {% endif %}
+        <span class="text-left">{{ match.away_placeholder }}</span>
+    </div>
     {% endif %}
     {% elif by_date %}
     <span class="absolute left-2 top-1/2 -translate-y-1/2 text-[0.8rem]
@@ -54,6 +70,8 @@
             <img class="max-h-6 max-w-[30px] rounded-[3px]"
                  src="{{ match.home_team.crest }}" alt="">
             {% endif %}
+            {% elif match.home_contenders %}
+            <c-contenders :teams="match.home_contenders" align="end" />
             {% else %}
             <span class="team-placeholder font-medium italic text-base-content/60
                          opacity-70">{{ match.home_placeholder }}</span>
@@ -62,19 +80,13 @@
 
         <div class="score flex items-center gap-1">
             {% if match.is_finished %}
-            {# Orden FIFA con penales: 3 (4) - (2) 3 #}
+            {# Marcador real; el ganador (tanda o marcador) lo subraya #}
+            {# home_mark/away_mark. Los penales van arriba, en la línea de #}
+            {# placeholders. #}
             <span class="flex h-[26px] w-[30px] items-center justify-center
                          text-2xl font-extrabold leading-none tabular-nums
                          text-primary/75">{{ match.home_goals }}</span>
-            {% if match.decided_by == 'PENALTY_SHOOTOUT' %}
-            <span class="text-[11px] font-semibold tabular-nums
-                         text-base-content/60">({{ match.home_penalties }})</span>
-            {% endif %}
             <span class="text-sm font-bold opacity-70">-</span>
-            {% if match.decided_by == 'PENALTY_SHOOTOUT' %}
-            <span class="text-[11px] font-semibold tabular-nums
-                         text-base-content/60">({{ match.away_penalties }})</span>
-            {% endif %}
             <span class="flex h-[26px] w-[30px] items-center justify-center
                          text-2xl font-extrabold leading-none tabular-nums
                          text-primary/75">{{ match.away_goals }}</span>
@@ -119,6 +131,8 @@
             {% endif %}
             <span class="{{ match.away_mark }} text-[15px] font-semibold
                          leading-[1.1]">{{ match.away_team.name_es }}</span>
+            {% elif match.away_contenders %}
+            <c-contenders :teams="match.away_contenders" align="start" />
             {% else %}
             <span class="team-placeholder font-medium italic text-base-content/60
                          opacity-70">{{ match.away_placeholder }}</span>
@@ -149,12 +163,16 @@
     {% endif %}
 
     {% if match.is_finished %}
-    <div class="relative flex w-full items-center justify-center text-xs
-                text-base-content/60">
-        <span class="relative inline-flex items-center gap-1
-                     whitespace-nowrap">
-            <span class="absolute right-[calc(100%+4px)]">TÚ:</span>{% if match.chips %}<span class="inline-flex h-5 w-[26px] items-center justify-center rounded-md text-[13px] font-bold tabular-nums text-base-content shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--color-base-content)_15%,transparent)]">{{ match.predicted_home }}</span><span class="font-bold opacity-70">-</span><span class="inline-flex h-5 w-[26px] items-center justify-center rounded-md text-[13px] font-bold tabular-nums text-base-content shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--color-base-content)_15%,transparent)]">{{ match.predicted_away }}</span>{% else %}&mdash;{% endif %}
-        </span>
+    {# Misma rejilla que el marcador real (1fr auto 1fr): el marcador #}
+    {# pronosticado va centrado en la columna media (alineado con el real); #}
+    {# "TÚ:" y la banderita del pase quedan en las columnas laterales. #}
+    <div class="relative w-full text-xs text-base-content/60">
+        <div class="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]
+                    items-center gap-[7px]">
+            <span class="flex items-center justify-end gap-1 whitespace-nowrap">TÚ:{% if match.chips and not is_group_stage and match.predicted_advancing_id and match.predicted_home == match.predicted_away and match.predicted_advancing_id == match.home_team.id and match.home_team.flag_path %}<img class="pass-flag" src="{% static match.home_team.flag_path %}" alt="" title="Tu pase: {{ match.home_team.name_es }}">{% endif %}</span>
+            <span class="flex items-center justify-center gap-1">{% if match.chips %}<span class="inline-flex h-5 w-[26px] items-center justify-center rounded-md text-[13px] font-bold tabular-nums text-base-content shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--color-base-content)_15%,transparent)]">{{ match.predicted_home }}</span><span class="font-bold opacity-70">-</span><span class="inline-flex h-5 w-[26px] items-center justify-center rounded-md text-[13px] font-bold tabular-nums text-base-content shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--color-base-content)_15%,transparent)]">{{ match.predicted_away }}</span>{% else %}&mdash;{% endif %}</span>
+            <span class="flex items-center justify-start gap-1">{% if match.chips and not is_group_stage and match.predicted_advancing_id and match.predicted_home == match.predicted_away and match.predicted_advancing_id == match.away_team.id and match.away_team.flag_path %}<img class="pass-flag" src="{% static match.away_team.flag_path %}" alt="" title="Tu pase: {{ match.away_team.name_es }}">{% endif %}</span>
+        </div>
         {% if match.chips %}
         <span class="absolute right-0 top-1/2 inline-flex -translate-y-1/2
                      gap-[5px]">
@@ -170,6 +188,16 @@
         {% if match.points_kind == 'none' %}&mdash;{% else %}<span class="text-[22px] font-extrabold tabular-nums {% if match.points_kind == 'zero' %}text-base-content/60{% else %}text-primary{% endif %}">{{ match.user_points|floatformat:"-1" }}</span>{% endif %}
     </span>
     {% else %}
+    {# Avance pronosticado, solo lectura (ventana cerrada/enviada): solo si #}
+    {# eligió equipo en un empate de eliminatoria. Va sobre el .meta. Visible #}
+    {# en toda quiniela. #}
+    {% if not match.editable and not is_group_stage and match.predicted_advancing_id and match.predicted_home == match.predicted_away and match.home_team and match.away_team %}
+    {% if match.predicted_advancing_id == match.home_team.id %}
+    <p class="pasa-line">Pasa:{% if match.home_team.flag_path %}<img src="{% static match.home_team.flag_path %}" alt="">{% endif %}<span>{{ match.home_team.name_es }}</span></p>
+    {% else %}
+    <p class="pasa-line">Pasa:{% if match.away_team.flag_path %}<img src="{% static match.away_team.flag_path %}" alt="">{% endif %}<span>{{ match.away_team.name_es }}</span></p>
+    {% endif %}
+    {% endif %}
     {# Bloque .meta intacto (clases legacy): match_dialog.js construye #}
     {# este mismo markup y ambos comparten su CSS en styles.css. #}
     <div class="meta" data-utc="{{ match.datetime.isoformat }}">

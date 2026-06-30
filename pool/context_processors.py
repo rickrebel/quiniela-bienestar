@@ -146,6 +146,7 @@ def today_matches(request) -> dict:
                 "id": match.id,
                 "home": _team_chip(match.home_team, match.home_placeholder),
                 "away": _team_chip(match.away_team, match.away_placeholder),
+                "winner": _chip_winner(match) if finished else None,
                 "pred": (
                     (pred.home_goals, pred.away_goals) if pred else None
                 ),
@@ -214,3 +215,24 @@ def _team_chip(team, placeholder: str) -> dict:
     if team is None:
         return {"code": placeholder, "flag": ""}
     return {"code": team.fifa_code, "flag": team.flag_path}
+
+
+def _chip_winner(match) -> str | None:
+    """Lado ganador para resaltar en el chip: solo eliminatoria terminada.
+
+    En grupos no se marca (un partido suelto no define nada). El ganador
+    sale de la tanda si se decidió por penales; si no, del marcador.
+    """
+    if match.stage.is_group:
+        return None
+    if match.decided_by == Match.PENALTY_SHOOTOUT:
+        if (match.home_penalties or 0) > (match.away_penalties or 0):
+            return "home"
+        if (match.away_penalties or 0) > (match.home_penalties or 0):
+            return "away"
+        return None
+    if match.home_goals > match.away_goals:
+        return "home"
+    if match.away_goals > match.home_goals:
+        return "away"
+    return None
