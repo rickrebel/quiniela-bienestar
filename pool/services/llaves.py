@@ -1,140 +1,100 @@
 """Datos del bracket (llaves) del Mundial para la vista ``/<slug>/llaves/``.
 
-Mantenido **a mano**: ``LAST_32_MATCHES`` es la lista de los 16 partidos de
-dieciseisavos (LAST_32, "16avos") con sus resultados conforme se van jugando.
-No se sincroniza con el modelo ``Match`` (los placeholders y la captura de
-resultados viven aparte); aquí se transcriben los marcadores reales para
-dibujar el árbol radial.
+Se arma **desde la BD**: los 16 partidos de dieciseisavos (fase ``LAST_32``)
+con sus equipos, banderas y marcadores reales, más el ganador de cada uno (que
+sube a la ranura de octavos). Nada inventado: si el cruce aún no está definido
+se muestra el origen textual del equipo (placeholder de OF, p. ej. ``"2A"``,
+``"3A/B/C/D/F"``) y sin bandera.
 
-Orden de la lista = el que consume el layout radial de ``llaves.js``: los
-primeros 8 partidos forman las dos alas superiores (izquierda y derecha) y los
-últimos 8 las dos inferiores, en grupos de 4. El **ganador** de cada partido
-sube a la ranura de octavos (depth-2) de su ala.
-
-Cada partido:
-    {
-        "home": ("br", "Brasil"),      # (flag_code, nombre_es)
-        "away": ("sn", "Senegal"),
-        "played": True,
-        "home_goals": 3, "away_goals": 0,
-        "advancing": None,             # flag_code del que pasa si fue empate
-                                       # (penales); None si se definió en cancha
-        "venue": "MetLife Stadium",
-        "date": "",                    # texto si aún no se juega
-    }
-
-Para actualizar tras un partido: pon ``played=True`` con el marcador; si fue
-empate definido por penales, pon ``advancing`` con el código del que avanza.
+El **orden** de la lista es el que consume el layout radial de ``llaves.js``
+(alas de 4 partidos: los pares adyacentes alimentan el mismo octavo). Se deriva
+del árbol real recorriendo los placeholders ``W##`` desde la final hacia las
+hojas (``_leaf_order``), de modo que las conexiones del árbol quedan correctas
+sin cablearlas a mano.
 """
 
 from __future__ import annotations
 
 from django.templatetags.static import static
 
-
-# NOTE: datos ilustrativos de ejemplo — reemplazar con el bracket/resultados
-# reales conforme se jueguen. Brasil, Canadá y Paraguay quedan ya marcados como
-# clasificados a octavos a modo de muestra de la vista.
-LAST_32_MATCHES: list[dict] = [
-    # --- Ala superior izquierda ---
-    {"home": ("br", "Brasil"), "away": ("sn", "Senegal"), "played": True,
-     "home_goals": 3, "away_goals": 0, "advancing": None,
-     "venue": "MetLife Stadium", "date": ""},
-    {"home": ("ar", "Argentina"), "away": ("fr", "Francia"), "played": False,
-     "home_goals": None, "away_goals": None, "advancing": None,
-     "venue": "SoFi Stadium", "date": "5 Jul, 20:00"},
-    {"home": ("de", "Alemania"), "away": ("es", "España"), "played": True,
-     "home_goals": 1, "away_goals": 1, "advancing": "de",
-     "venue": "AT&T Stadium (4-3 pen)", "date": ""},
-    {"home": ("gb-eng", "Inglaterra"), "away": ("pt", "Portugal"), "played": False,
-     "home_goals": None, "away_goals": None, "advancing": None,
-     "venue": "Hard Rock Stadium", "date": "5 Jul, 16:00"},
-    # --- Ala superior derecha ---
-    {"home": ("nl", "Países Bajos"), "away": ("be", "Bélgica"), "played": True,
-     "home_goals": 1, "away_goals": 0, "advancing": None,
-     "venue": "Lincoln Financial", "date": ""},
-    {"home": ("hr", "Croacia"), "away": ("it", "Italia"), "played": False,
-     "home_goals": None, "away_goals": None, "advancing": None,
-     "venue": "Arrowhead Stadium", "date": "6 Jul, 13:00"},
-    {"home": ("uy", "Uruguay"), "away": ("co", "Colombia"), "played": True,
-     "home_goals": 0, "away_goals": 1, "advancing": None,
-     "venue": "Mercedes-Benz", "date": ""},
-    {"home": ("ca", "Canadá"), "away": ("mx", "México"), "played": True,
-     "home_goals": 2, "away_goals": 1, "advancing": None,
-     "venue": "BC Place", "date": ""},
-    # --- Ala inferior izquierda ---
-    {"home": ("py", "Paraguay"), "away": ("eg", "Egipto"), "played": True,
-     "home_goals": 1, "away_goals": 0, "advancing": None,
-     "venue": "NRG Stadium", "date": ""},
-    {"home": ("jp", "Japón"), "away": ("kr", "Corea del Sur"), "played": False,
-     "home_goals": None, "away_goals": None, "advancing": None,
-     "venue": "Levi's Stadium", "date": "6 Jul, 19:00"},
-    {"home": ("gh", "Ghana"), "away": ("ng", "Nigeria"), "played": True,
-     "home_goals": 1, "away_goals": 3, "advancing": None,
-     "venue": "Estadio Akron", "date": ""},
-    {"home": ("ec", "Ecuador"), "away": ("au", "Australia"), "played": False,
-     "home_goals": None, "away_goals": None, "advancing": None,
-     "venue": "Gillette Stadium", "date": "7 Jul, 20:00"},
-    # --- Ala inferior derecha ---
-    {"home": ("dk", "Dinamarca"), "away": ("no", "Noruega"), "played": True,
-     "home_goals": 2, "away_goals": 1, "advancing": None,
-     "venue": "Estadio Azteca", "date": ""},
-    {"home": ("dz", "Argelia"), "away": ("ba", "Bosnia"), "played": False,
-     "home_goals": None, "away_goals": None, "advancing": None,
-     "venue": "GEHA Field", "date": "7 Jul, 16:00"},
-    {"home": ("ie", "Irlanda"), "away": ("ma", "Marruecos"), "played": False,
-     "home_goals": None, "away_goals": None, "advancing": None,
-     "venue": "Lumen Field", "date": "8 Jul, 13:00"},
-    {"home": ("us", "Estados Unidos"), "away": ("ch", "Suiza"), "played": True,
-     "home_goals": 2, "away_goals": 2, "advancing": "us",
-     "venue": "Estadio BBVA (5-4 pen)", "date": ""},
-]
+from pool.services.bracket import SOURCE_RE, winner_team
+from tournament.models import Match, Stage
 
 
-def _team(pair: tuple[str, str]) -> dict:
-    code, name = pair
-    return {"code": code, "name": name, "flag_url": static(f"flags_40/{code}.png")}
+def _team(team, placeholder: str) -> dict:
+    """Equipo para el nodo: real (con bandera) o su origen textual.
+
+    Si el FK está en BD devuelve nombre + bandera; si el cruce aún no se
+    define, expone el placeholder de OF como nombre y sin bandera."""
+    if team is not None:
+        return {
+            "code": team.flag_code,
+            "name": team.name_es or team.name,
+            "flag_url": static(team.flag_path) if team.flag_path else "",
+        }
+    return {"name": placeholder or "", "flag_url": ""}
 
 
-def _winner(match: dict) -> dict | None:
-    """Equipo que avanza a octavos, o ``None`` si el partido no se ha jugado.
+def _winner(match: Match) -> dict | None:
+    """Equipo que avanza a octavos, o ``None`` si el partido no está resuelto."""
+    team = winner_team(match)
+    return _team(team, "") if team is not None else None
 
-    Se define por marcador; en empate (penales) por ``advancing``.
-    """
-    if not match["played"]:
-        return None
-    hg, ag = match["home_goals"], match["away_goals"]
-    if hg is None or ag is None:
-        return None
-    if hg > ag:
-        return _team(match["home"])
-    if ag > hg:
-        return _team(match["away"])
-    adv = match.get("advancing")
-    if adv == match["home"][0]:
-        return _team(match["home"])
-    if adv == match["away"][0]:
-        return _team(match["away"])
-    return None
+
+def _leaf_order(by_num: dict[int, Match], of_number: int) -> list[int]:
+    """Orden de las hojas (of_number de LAST_32) bajo un nodo del árbol.
+
+    Recorre los placeholders ``W##`` (local y luego visitante) hacia abajo;
+    en un partido de dieciseisavos devuelve su propio número. El resultado es
+    justo el orden que espera el layout de alas de ``llaves.js``."""
+    match = by_num.get(of_number)
+    if match is None:
+        return []
+    if match.stage.key == Stage.LAST_32:
+        return [of_number]
+    order: list[int] = []
+    for placeholder in (match.home_placeholder, match.away_placeholder):
+        matched = SOURCE_RE.match(placeholder or "")
+        if matched and matched.group(1) == "W":
+            order.extend(_leaf_order(by_num, int(matched.group(2))))
+    return order
 
 
 def build_bracket() -> dict:
     """Payload JSON-able para ``llaves.js`` (vía ``json_script``).
 
-    Resuelve banderas estáticas y el ganador de cada partido (que sube a la
-    ranura de octavos). ``llaves.js`` parte ``matches`` en alas (8 + 8).
+    Toma de la BD los 16 dieciseisavos ordenados por el árbol real y resuelve
+    equipos/banderas/marcadores y el ganador que sube a octavos.
     """
+    ko_keys = [
+        Stage.LAST_32, Stage.LAST_16, Stage.QUARTER_FINALS,
+        Stage.SEMI_FINALS, Stage.FINAL,
+    ]
+    by_num = {
+        m.of_number: m
+        for m in Match.objects.filter(stage__key__in=ko_keys).select_related(
+            "stage", "home_team", "away_team"
+        )
+    }
+
+    order = _leaf_order(by_num, Match.FINAL_NUMBER)
+    if len(order) != 16:
+        # Respaldo: árbol incompleto → los LAST_32 por número de partido.
+        order = sorted(
+            n for n, m in by_num.items() if m.stage.key == Stage.LAST_32
+        )
+
     matches = []
-    for m in LAST_32_MATCHES:
+    for number in order:
+        m = by_num[number]
+        played = m.status == "FINISHED" and m.home_goals is not None
         matches.append(
             {
-                "home": _team(m["home"]),
-                "away": _team(m["away"]),
-                "played": m["played"],
-                "home_goals": m["home_goals"],
-                "away_goals": m["away_goals"],
-                "venue": m["venue"],
-                "date": m["date"],
+                "home": _team(m.home_team, m.home_placeholder),
+                "away": _team(m.away_team, m.away_placeholder),
+                "played": played,
+                "home_goals": m.home_goals,
+                "away_goals": m.away_goals,
                 "winner": _winner(m),
             }
         )

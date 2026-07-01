@@ -18,7 +18,7 @@
   var AX = 170, AY = 330;       // semiejes de la elipse exterior (16avos)
   var K = [1.0, 0.74, 0.46, 0.20]; // escala por fase: 16avos, oct, cuartos, semis
   var L = [34, 32, 30, 26, 30]; // separador del partido por fase (+ final)
-  var RAD = [13, 13, 12, 12, 13]; // radio del círculo por fase
+  var RAD = [12, 12, 12, 12, 13]; // radio del círculo por fase
   var SEAMR = 1.18;             // costura = SEAMR · separación entre partidos
 
   function el(tag, attrs) {
@@ -229,7 +229,7 @@
     var geo = computeLayout(data.matches || []);
 
     var svg = el("svg", {
-      viewBox: "0 0 384 691",
+      viewBox: "0 10 384 670",
       width: "100%",
       style: "display:block;overflow:visible",
     });
@@ -312,9 +312,10 @@
   }
 
   function flagImg(url) {
+    if (!url) return "";
     return (
       '<img src="' + url +
-      '" alt="" style="width:36px;height:36px;border-radius:50%;' +
+      '" alt="" style="width:30px;height:20px;border-radius:3px;' +
       "object-fit:cover;flex:none;border:1px solid " +
       "color-mix(in oklch, var(--color-base-content) 45%, transparent)\">"
     );
@@ -331,26 +332,21 @@
     var played = m.played;
     var score = played ? m.home_goals + " — " + m.away_goals : "VS";
     var scoreColor = played ? "var(--color-primary)" : muted;
-    var status = played
-      ? "Finalizado · " + (m.venue || "")
-      : "Por jugar · " + (m.date || "") + (m.venue ? " · " + m.venue : "");
 
     panel.innerHTML =
       '<div style="text-align:center;font-size:9px;letter-spacing:0.22em;' +
       "color:" + muted +
-      ';text-transform:uppercase;margin-bottom:12px">16avos de final</div>' +
-      '<div style="display:flex;align-items:center;justify-content:center;gap:12px">' +
-      '<div style="display:flex;align-items:center;gap:9px;flex:1;justify-content:flex-end">' +
-      '<span style="font-size:15px;color:var(--color-base-content);text-align:right">' +
+      ';text-transform:uppercase;margin-bottom:2px">16avos de final</div>' +
+      '<div style="display:flex;align-items:center;justify-content:center;gap:8px">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end">' +
+      '<span style="font-size:13px;color:var(--color-base-content);text-align:right">' +
       m.home.name + "</span>" + flagImg(m.home.flag_url) + "</div>" +
-      '<div style="font-weight:600;font-size:19px;color:' + scoreColor +
+      '<div style="font-weight:600;font-size:16px;color:' + scoreColor +
       ';min-width:56px;text-align:center;white-space:nowrap">' + score + "</div>" +
-      '<div style="display:flex;align-items:center;gap:9px;flex:1">' +
+      '<div style="display:flex;align-items:center;gap:6px;flex:1">' +
       flagImg(m.away.flag_url) +
-      '<span style="font-size:15px;color:var(--color-base-content)">' +
-      m.away.name + "</span></div></div>" +
-      '<div style="text-align:center;font-size:10px;letter-spacing:0.05em;' +
-      "color:" + muted + ';margin-top:12px">' + status + "</div>";
+      '<span style="font-size:13px;color:var(--color-base-content)">' +
+      m.away.name + "</span></div></div>";
   }
 
   document.addEventListener("DOMContentLoaded", function () {

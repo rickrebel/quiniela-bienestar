@@ -5,11 +5,11 @@
 
 {% include 'header.html' %}
 
-<main class="content">
-    <section class="mx-auto max-w-[460px] px-3 py-1">
+<main class="content" style="padding-top:4px">
+    <section class="mx-auto max-w-[460px] px-3 py-1 mt-1">
         <div id="bracket-svg" class="w-full"></div>
         <div id="bracket-panel"
-             class="mt-2 border-t border-base-content/10 pt-4"></div>
+             class="mt-2 border-t border-base-content/10 pt-1"></div>
     </section>
     {{ bracket|json_script:"bracket-data" }}
 </main>
