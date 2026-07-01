@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+{% include 'header.html' %}
+
+<main class="content">
+    <section class="mx-auto max-w-[460px] px-3 py-1">
+        <div id="bracket-svg" class="w-full"></div>
+        <div id="bracket-panel"
+             class="mt-2 border-t border-base-content/10 pt-4"></div>
+    </section>
+    {{ bracket|json_script:"bracket-data" }}
+</main>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'llaves.js' %}" defer></script>
+{% endblock %}

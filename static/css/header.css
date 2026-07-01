@@ -81,16 +81,20 @@
     text-overflow: ellipsis;
 }
 
-/* Botones-ícono de la derecha (historia y cuenta): cuadrados e iguales. */
+/* Botones-ícono (historia y cuenta a la derecha; llaves a la izquierda):
+   cuadrados e iguales. */
 .history-link,
+.bracket-link,
 .user-chip {
     min-width: 40px;
     padding: 0;
 }
-.history-link:hover {
+.history-link:hover,
+.bracket-link:hover {
     color: var(--color-primary);
 }
-.history-link .material-symbols-outlined {
+.history-link .material-symbols-outlined,
+.bracket-link .material-symbols-outlined {
     font-size: 22px;
 }
 

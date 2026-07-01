@@ -7,13 +7,22 @@ identifica por su ``order`` dentro de la quiniela.
 
 from django.urls import path
 
-from pool.views import leaderboard, predictions, progress, results, scope, stages
+from pool.views import (
+    bracket,
+    leaderboard,
+    predictions,
+    progress,
+    results,
+    scope,
+    stages,
+)
 
 urlpatterns = [
     path("reglas/", stages.reglas, name="reglas"),
     path("calendario/", stages.por_fecha_view, name="by_date"),
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
     path("historia/", progress.history_view, name="history"),
+    path("llaves/", bracket.llaves_view, name="llaves"),
     path(
         "historia/seleccion/",
         progress.save_history_compare,
