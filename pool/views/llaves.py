@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
-from pool.services.bracket import build_bracket
+from pool.services.llaves import build_bracket
 from pool.views.scope import with_quiniela
 from pool.views.stages import _build_tabs
 

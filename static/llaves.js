@@ -6,7 +6,7 @@
 // vertical para aprovechar el móvil. Los tallos a la fase siguiente varían. Los
 // partidos se reparten por longitud de arco con simetría → costuras parejas.
 // Colores desde los tokens del tema (var(--color-*)). Datos: build_bracket() ->
-// #bracket-data. Ver pool/services/bracket.py.
+// #bracket-data. Ver pool/services/llaves.py.
 (function () {
   "use strict";
 

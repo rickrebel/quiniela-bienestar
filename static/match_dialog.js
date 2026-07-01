@@ -189,11 +189,6 @@
 
         if (sub.points) {
             const evalLine = el("div", "pred-sub-eval");
-            // Penales: la rama de empate trae el equipo que avanza.
-            if (sub.advancing_label) {
-                evalLine.append(el("span", "pred-advancing",
-                    sub.advancing_label));
-            }
             evalLine.append(el("span", "pred-pts",
                 `${sub.points.total} pts`));
             for (const chip of sub.chips) evalLine.append(predChip(chip));
@@ -418,17 +413,32 @@
         }
         for (const group of data.groups) {
             const head = el("h6", "pred-group-head");
-            // Banderita del que gana en este grupo, antes del texto; en
-            // empate no hay.
-            const flag = group.diff > 0 ? data.home.flag
-                : group.diff < 0 ? data.away.flag : null;
-            if (flag) {
-                const img = document.createElement("img");
-                img.src = flag;
-                img.alt = "";
-                head.append(img);
+            if (group.advancing_side) {
+                // Empate repartido por equipo que avanza: "Empate pasa 🏴 COD"
+                // (la bandera va en medio, no al inicio).
+                head.append(el("span", null, "Empate pasa"));
+                const f = group.advancing_side === "home"
+                    ? data.home.flag : data.away.flag;
+                if (f) {
+                    const img = document.createElement("img");
+                    img.src = f;
+                    img.alt = "";
+                    head.append(img);
+                }
+                head.append(el("span", null, group.advancing_code));
+            } else {
+                // Banderita del que gana en este grupo, antes del texto; en
+                // empate no hay.
+                const flag = group.diff > 0 ? data.home.flag
+                    : group.diff < 0 ? data.away.flag : null;
+                if (flag) {
+                    const img = document.createElement("img");
+                    img.src = flag;
+                    img.alt = "";
+                    head.append(img);
+                }
+                head.append(el("span", null, group.label));
             }
-            head.append(el("span", null, group.label));
             wrap.append(head);
             for (const sub of group.subgroups) {
                 wrap.append(subgroupRow(sub));

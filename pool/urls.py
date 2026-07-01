@@ -8,8 +8,8 @@ identifica por su ``order`` dentro de la quiniela.
 from django.urls import path
 
 from pool.views import (
-    bracket,
     leaderboard,
+    llaves,
     predictions,
     progress,
     results,
@@ -22,7 +22,7 @@ urlpatterns = [
     path("calendario/", stages.por_fecha_view, name="by_date"),
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
     path("historia/", progress.history_view, name="history"),
-    path("llaves/", bracket.llaves_view, name="llaves"),
+    path("llaves/", llaves.llaves_view, name="llaves"),
     path(
         "historia/seleccion/",
         progress.save_history_compare,

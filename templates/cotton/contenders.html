@@ -1,0 +1,28 @@
+{% load static %}
+{# Dos contendientes de un slot de eliminatoria sin ganador aún: bandera #}
+{# + CODE apilados. El que el jugador estimó que pasaría (``picked``) #}
+{# lleva el realce dorado (anillo + tinte), mismo lenguaje que .is-picked #}
+{# pero con utilidades Tailwind para no chocar con los hooks JS del #}
+{# selector de avance. Preflight pone img a block: van inline-block. #}
+{# Uso: <c-contenders :teams="match.home_contenders" align="end" /> #}
+<div class="flex flex-col gap-1
+            {% if align == 'end' %}items-end{% else %}items-start{% endif %}">
+    {% for c in teams %}
+    <span class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5
+                 text-[12px] font-semibold tabular-nums
+                 {% if c.picked %}text-primary
+                 shadow-[inset_0_0_0_1.5px_var(--color-primary)]
+                 bg-[color-mix(in_oklch,var(--color-primary)_18%,transparent)]
+                 {% else %}text-base-content/55{% endif %}">
+        {% if align == 'start' and c.team.flag_path %}
+        <img class="inline-block max-h-4 max-w-5 rounded-[2px]"
+             src="{% static c.team.flag_path %}" alt="">
+        {% endif %}
+        {{ c.team.fifa_code }}
+        {% if align == 'end' and c.team.flag_path %}
+        <img class="inline-block max-h-4 max-w-5 rounded-[2px]"
+             src="{% static c.team.flag_path %}" alt="">
+        {% endif %}
+    </span>
+    {% endfor %}
+</div>

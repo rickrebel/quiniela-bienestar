@@ -264,7 +264,7 @@ body.history-page .history {
 }
 .history-controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.6rem;
   align-items: center;
 }
@@ -272,6 +272,9 @@ body.history-page .history {
   flex: 1 1 240px;
   min-width: 0;
 }
+/* El switch Cono/Simple nunca se encoge ni baja de línea: el select cede
+   ancho (min-width:0) y queda siempre a su lado. */
+.history-controls .history-xmode { flex: none; }
 .history-xmode {
   display: inline-flex;
   background: color-mix(in srgb, var(--color-base-content) 8%, transparent);
@@ -354,7 +357,7 @@ body.history-page .history {
   overflow-x: auto;
   overflow-y: hidden;
 }
-/* Switch de zoom: misma píldora que Cono/Absoluta (hereda .history-xmode),
+/* Switch de zoom: misma píldora que Cono/Simple (hereda .history-xmode),
    solo superpuesto arriba-izquierda y fijo aunque la gráfica se desplace. */
 .history-zoom {
   position: absolute;
@@ -362,28 +365,110 @@ body.history-page .history {
   left: 0.5rem;
   z-index: 5;
 }
-/* Pie de la página: única salida hacia la vista por fecha. */
-.history-foot {
-  display: flex;
-  justify-content: center;
-  margin-top: 1.25rem;
-}
-.history-back {
+/* Regreso discreto: botón-ícono fantasma a la izquierda del select (lleva
+   al destino del login: la ventana vigente, vía la URL ``root``). El botón
+   de cierre del inmersivo comparte caja. */
+.history-back,
+.history-close {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1.1rem;
+  justify-content: center;
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
-  color: var(--color-primary);
-  font-size: 13px;
-  font-weight: 700;
+  cursor: pointer;
   text-decoration: none;
-  transition: background 180ms ease;
+}
+.history-back .material-symbols-outlined,
+.history-close .material-symbols-outlined { font-size: 22px; }
+.history-back {
+  color: color-mix(in srgb, var(--color-base-content) 55%, transparent);
+  background: transparent;
 }
 .history-back:hover {
-  background: color-mix(in srgb, var(--color-primary) 25%, transparent);
+  background: color-mix(in srgb, var(--color-base-content) 10%, transparent);
+  color: var(--color-base-content);
 }
+/* Cerrar el inmersivo: oculto fuera de él, resaltado en rojo dentro. */
+.history-close {
+  display: none;
+  color: var(--color-error, #ef4444);
+  background: color-mix(in srgb, var(--color-error, #ef4444) 22%, transparent);
+}
+body.history-immersive .history-close { display: inline-flex; }
+body.history-immersive .history-back { display: none; }
+
+/* Botón "expandir" (sólo móvil): abre la vista inmersiva. Espejo del switch
+   de zoom (arriba-izq), pero abajo-izq y por encima del canalón de banderas. */
+.history-expand {
+  display: none;
+  position: absolute;
+  bottom: 2.6rem;
+  left: 0.5rem;
+  z-index: 5;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+  background: color-mix(in srgb, var(--color-base-content) 10%, transparent);
+}
+.history-expand .material-symbols-outlined { font-size: 20px; }
+@media (max-width: 820px) {
+  .history-expand { display: inline-flex; }
+}
+body.history-immersive .history-expand { display: none; }
+
+/* Modo inmersivo: la gráfica cubre todo el viewport por encima de todo.
+   Conserva el ``display:flex; flex-direction:column`` de ``.history``. */
+body.history-immersive { overflow: hidden; }
+body.history-immersive .history {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0.5rem;
+  z-index: 1000;
+  background: var(--color-base-100);
+}
+body.history-immersive .history-chart { min-height: 0; }
+/* Horizontal forzado por CSS cuando el aparato no permite bloquear la
+   orientación (p. ej. iOS): se rota el overlay 90° sólo si está vertical
+   (clase ``is-rotated`` que pone el JS según la orientación real). */
+body.history-immersive.is-rotated .history {
+  width: 100vh;
+  height: 100vw;
+  transform-origin: top left;
+  transform: translateX(100vw) rotate(90deg);
+}
+
+/* Aviso para girar el teléfono: respaldo cuando no hay bloqueo nativo. */
+.history-hint {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+  z-index: 1100;
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  background: var(--color-base-300);
+  color: var(--color-base-content);
+  font-size: 12px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.history-hint.show { opacity: 1; }
 
 .hist-svg { display: block; }
 .hist-grid {
@@ -441,17 +526,23 @@ body.history-page .history {
 }
 .hist-line.is-hi {
   stroke-width: 2.4;
-  stroke-opacity: 1;
+  stroke-opacity: 0.85;
 }
 .hist-line.is-me {
-  stroke-width: 2.4;
-  stroke-opacity: 1;
+  stroke-width: 2.8;
+  stroke-opacity: 0.85;
   filter: url(#hist-glow);
 }
 .hist-line.is-hover {
   stroke-width: 3;
   stroke-opacity: 1;
 }
+/* Poco alto disponible (< 580px: inmersivo/móvil): trazos más finos para
+   que no se empasten. El JS pone ``is-short`` en el contenedor. */
+.history-chart.is-short .hist-line { stroke-width: 1; }
+.history-chart.is-short .hist-line.is-hi { stroke-width: 1.6; }
+.history-chart.is-short .hist-line.is-me { stroke-width: 1.9; }
+.history-chart.is-short .hist-line.is-hover { stroke-width: 2; }
 .hist-tip {
   position: absolute;
   transform: translate(-50%, -130%);
@@ -519,16 +610,9 @@ body.history-page .history {
   flex: none;
 }
 /* Los chips del control sobran: la leyenda de abajo ya lista a los
-   seleccionados con su color. Se ocultan y en su lugar el control
-   muestra el conteo "N seleccionados" (data-label lo fija el JS;
-   vacío en cero, para que se vea el placeholder). */
+   seleccionados con su color, así que se ocultan (el conteo "N
+   seleccionados" se retiró: era redundante con la leyenda). */
 /* !important para ganarle a la regla del CDN
    `.ts-wrapper.plugin-remove_button .item{display:inline-flex}` (misma
    especificidad pero carga después en el <head>). */
 .history .ts-control > .item { display: none !important; }
-.history .ts-control[data-label]:not([data-label=""])::after {
-  content: attr(data-label);
-  align-self: center;
-  font-size: 12.5px;
-  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
-}

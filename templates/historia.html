@@ -16,12 +16,21 @@
 <main class="history">
     <header class="history-top">
         <div class="history-controls">
+            {# Regreso discreto: al destino del login (ventana vigente). #}
+            <a class="history-back" href="{% url 'root' %}" title="Regresar">
+                <c-icon name="chevron_left" />
+            </a>
             <select id="history-users" multiple
                     placeholder="Comparar participantes…" autocomplete="off"></select>
             <div class="history-xmode" data-view-switch>
-                <button type="button" data-view="cono" class="active">Cono</button>
-                <button type="button" data-view="abs">Absoluta</button>
+                <button type="button" data-view="cono" class="active">cono</button>
+                <button type="button" data-view="abs">simple</button>
             </div>
+            {# Salir del modo inmersivo (sólo visible dentro de él). #}
+            <button type="button" class="history-close" data-immersive-close
+                    title="Cerrar">
+                <c-icon name="clear" />
+            </button>
         </div>
         <div id="history-legend" class="history-legend"></div>
     </header>
@@ -39,15 +48,15 @@
             <button type="button" data-zoom="full">full</button>
         </div>
         <div id="history-chart" class="history-chart"></div>
+        {# Sólo en móvil: abre la vista inmersiva (horizontal a pantalla #}
+        {# completa). Espejo del switch de zoom, abajo-izquierda. #}
+        <button type="button" class="history-expand" data-immersive-open
+                title="Expandir">
+            <c-icon name="open_in_full" />
+        </button>
     </div>
 
     {{ progress|json_script:"history-data" }}
-
-    <footer class="history-foot">
-        <a class="history-back" href="{% url 'by_date' request.quiniela.slug %}">
-            ← Regresar a Fechas
-        </a>
-    </footer>
 </main>
 
 {% endblock %}

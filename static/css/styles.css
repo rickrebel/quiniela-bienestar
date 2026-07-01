@@ -222,6 +222,33 @@
   border-radius: 3px;
 }
 
+/* Banderita del equipo que el usuario cree que avanza, junto al marcador de
+   la línea TÚ (partido jugado). El lado (izq./der. del marcador) lo da el
+   orden en el DOM. Preflight pone img a display:block: forzar inline-block. */
+.pass-flag {
+  display: inline-block;
+  max-height: 14px;
+  max-width: 20px;
+  border-radius: 3px;
+}
+
+/* Línea de solo lectura "Pasa: 🏴 equipo" (partido no jugado, ventana
+   cerrada). Misma banderita-ícono que el pick de la línea TÚ. */
+.pasa-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--color-primary) 90%, transparent);
+}
+.pasa-line img {
+  display: inline-block;
+  max-height: 16px;
+  max-width: 22px;
+  border-radius: 3px;
+}
+
 /* Mira del marcador exacto (SVG inline icons/mira.html); la usa el
    leaderboard. En vistas migradas la sustituye <c-icon>. */
 .icon-mira {
@@ -971,6 +998,10 @@
 /* Encabezado de grupo de predicciones: alineado a la izquierda, blanco,
    con divisor neutro ligero. */
 .pred-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
   margin: 14px 0 2px;
   padding-top: 8px;
   border-top: 1px solid color-mix(in oklch, var(--color-primary) 35%, transparent);
@@ -980,17 +1011,15 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-align: left;
   text-transform: uppercase;
 }
-/* Banderita del equipo que gana en el grupo, antes de la frase.
+/* Banderita del grupo (al inicio en "gana"; en medio en "Empate pasa").
+   El flex del encabezado la centra vertical y la separa a ambos lados.
    inline-block: el preflight de Tailwind vuelve block toda img. */
 .pred-group-head img {
   display: inline-block;
   max-width: 18px;
   max-height: 13px;
-  margin-right: 6px;
-  vertical-align: -2px;
   border-radius: 2px;
 }
 /* Subgrupo: arriba marcador (izq.) + nombres en columnas (der.); abajo,

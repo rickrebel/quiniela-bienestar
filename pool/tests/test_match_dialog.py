@@ -195,3 +195,91 @@ class DialogPayloadPrivacyTests(TestCase):
         self.ana.is_superuser = True
         self.ana.save()
         self.assertTrue(self._payload_for(self.open_match)["can_record"])
+
+
+class PenaltySplitGateTests(TestCase):
+    """El subgrupo de empates se parte por equipo de avance solo si la
+    quiniela tiene la regla PENALTY (bienestar), no en la original."""
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("load_rules")
+        cls.bienestar = Quiniela.objects.get(slug="bienestar")
+        cls.sanginiela = Quiniela.objects.get(slug="sanginiela")
+        now = timezone.now()
+        cls.stage = Stage.objects.create(
+            key="LAST_16", name="Octavos", short_name="8avos",
+            color="#2196F3", order=3, send_deadline=now - timedelta(days=1),
+        )
+        cls.stadium = Stadium.objects.create(
+            name="Azteca", city="CDMX", country="mx", utc_offset=-6)
+        cls.mex = Team.objects.create(
+            name="Mexico", name_es="México", fifa_code="MEX",
+            group_name="A", confederation="concacaf")
+        cls.can = Team.objects.create(
+            name="Canada", name_es="Canadá", fifa_code="CAN",
+            group_name="A", confederation="concacaf")
+        cls.match = Match.objects.create(
+            datetime=now, stage=cls.stage, stadium=cls.stadium,
+            home_team=cls.mex, away_team=cls.can, of_number=89,
+            status="FINISHED", home_goals=1, away_goals=1,
+            decided_by=Match.PENALTY_SHOOTOUT,
+            home_penalties=4, away_penalties=2,
+        )
+        # Partido aún no jugado, pero con deadline pasado (predicciones
+        # reveladas): el reparto por avance debe verse sin puntos.
+        cls.pending = Match.objects.create(
+            datetime=now, stage=cls.stage, stadium=cls.stadium,
+            home_team=cls.mex, away_team=cls.can, of_number=90,
+        )
+        cls.ana = User.objects.create_user("ana@x.com", first_name="Ana",
+                                           is_active=True)
+        cls.beto = User.objects.create_user("beto@x.com", first_name="Beto",
+                                            is_active=True)
+        # Ambos predicen empate 1-1; Ana cree que pasa MEX, Beto que pasa CAN.
+        for quiniela in (cls.bienestar, cls.sanginiela):
+            for match in (cls.match, cls.pending):
+                Prediction.objects.create(
+                    user=cls.ana, match=match, quiniela=quiniela,
+                    home_goals=1, away_goals=1, advancing_team=cls.mex,
+                    date=now)
+                Prediction.objects.create(
+                    user=cls.beto, match=match, quiniela=quiniela,
+                    home_goals=1, away_goals=1, advancing_team=cls.can,
+                    date=now)
+
+    def _draw_groups(self, quiniela, match=None):
+        match = match or self.match
+        matches = list(Match.objects.filter(id=match.id).select_related(
+            "stage", "stadium", "home_team", "away_team"))
+        payload = build_match_dialog_payload(matches, self.ana, quiniela)[0]
+        return [g for g in payload["groups"] if g["diff"] == 0]
+
+    def test_splits_when_quiniela_has_penalty(self):
+        # Dos grupos grandes de empate, uno por equipo que avanza (local
+        # primero); el reparto va en el encabezado, no por subgrupo.
+        groups = self._draw_groups(self.bienestar)
+        self.assertEqual([g["advancing_side"] for g in groups],
+                         ["home", "away"])
+        self.assertEqual([g["advancing_code"] for g in groups],
+                         ["MEX", "CAN"])
+        for g in groups:
+            for sub in g["subgroups"]:
+                self.assertNotIn("advancing_label", sub)
+
+    def test_no_split_without_penalty_rule(self):
+        groups = self._draw_groups(self.sanginiela)
+        self.assertEqual(len(groups), 1)
+        self.assertNotIn("advancing_side", groups[0])
+        self.assertEqual(groups[0]["label"], "Empate")
+        names = {n["name"] for s in groups[0]["subgroups"]
+                 for n in s["names"]}
+        self.assertEqual(names, {"Ana", "Beto"})
+
+    def test_splits_before_match_played_without_points(self):
+        groups = self._draw_groups(self.bienestar, self.pending)
+        self.assertEqual([g["advancing_code"] for g in groups],
+                         ["MEX", "CAN"])
+        # Aún sin jugar: reparto visible, pero sin puntos.
+        for g in groups:
+            self.assertTrue(all(s["points"] is None for s in g["subgroups"]))
