@@ -29,6 +29,11 @@ THEME_COLORS = {
 }
 DEFAULT_THEME = "sanginiela"
 
+# Favicon por quiniela: bienestar conserva la mascota; el resto (sanginiela y
+# páginas sin quiniela, que caen al default) usa el balón.
+FAVICONS = {"bienestar": "favicon.svg"}
+DEFAULT_FAVICON = "favicon-ball.svg"
+
 
 def quiniela_theme(request) -> dict:
     """Slug del tema y su color base para <html data-theme> y theme-color.
@@ -54,6 +59,7 @@ def quiniela_theme(request) -> dict:
     return {
         "quiniela_theme": slug,
         "quiniela_theme_color": THEME_COLORS[slug],
+        "quiniela_favicon": FAVICONS.get(slug, DEFAULT_FAVICON),
     }
 
 
