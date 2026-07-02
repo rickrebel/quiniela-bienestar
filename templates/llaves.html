@@ -6,13 +6,16 @@
 {% include 'header.html' %}
 
 <main class="content" style="padding-top:4px">
-    <section class="mx-auto max-w-[460px] px-3 py-1 mt-1">
-        {# Regreso discreto (mismo patrón que /historia): al destino del #}
-        {# login, la ventana vigente. #}
-        <a class="history-back" href="{% url 'root' %}" title="Regresar">
+    <section class="relative mx-auto max-w-[460px] px-3 py-1 mt-1">
+        {# Regreso discreto: botón-ícono con solo contorno, flotante sobre #}
+        {# la gráfica para que las llaves ocupen todo el alto disponible. #}
+        {# Al destino del login (la ventana vigente). #}
+        <a class="btn btn-sm btn-circle btn-outline absolute top-1 left-2 z-10"
+           href="{% url 'root' %}" title="Regresar">
             <c-icon name="chevron_left" />
         </a>
-        <div id="bracket-svg" class="w-full"></div>
+        <div id="bracket-svg" class="w-full"
+             data-copa="{% static 'copa.png' %}"></div>
         <div id="bracket-panel"
              class="mt-2 border-t border-base-content/10 pt-1"></div>
     </section>

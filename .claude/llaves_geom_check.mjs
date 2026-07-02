@@ -10,14 +10,14 @@ const C = {
   CX: 192, CY: 345,
   AX: 170, AY: 280,
   K: [1.0, 0.74, 0.50, 0.20],
-  L: [34, 40, 46, 44, 48],
-  RAD: [14, 16, 18, 19, 21],
+  L: [34, 40, 46, 50, 64],
+  RAD: [14, 16, 18, 20, 23],
   SEAMR: 1.18,
   NUDGE_OCT: 20, NUDGE_QTR: 10, POLE_THRESH: 40,
-  CLUSTER: 0.11,   // gap dentro del par que comparte octavos (compacto)
-  INTER: 1.05,     // gap entre los 2 pares de octavos de un ala (en unidades da)
-  DV: 16,          // "explode" vertical (separa arriba/abajo)
-  DH: 6,           // "explode" horizontal (separa izq/der; < DV)
+  CLUSTER: 0.103,  // gap dentro del par que comparte octavos (compacto)
+  INTER: 1.072,    // gap entre los 2 pares de octavos de un ala (en unidades da)
+  DV: 4.5,         // "explode" vertical (separa arriba/abajo)
+  DH: -2.5,        // "explode" horizontal (izq/der; <0 = comprime al centro)
   FIN_DX: 0,
   VIEWBOX: { x: 0, y: 45, w: 384, h: 599 },
 };
@@ -152,8 +152,8 @@ function computeLayout(C) {
     for (let j = 0; j < 4; j++) {
       const pp = pair(1, ang[j], L[0]);
       mid16.push(pp.mid);
-      nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], ph: 0, g: wi });
-      nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], ph: 0, g: wi });
+      nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], ph: 0, g: wi, mi: j });
+      nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], ph: 0, g: wi, mi: j });
     }
 
     const midOct = [];
@@ -221,6 +221,48 @@ const suggest = {
   x: Math.round(minX - M), y: Math.round(minY - M),
   w: Math.round((maxX - minX) + 2 * M), h: Math.round((maxY - minY) + 2 * M),
 };
+
+// --- Medición de las 5 separaciones al nivel de 16avos (borde a borde) ------
+const s16 = nodes.filter((n) => n.ph === 0);
+const edge = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) - (a.r + b.r);
+function minEdge(A, B) {
+  let m = Infinity;
+  for (const a of A) for (const b of B) if (a !== b) m = Math.min(m, edge(a, b));
+  return m;
+}
+const inWing = (w) => s16.filter((n) => n.g === w);
+const inMatch = (w, mi) => s16.filter((n) => n.g === w && n.mi === mi);
+
+// within: entre las 2 banderas del mismo partido (unidad de referencia).
+let within = Infinity;
+for (let w = 0; w < 4; w++) for (let mi = 0; mi < 4; mi++)
+  within = Math.min(within, minEdge(inMatch(w, mi), inMatch(w, mi)));
+
+// gIntra: entre los 2 partidos que comparten octavos (pares mi 0-1 y 2-3).
+let gIntra = Infinity;
+for (let w = 0; w < 4; w++) {
+  gIntra = Math.min(gIntra, minEdge(inMatch(w, 0), inMatch(w, 1)));
+  gIntra = Math.min(gIntra, minEdge(inMatch(w, 2), inMatch(w, 3)));
+}
+// gInter: entre los 2 grupos de 4 de un ala (división mi1 | mi2).
+let gInter = Infinity;
+for (let w = 0; w < 4; w++)
+  gInter = Math.min(gInter, minEdge(inMatch(w, 1), inMatch(w, 2)));
+
+// L/R: costura en los polos (arriba: alas 0|1; abajo: alas 3|2).
+const LR = Math.min(minEdge(inWing(0), inWing(1)), minEdge(inWing(3), inWing(2)));
+// T/B: costura en el ecuador (derecha: alas 1|2; izquierda: alas 0|3).
+const TB = Math.min(minEdge(inWing(1), inWing(2)), minEdge(inWing(0), inWing(3)));
+
+const u = within;
+const ratio = (x) => (x / u).toFixed(1);
+console.log("--- separaciones 16avos (px | unidades; objetivo) ---");
+console.log(`  banderas mismo partido: ${within.toFixed(1)}px | ${ratio(within)}u  (1)`);
+console.log(`  entre partidos:         ${gIntra.toFixed(1)}px | ${ratio(gIntra)}u  (3)`);
+console.log(`  entre grupos de 4:      ${gInter.toFixed(1)}px | ${ratio(gInter)}u  (5-6)`);
+console.log(`  izquierda/derecha:      ${LR.toFixed(1)}px | ${ratio(LR)}u  (7-8)`);
+console.log(`  arriba/abajo:           ${TB.toFixed(1)}px | ${ratio(TB)}u  (9-11)`);
+console.log("");
 
 const fmt = (n) => `${PHASE[n.ph]}(${n.x.toFixed(0)},${n.y.toFixed(0)} r${n.r})`;
 console.log(`nodos: ${nodes.length}`);

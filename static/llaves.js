@@ -10,33 +10,36 @@
 (function () {
   "use strict";
 
-  var SVGNS = "http://www.w3.org/2000/svg";
+  let SVGNS = "http://www.w3.org/2000/svg";
 
   // Geometría (verificada: separadores Δ=0 por fase, costuras parejas,
   // h/w≈1.6, sin encimes). Elipses verticales concéntricas por fase.
-  var CX = 192, CY = 345;       // centro
-  var AX = 170, AY = 280;       // semiejes de la elipse exterior (16avos)
-  var K = [1.0, 0.74, 0.50, 0.20]; // escala por fase: 16avos, oct, cuartos, semis
-  var L = [34, 40, 46, 44, 48]; // separador del partido por fase (+ final):
+  let CX = 192, CY = 345;       // centro
+  let AX = 170, AY = 280;       // semiejes de la elipse exterior (16avos)
+  let K = [1.0, 0.74, 0.49, 0.20]; // escala por fase: 16avos, oct, cuartos, semis
+  let L = [34, 40, 46, 50, 76]; // separador del partido por fase (+ final):
                                 // crece con RAD para que los 2 círculos de un
                                 // mismo partido no se fundan.
-  var RAD = [14, 16, 18, 19, 21]; // radio del círculo por fase: crece suave;
+  let RAD = [14, 16, 18, 20, 23]; // radio del círculo por fase: crece suave;
                                   // el área (∝r²) sube sin saltos bruscos.
-  var SEAMR = 1.18;             // costura = SEAMR · separación entre partidos
-  var CLUSTER = 0.11;           // gap dentro del par que comparte octavos
+  let SEAMR = 1.18;             // costura = SEAMR · separación entre partidos
+  // Separaciones al nivel de 16avos, calibradas al objetivo (en unidades de la
+  // separación entre las 2 banderas de un partido): partidos 2.5, grupos-de-4
+  // 5, izq/der 7.5, arriba/abajo 10.
+  let CLUSTER = 0.103;          // gap dentro del par que comparte octavos
                                 // (compacto): hueco = da·(1-CLUSTER)
-  var INTER = 1.05;             // gap (en unidades da) entre los 2 pares de
+  let INTER = 1.072;            // gap (en unidades da) entre los 2 pares de
                                 // octavos de un ala (división "diagonal")
-  var DV = 16;                  // "explode": corrimiento vertical de cada ala
-                                // hacia afuera (separa arriba/abajo)
-  var DH = 6;                   // "explode": corrimiento horizontal (izq/der,
-                                // menor que DV)
-  var FIN_DX = 0;               // corrimiento de la final respecto al centro
+  let DV = 4.5;                 // "explode": corrimiento vertical de cada ala
+                                // (sube arriba/abajo a 10u)
+  let DH = -2.5;                // "explode": corrimiento horizontal (<0 comprime
+                                // izq/der al centro, a 7.5u)
+  let FIN_DX = 0;               // corrimiento de la final respecto al centro
 
   function el(tag, attrs) {
-    var node = document.createElementNS(SVGNS, tag);
+    let node = document.createElementNS(SVGNS, tag);
     if (attrs) {
-      for (var k in attrs) {
+      for (let k in attrs) {
         if (k === "style") node.setAttribute("style", attrs[k]);
         else node.setAttribute(k, attrs[k]);
       }
@@ -45,21 +48,21 @@
   }
 
   function computeLayout(matches) {
-    var nodes = [], links = [];
+    let nodes = [], links = [];
 
     function ept(scale, th) {
-      var r = (th * Math.PI) / 180;
+      let r = (th * Math.PI) / 180;
       return [CX + AX * scale * Math.cos(r), CY + AY * scale * Math.sin(r)];
     }
     function tang(scale, th) {
-      var r = (th * Math.PI) / 180;
-      var vx = -AX * scale * Math.sin(r), vy = AY * scale * Math.cos(r);
-      var m = Math.hypot(vx, vy) || 1;
+      let r = (th * Math.PI) / 180;
+      let vx = -AX * scale * Math.sin(r), vy = AY * scale * Math.cos(r);
+      let m = Math.hypot(vx, vy) || 1;
       return [vx / m, vy / m];
     }
     // pareja de círculos de un partido: medio ± (Lp/2)·tangente.
     function pair(scale, th, Lp) {
-      var M = ept(scale, th), t = tang(scale, th);
+      let M = ept(scale, th), t = tang(scale, th);
       return {
         a: [M[0] + (Lp / 2) * t[0], M[1] + (Lp / 2) * t[1]],
         b: [M[0] - (Lp / 2) * t[0], M[1] - (Lp / 2) * t[1]],
@@ -67,8 +70,8 @@
       };
     }
     // g1/g2 = grupo de "explode" de cada extremo (para correrlo luego).
-    function sep(p, g) { links.push({ x1: p.a[0], y1: p.a[1], x2: p.b[0], y2: p.b[1], strong: true, g1: g, g2: g }); }
-    function stem(from, to, g1, g2) { links.push({ x1: from[0], y1: from[1], x2: to[0], y2: to[1], strong: false, g1: g1, g2: g2 }); }
+    function sep(p, g, played) { links.push({ x1: p.a[0], y1: p.a[1], x2: p.b[0], y2: p.b[1], strong: true, played: played, g1: g, g2: g }); }
+    function stem(from, to, g1, g2, played) { links.push({ x1: from[0], y1: from[1], x2: to[0], y2: to[1], strong: false, played: played, g1: g1, g2: g2 }); }
 
     // C = intersección más cercana (a los padres) de la mediatriz de P0P1 con
     // la elipse `scale`. P0, P1 = centros (sobre la elipse externa) de los 2
@@ -77,29 +80,29 @@
       // La elipse de `ept` está centrada en (CX,CY); para intersecarla con la
       // mediatriz hay que trabajar en coordenadas centradas (restar CX,CY).
       // El resultado se devuelve centrado, y `thOf` lo interpreta igual.
-      var P0 = [P0in[0] - CX, P0in[1] - CY], P1 = [P1in[0] - CX, P1in[1] - CY];
-      var a = P1[0] - P0[0], b = P1[1] - P0[1];
-      var c = ((P1[0] * P1[0] + P1[1] * P1[1]) - (P0[0] * P0[0] + P0[1] * P0[1])) / 2;
-      var rx = AX * scale, ry = AY * scale;
-      var Mx = (P0[0] + P1[0]) / 2, My = (P0[1] + P1[1]) / 2;
-      var sols = [];
+      let P0 = [P0in[0] - CX, P0in[1] - CY], P1 = [P1in[0] - CX, P1in[1] - CY];
+      let a = P1[0] - P0[0], b = P1[1] - P0[1];
+      let c = ((P1[0] * P1[0] + P1[1] * P1[1]) - (P0[0] * P0[0] + P0[1] * P0[1])) / 2;
+      let rx = AX * scale, ry = AY * scale;
+      let Mx = (P0[0] + P1[0]) / 2, My = (P0[1] + P1[1]) / 2;
+      let sols = [];
       if (Math.abs(b) >= Math.abs(a)) {
-        var A = 1 / (rx * rx) + (a * a) / (b * b * ry * ry);
-        var B = -2 * a * c / (b * b * ry * ry);
-        var C = c * c / (b * b * ry * ry) - 1;
-        var d = B * B - 4 * A * C;
+        let A = 1 / (rx * rx) + (a * a) / (b * b * ry * ry);
+        let B = -2 * a * c / (b * b * ry * ry);
+        let C = c * c / (b * b * ry * ry) - 1;
+        let d = B * B - 4 * A * C;
         if (d < 0) return null;
-        var sd = Math.sqrt(d);
+        let sd = Math.sqrt(d);
         [(-B + sd) / (2 * A), (-B - sd) / (2 * A)].forEach(function (x) {
           sols.push([x, (c - a * x) / b]);
         });
       } else {
-        var A2 = 1 / (ry * ry) + (b * b) / (a * a * rx * rx);
-        var B2 = -2 * b * c / (a * a * rx * rx);
-        var C2 = c * c / (a * a * rx * rx) - 1;
-        var d2 = B2 * B2 - 4 * A2 * C2;
+        let A2 = 1 / (ry * ry) + (b * b) / (a * a * rx * rx);
+        let B2 = -2 * b * c / (a * a * rx * rx);
+        let C2 = c * c / (a * a * rx * rx) - 1;
+        let d2 = B2 * B2 - 4 * A2 * C2;
         if (d2 < 0) return null;
-        var sd2 = Math.sqrt(d2);
+        let sd2 = Math.sqrt(d2);
         [(-B2 + sd2) / (2 * A2), (-B2 - sd2) / (2 * A2)].forEach(function (y) {
           sols.push([(c - b * y) / a, y]);
         });
@@ -114,15 +117,15 @@
     }
     // Recorre por la elipse (aleja del polo) a los octavos cercanos a un polo
     // (arriba=270, abajo=90) para que no queden tan juntos; los centrales no.
-    var NUDGE_OCT = 20, NUDGE_QTR = 10, POLE_THRESH = 40;
+    let NUDGE_OCT = 20, NUDGE_QTR = 10, POLE_THRESH = 40;
     function arcPerDeg(scale, th) {
-      var r = (th * Math.PI) / 180;
+      let r = (th * Math.PI) / 180;
       return Math.hypot(AX * scale * Math.sin(r), AY * scale * Math.cos(r)) * Math.PI / 180;
     }
     function nudgePole(scale, th, px) {
-      var poles = [270, 90];
-      for (var i = 0; i < 2; i++) {
-        var dd = ((th - poles[i] + 540) % 360) - 180; // dif. con signo al polo
+      let poles = [270, 90];
+      for (let i = 0; i < 2; i++) {
+        let dd = ((th - poles[i] + 540) % 360) - 180; // dif. con signo al polo
         if (Math.abs(dd) < POLE_THRESH) {
           return th + Math.sign(dd) * (px / arcPerDeg(scale, th));
         }
@@ -132,31 +135,31 @@
 
 
     // Tabla longitud-de-arco -> ángulo en la elipse exterior.
-    var Ns = 1440, ths = [], cum = [0];
-    for (var i = 0; i <= Ns; i++) ths.push((360 * i) / Ns);
-    var prev = ept(1, ths[0]);
-    for (i = 1; i <= Ns; i++) {
-      var p = ept(1, ths[i]);
+    let Ns = 1440, ths = [], cum = [0];
+    for (let i = 0; i <= Ns; i++) ths.push((360 * i) / Ns);
+    let prev = ept(1, ths[0]);
+    for (let i = 1; i <= Ns; i++) {
+      let p = ept(1, ths[i]);
       cum.push(cum[i - 1] + Math.hypot(p[0] - prev[0], p[1] - prev[1]));
       prev = p;
     }
-    var P = cum[Ns];
+    let P = cum[Ns];
     function arc2th(s) {
       s = ((s % P) + P) % P;
-      var lo = 0, hi = Ns;
-      while (lo < hi) { var mid = (lo + hi) >> 1; if (cum[mid] < s) lo = mid + 1; else hi = mid; }
+      let lo = 0, hi = Ns;
+      while (lo < hi) { let mid = (lo + hi) >> 1; if (cum[mid] < s) lo = mid + 1; else hi = mid; }
       if (lo <= 0) return 0;
-      var f = (s - cum[lo - 1]) / (cum[lo] - cum[lo - 1]);
+      let f = (s - cum[lo - 1]) / (cum[lo] - cum[lo - 1]);
       return ths[lo - 1] + f * (ths[lo] - ths[lo - 1]);
     }
     function arc0(qs) { return cum[Math.round(((qs % 360) / 360) * Ns)]; }
 
-    var da = (P / 4) / (3 + SEAMR);
+    let da = (P / 4) / (3 + SEAMR);
 
     // 4 cuadrantes (inicio cardinal, partidos del ala). Las 2 alas de arriba
     // (topL,topR) alimentan la semifinal de arriba; las de abajo, la de abajo.
     // El índice (0-3) es el grupo de "explode" (ver SHIFT abajo).
-    var wings = [
+    let wings = [
       { start: 180, ms: matches.slice(0, 4) },   // topL  (arriba-izq)  ala 0
       { start: 270, ms: matches.slice(4, 8) },   // topR  (arriba-der)  ala 1
       { start: 0, ms: matches.slice(12, 16) },   // botR  (abajo-der)   ala 2
@@ -166,53 +169,53 @@
     // Huecos dentro de un ala: el par que comparte octavos va compacto
     // (da·(1-CLUSTER)); la división entre los 2 pares de octavos es da·INTER.
     // El resto del cuadrante (P/4 − span) es la costura entre alas.
-    var gIntra = da * (1 - CLUSTER);
-    var gInter = da * INTER;
-    var off = [0, gIntra, gIntra + gInter, 2 * gIntra + gInter];
-    var seam = (P / 4) - (2 * gIntra + gInter);
+    let gIntra = da * (1 - CLUSTER);
+    let gInter = da * INTER;
+    let off = [0, gIntra, gIntra + gInter, 2 * gIntra + gInter];
+    let seam = (P / 4) - (2 * gIntra + gInter);
 
     // Por ala: coloca 16avos, octavos y el cuarto; guarda el medio del cuarto.
     wings.forEach(function (w, wi) {
-      var ang = [];
-      for (var j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + seam / 2 + off[j]));
+      let ang = [];
+      for (let j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + seam / 2 + off[j]));
 
       // 16avos: 4 partidos (8 hojas) sobre la elipse exterior.
-      var mid16 = [];
-      for (j = 0; j < 4; j++) {
-        var m = w.ms[j], pp = pair(1, ang[j], L[0]);
+      let mid16 = [];
+      for (let j = 0; j < 4; j++) {
+        let m = w.ms[j], pp = pair(1, ang[j], L[0]);
         mid16.push(pp.mid);
         // home en lado -tan (b), away en lado +tan (a).
         nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], team: m.home, match: m, g: wi });
         nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], team: m.away, match: m, g: wi });
-        sep(pp, wi);
+        sep(pp, wi, m.played);
       }
 
       // octavos: 2 partidos; cada círculo = ganador de un 16avos. El centro va
       // equidistante de sus 2 padres (distancia real), no en el ángulo medio.
-      var midOct = [];
-      for (var g = 0; g < 2; g++) {
+      let midOct = [];
+      for (let g = 0; g < 2; g++) {
         // C = ápice de la mediatriz de los 2 centros padres de 16avos con la
         // elipse de octavos; ahí va el octavos (a la mitad de sus padres).
-        var ap = apex(K[1], mid16[2 * g], mid16[2 * g + 1]);
-        var th = ap ? thOf(K[1], ap) : (ang[2 * g] + ang[2 * g + 1]) / 2;
+        let ap = apex(K[1], mid16[2 * g], mid16[2 * g + 1]);
+        let th = ap ? thOf(K[1], ap) : (ang[2 * g] + ang[2 * g + 1]) / 2;
         th = nudgePole(K[1], th, NUDGE_OCT); // separa los octavos cercanos a los polos
-        var po = pair(K[1], th, L[1]);
+        let po = pair(K[1], th, L[1]);
         midOct.push(po.mid);
-        var mLo = w.ms[2 * g], mHi = w.ms[2 * g + 1];
+        let mLo = w.ms[2 * g], mHi = w.ms[2 * g + 1];
         // círculo b (-tan, ángulo menor) = ganador de mLo; a (+tan) = ganador de mHi.
         nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, match: mLo, g: wi });
         nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, match: mHi, g: wi });
         sep(po, wi);
-        stem(mid16[2 * g], po.b, wi, wi);
-        stem(mid16[2 * g + 1], po.a, wi, wi);
+        stem(mid16[2 * g], po.b, wi, wi, mLo.played);
+        stem(mid16[2 * g + 1], po.a, wi, wi, mHi.played);
       }
 
       // cuarto: C = ápice de la mediatriz de los 2 centros de octavos padres
       // con la elipse de cuartos. Slots vacíos (sin resultados).
-      var apq = apex(K[2], midOct[0], midOct[1]);
-      var thq = apq ? thOf(K[2], apq) : (ang[0] + ang[1] + ang[2] + ang[3]) / 4;
+      let apq = apex(K[2], midOct[0], midOct[1]);
+      let thq = apq ? thOf(K[2], apq) : (ang[0] + ang[1] + ang[2] + ang[3]) / 4;
       thq = nudgePole(K[2], thq, NUDGE_QTR); // corre los cuartos hacia el ecuador
-      var pq = pair(K[2], thq, L[2]);
+      let pq = pair(K[2], thq, L[2]);
       nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], g: wi });
       nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], g: wi });
       sep(pq, wi);
@@ -224,42 +227,44 @@
 
     // semifinales: arriba (alas 0,1) en θ=270; abajo (alas 3,2) en θ=90.
     // final: 2 círculos HORIZONTALES (uno al lado del otro) centrados (grupo 6).
-    var finMid = [CX + FIN_DX, CY];
-    var fin = [[finMid[0] - L[4] / 2, CY], [finMid[0] + L[4] / 2, CY]];
+    let finMid = [CX + FIN_DX, CY];
+    let fin = [[finMid[0] - L[4] / 2, CY], [finMid[0] + L[4] / 2, CY]];
     nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], g: 6 });
     nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], g: 6 });
     links.push({ x1: fin[0][0], y1: fin[0][1], x2: fin[1][0], y2: fin[1][1], strong: true, g1: 6, g2: 6 });
 
     [
-      { th: 270, left: wings[0], right: wings[1], g: 4 }, // semi arriba
-      { th: 90, left: wings[3], right: wings[2], g: 5 },  // semi abajo
+      // arriba → círculo izq. de la final; abajo → círculo der.
+      { th: 270, left: wings[0], right: wings[1], g: 4, finTo: fin[0] },
+      { th: 90, left: wings[3], right: wings[2], g: 5, finTo: fin[1] },
     ].forEach(function (s) {
-      var ps = pair(K[3], s.th, L[3]);
+      let ps = pair(K[3], s.th, L[3]);
       // círculo izquierdo (menor x) = ala izquierda; derecho = ala derecha.
-      var lft = ps.a[0] <= ps.b[0] ? ps.a : ps.b;
-      var rgt = ps.a[0] <= ps.b[0] ? ps.b : ps.a;
+      let lft = ps.a[0] <= ps.b[0] ? ps.a : ps.b;
+      let rgt = ps.a[0] <= ps.b[0] ? ps.b : ps.a;
       nodes.push({ x: lft[0], y: lft[1], r: RAD[3], g: s.g });
       nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], g: s.g });
       sep(ps, s.g);
       stem(s.left.quarterMid, lft, s.left.g, s.g);
       stem(s.right.quarterMid, rgt, s.right.g, s.g);
-      stem(ps.mid, finMid, s.g, 6); // ambas semifinales convergen a la final
+      // cada semifinal se une a su propio círculo de la final (no al medio).
+      stem(ps.mid, s.finTo, s.g, 6);
     });
 
     // "Explode": corre cada grupo hacia afuera desde el centro. Alas en
     // diagonal (DH,DV); semis sólo vertical (para no partirlas); final quieta.
     // Abre un canal horizontal (arriba/abajo) y uno vertical (izq/der).
-    var SHIFT = [
+    let SHIFT = [
       { dx: -DH, dy: -DV }, { dx: DH, dy: -DV },   // alas 0,1 (arriba)
       { dx: DH, dy: DV }, { dx: -DH, dy: DV },     // alas 2,3 (abajo)
       { dx: 0, dy: -DV }, { dx: 0, dy: DV },        // semis arriba/abajo
       { dx: 0, dy: 0 },                             // final
     ];
     nodes.forEach(function (n) {
-      var s = SHIFT[n.g]; n.x += s.dx; n.y += s.dy;
+      let s = SHIFT[n.g]; n.x += s.dx; n.y += s.dy;
     });
     links.forEach(function (l) {
-      var s1 = SHIFT[l.g1], s2 = SHIFT[l.g2];
+      let s1 = SHIFT[l.g1], s2 = SHIFT[l.g2];
       l.x1 += s1.dx; l.y1 += s1.dy; l.x2 += s2.dx; l.y2 += s2.dy;
     });
 
@@ -267,30 +272,53 @@
   }
 
   function render(root, panel, data) {
-    var geo = computeLayout(data.matches || []);
+    let geo = computeLayout(data.matches || []);
 
-    var svg = el("svg", {
-      viewBox: "-5 34 393 622",
+    let svg = el("svg", {
+      viewBox: "4 45 376 601",
       width: "100%",
       style: "display:block;overflow:visible",
     });
 
-    var selected = { match: null };
-    var nodeEls = [];
+    // Filtro de brillo (halo) para el contorno del ganador.
+    let defs = el("defs");
+    let glow = el("filter", {
+      id: "win-glow", x: "-90%", y: "-90%", width: "280%", height: "280%",
+    });
+    glow.appendChild(el("feGaussianBlur", {
+      in: "SourceAlpha", stdDeviation: "1.6", result: "b",
+    }));
+    glow.appendChild(el("feFlood", {
+      style: "flood-color:var(--color-primary);flood-opacity:1", result: "f",
+    }));
+    // "in" recorta el flood a la silueta difuminada → sale SOLO el halo (sin
+    // redibujar el trazo fuente encima).
+    glow.appendChild(el("feComposite", { in: "f", in2: "b", operator: "in" }));
+    defs.appendChild(glow);
+    svg.appendChild(defs);
+
+    let selected = { match: null };
+    let nodeEls = [];
 
     function paint() {
       nodeEls.forEach(function (e) {
-        var isSel = e.match && selected.match && e.match === selected.match;
+        let isSel = e.match && selected.match && e.match === selected.match;
+        let hot = isSel || e.winner; // resaltado: glow + contorno dorado
         e.bg.style.stroke = isSel
           ? "var(--color-primary)"
           : "color-mix(in oklch, var(--color-base-content) 28%, transparent)";
         e.bg.style.strokeWidth = isSel ? "2.5" : "1";
-        if (e.ring) {
-          e.ring.style.stroke = isSel
-            ? "var(--color-primary)"
-            : "color-mix(in oklch, var(--color-base-content) 45%, transparent)";
-          e.ring.style.strokeWidth = isSel ? "2.5" : "1";
+        // El glow es un círculo aparte (detrás de la bandera): se enciende con
+        // el filtro y se apaga bajando su opacidad a 0.
+        if (e.glow) {
+          e.glow.style.filter = hot ? "url(#win-glow)" : "none";
+          e.glow.style.opacity = hot ? "1" : "0";
         }
+        if (!e.ring) return;
+        e.ring.style.stroke = hot
+          ? "var(--color-primary)"
+          : "color-mix(in oklch, var(--color-base-content) 45%, transparent)";
+        e.ring.style.strokeWidth = isSel ? "2" : (e.winner ? "0.9" : "1");
       });
     }
 
@@ -301,39 +329,55 @@
     }
 
     geo.links.forEach(function (l) {
+      // Partido ya jugado → línea sólida (opacity 1); pendiente → tenue.
+      let stroke = l.played
+        ? "var(--color-base-content)"
+        : (l.strong
+            ? "color-mix(in oklch, var(--color-base-content) 38%, transparent)"
+            : "color-mix(in oklch, var(--color-base-content) 18%, transparent)");
       svg.appendChild(
         el("line", {
           x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2,
-          style:
-            "stroke:" +
-            (l.strong
-              ? "color-mix(in oklch, var(--color-base-content) 38%, transparent)"
-              : "color-mix(in oklch, var(--color-base-content) 18%, transparent)") +
-            ";stroke-width:" + (l.strong ? "1.5" : "1"),
+          style: "stroke:" + stroke + ";stroke-width:" + (l.strong ? "1.5" : "1"),
         })
       );
     });
 
     geo.nodes.forEach(function (n) {
-      var team = n.team || n.winner || null;
-      var g = el("g", { style: "cursor:" + (n.match ? "pointer" : "default") });
-      var bg = el("circle", {
+      let team = n.team || n.winner || null;
+      let g = el("g", { style: "cursor:" + (n.match ? "pointer" : "default") });
+      let bg = el("circle", {
         cx: n.x, cy: n.y, r: n.r, style: "fill:var(--color-base-300)",
       });
       g.appendChild(bg);
-      var entry = { match: n.match || null, bg: bg, ring: null };
+      // Contorno de ganador SOLO en el equipo que ganó su partido jugado
+      // (16avos). El círculo de octavos muestra quién avanzó, pero su propio
+      // partido aún no se juega → sin contorno.
+      let isWinner = !!(n.team && n.match && n.match.played &&
+        n.match.winner && n.match.winner.code &&
+        n.team.code && n.match.winner.code === n.team.code);
+      let entry = { match: n.match || null, bg: bg, ring: null, glow: null, winner: isWinner };
 
       if (team && team.flag_url) {
-        var img = el("image", {
+        // Detrás de la bandera, en orden: 1) fuente del glow (radio un poco
+        // mayor para que el halo asome POR FUERA del borde y no lo tape la
+        // bandera); 2) contorno fino nítido. La bandera va encima de ambos.
+        let glowSrc = el("circle", {
+          cx: n.x, cy: n.y, r: n.r + 1,
+          style: "fill:none;stroke:#000;stroke-width:1.4;opacity:0",
+        });
+        g.appendChild(glowSrc);
+        entry.glow = glowSrc;
+        let ring = el("circle", { cx: n.x, cy: n.y, r: n.r, style: "fill:none" });
+        g.appendChild(ring);
+        entry.ring = ring;
+        let img = el("image", {
           x: n.x - n.r, y: n.y - n.r, width: n.r * 2, height: n.r * 2,
           preserveAspectRatio: "xMidYMid slice", style: "clip-path:circle(50%)",
         });
         img.setAttribute("href", team.flag_url);
         img.setAttributeNS("http://www.w3.org/1999/xlink", "href", team.flag_url);
         g.appendChild(img);
-        var ring = el("circle", { cx: n.x, cy: n.y, r: n.r, style: "fill:none" });
-        g.appendChild(ring);
-        entry.ring = ring;
       }
 
       if (n.match) {
@@ -345,6 +389,19 @@
       nodeEls.push(entry);
       svg.appendChild(g);
     });
+
+    // Copa entre los 2 círculos de la final (decorativa; escala con el viewBox).
+    let copaUrl = root.getAttribute("data-copa");
+    if (copaUrl) {
+      let th = 54, tw = (th * 427) / 854; // copa.png 427×854 → mantiene proporción
+      let copa = el("image", {
+        x: CX + FIN_DX - tw / 2, y: CY - 5 - th / 2,
+        width: tw, height: th, preserveAspectRatio: "xMidYMid meet",
+      });
+      copa.setAttribute("href", copaUrl);
+      copa.setAttributeNS("http://www.w3.org/1999/xlink", "href", copaUrl);
+      svg.appendChild(copa);
+    }
 
     root.innerHTML = "";
     root.appendChild(svg);
@@ -363,16 +420,16 @@
   }
 
   function renderPanel(panel, m) {
-    var muted = "color-mix(in oklch, var(--color-base-content) 60%, transparent)";
+    let muted = "color-mix(in oklch, var(--color-base-content) 60%, transparent)";
     if (!m) {
       panel.innerHTML =
         '<div style="text-align:center;font-size:12px;letter-spacing:0.04em;' +
         "color:" + muted + '">Toca una bandera para ver el partido</div>';
       return;
     }
-    var played = m.played;
-    var score = played ? m.home_goals + " — " + m.away_goals : "VS";
-    var scoreColor = played ? "var(--color-primary)" : muted;
+    let played = m.played;
+    let score = played ? m.home_goals + " — " + m.away_goals : "VS";
+    let scoreColor = played ? "var(--color-primary)" : muted;
 
     panel.innerHTML =
       '<div style="text-align:center;font-size:9px;letter-spacing:0.22em;' +
@@ -391,11 +448,11 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    var dataEl = document.getElementById("bracket-data");
-    var root = document.getElementById("bracket-svg");
-    var panel = document.getElementById("bracket-panel");
+    let dataEl = document.getElementById("bracket-data");
+    let root = document.getElementById("bracket-svg");
+    let panel = document.getElementById("bracket-panel");
     if (!dataEl || !root || !panel) return;
-    var data;
+    let data;
     try {
       data = JSON.parse(dataEl.textContent);
     } catch (e) {
