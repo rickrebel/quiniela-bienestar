@@ -1,28 +1,31 @@
 // Chequeo geométrico del bracket de llaves (herramienta de desarrollo, no se
-// despliega). Porta computeLayout() de static/llaves.js SIN DOM: sólo calcula
-// los centros y radios de cada círculo para un juego de constantes, y reporta
-// el gap mínimo entre parejas de círculos, los que se enciman, el bounding-box
-// real del contenido y un viewBox sugerido ajustado. Uso: `node
-// .claude/llaves_geom_check.mjs`.
+// despliega). Porta computeLayout() de static/llaves.js SIN DOM: calcula los
+// centros y radios de cada círculo (con el "explode" diagonal de las 4 alas
+// desde el centro) para un juego de constantes, y reporta el gap mínimo entre
+// círculos, los solapes, el bounding-box real y un viewBox sugerido. Uso:
+// `node .claude/llaves_geom_check.mjs`.
 
 // ---- Constantes candidatas (espejo de las de llaves.js) --------------------
 const C = {
   CX: 192, CY: 345,
   AX: 170, AY: 280,
   K: [1.0, 0.74, 0.50, 0.20],
-  L: [34, 40, 46, 46, 50],
-  RAD: [14, 16, 18, 20, 22],
+  L: [34, 40, 46, 44, 48],
+  RAD: [14, 16, 18, 19, 21],
   SEAMR: 1.18,
   NUDGE_OCT: 20, NUDGE_QTR: 10, POLE_THRESH: 40,
-  CLUSTER: 0.11,   // junta los 2 dieciseisavos que comparten octavos
-  FIN_DX: 0,       // corrimiento de la final respecto al centro
-  VIEWBOX: { x: 0, y: 10, w: 384, h: 670 },
+  CLUSTER: 0.11,   // gap dentro del par que comparte octavos (compacto)
+  INTER: 1.05,     // gap entre los 2 pares de octavos de un ala (en unidades da)
+  DV: 16,          // "explode" vertical (separa arriba/abajo)
+  DH: 6,           // "explode" horizontal (separa izq/der; < DV)
+  FIN_DX: 0,
+  VIEWBOX: { x: 0, y: 45, w: 384, h: 599 },
 };
 
 function computeLayout(C) {
   const { CX, CY, AX, AY, K, L, RAD, SEAMR, NUDGE_OCT, NUDGE_QTR,
-          POLE_THRESH, CLUSTER, FIN_DX } = C;
-  const nodes = [], links = [];
+          POLE_THRESH, CLUSTER, INTER, DV, DH, FIN_DX } = C;
+  const nodes = [];
   const matches = Array.from({ length: 16 }, (_, i) => ({ id: i }));
 
   function ept(scale, th) {
@@ -116,34 +119,41 @@ function computeLayout(C) {
   }
   function arc0(qs) { return cum[Math.round(((qs % 360) / 360) * Ns)]; }
 
-  const da = (P / 4) / (3 + SEAMR), dg = SEAMR * da;
-  // Agrupa los 4 dieciseisavos de un ala en 2 parejas (cada par comparte
-  // octavos): gap intra-par = da·(1-CLUSTER), gap entre pares = da·(1+2·CLUSTER)
-  // → suma 3·da constante (no altera costuras entre alas).
-  const off = [
-    0,
-    da * (1 - CLUSTER),
-    da * (1 - CLUSTER) + da * (1 + 2 * CLUSTER),
-    3 * da,
+  const da = (P / 4) / (3 + SEAMR);
+  // Huecos dentro de un ala: par que comparte octavos (compacto) y la división
+  // entre los 2 pares de octavos. El resto del cuadrante es la costura (seam).
+  const gIntra = da * (1 - CLUSTER);
+  const gInter = da * INTER;
+  const off = [0, gIntra, gIntra + gInter, 2 * gIntra + gInter];
+  const wingSpan = 2 * gIntra + gInter;
+
+  // "Explode": cada ala se corre en diagonal hacia afuera; semis sólo vertical;
+  // final quieta. Índices: 0-3 alas, 4 semi-arriba, 5 semi-abajo, 6 final.
+  const SHIFT = [
+    { dx: -DH, dy: -DV }, { dx: +DH, dy: -DV },
+    { dx: +DH, dy: +DV }, { dx: -DH, dy: +DV },
+    { dx: 0, dy: -DV }, { dx: 0, dy: +DV }, { dx: 0, dy: 0 },
   ];
 
   const wings = [
-    { start: 180, ms: matches.slice(0, 4) },
-    { start: 270, ms: matches.slice(4, 8) },
-    { start: 0, ms: matches.slice(12, 16) },
-    { start: 90, ms: matches.slice(8, 12) },
+    { start: 180, ms: matches.slice(0, 4) },   // topL  (arriba-izq)  ala 0
+    { start: 270, ms: matches.slice(4, 8) },   // topR  (arriba-der)  ala 1
+    { start: 0, ms: matches.slice(12, 16) },   // botR  (abajo-der)   ala 2
+    { start: 90, ms: matches.slice(8, 12) },   // botL  (abajo-izq)   ala 3
   ];
 
-  wings.forEach((w) => {
+  wings.forEach((w, wi) => {
     const ang = [];
-    for (let j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + dg / 2 + off[j]));
+    const seam = (P / 4) - wingSpan;
+    for (let j = 0; j < 4; j++)
+      ang.push(arc2th(arc0(w.start) + seam / 2 + off[j]));
 
     const mid16 = [];
     for (let j = 0; j < 4; j++) {
       const pp = pair(1, ang[j], L[0]);
       mid16.push(pp.mid);
-      nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], ph: 0 });
-      nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], ph: 0 });
+      nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], ph: 0, g: wi });
+      nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], ph: 0, g: wi });
     }
 
     const midOct = [];
@@ -153,41 +163,40 @@ function computeLayout(C) {
       th = nudgePole(K[1], th, NUDGE_OCT);
       const po = pair(K[1], th, L[1]);
       midOct.push(po.mid);
-      nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], ph: 1 });
-      nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], ph: 1 });
+      nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], ph: 1, g: wi });
+      nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], ph: 1, g: wi });
     }
 
     const apq = apex(K[2], midOct[0], midOct[1]);
     let thq = apq ? thOf(K[2], apq) : (ang[0] + ang[1] + ang[2] + ang[3]) / 4;
     thq = nudgePole(K[2], thq, NUDGE_QTR);
     const pq = pair(K[2], thq, L[2]);
-    nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], ph: 2 });
-    nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], ph: 2 });
-    w.quarterMid = pq.mid;
+    nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], ph: 2, g: wi });
+    nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], ph: 2, g: wi });
   });
 
   // Final: pareja HORIZONTAL centrada.
   const finMid = [CX + FIN_DX, CY];
-  const fin = [[finMid[0] - L[4] / 2, CY], [finMid[0] + L[4] / 2, CY]];
-  nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], ph: 4 });
-  nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], ph: 4 });
+  nodes.push({ x: finMid[0] - L[4] / 2, y: CY, r: RAD[4], ph: 4, g: 6 });
+  nodes.push({ x: finMid[0] + L[4] / 2, y: CY, r: RAD[4], ph: 4, g: 6 });
 
   [
-    { th: 270, left: wings[0], right: wings[1] },
-    { th: 90, left: wings[3], right: wings[2] },
+    { th: 270, g: 4 }, { th: 90, g: 5 },
   ].forEach((s) => {
     const ps = pair(K[3], s.th, L[3]);
     const lft = ps.a[0] <= ps.b[0] ? ps.a : ps.b;
     const rgt = ps.a[0] <= ps.b[0] ? ps.b : ps.a;
-    nodes.push({ x: lft[0], y: lft[1], r: RAD[3], ph: 3 });
-    nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], ph: 3 });
+    nodes.push({ x: lft[0], y: lft[1], r: RAD[3], ph: 3, g: s.g });
+    nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], ph: 3, g: s.g });
   });
 
-  return { nodes, links };
+  // Aplica el "explode" a cada nodo según su grupo.
+  nodes.forEach((n) => { n.x += SHIFT[n.g].dx; n.y += SHIFT[n.g].dy; });
+  return { nodes };
 }
 
 // ---- Chequeo ---------------------------------------------------------------
-const PHASE = ["16avos", "octavos", "cuartos", "semis", "final", "3er"];
+const PHASE = ["16avos", "octavos", "cuartos", "semis", "final"];
 const { nodes } = computeLayout(C);
 const GAP_MIN = 3;
 
@@ -202,23 +211,16 @@ for (let i = 0; i < nodes.length; i++) {
   }
 }
 
-// Bounding-box real del contenido (círculos con su radio).
 let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 for (const n of nodes) {
   minX = Math.min(minX, n.x - n.r); maxX = Math.max(maxX, n.x + n.r);
   minY = Math.min(minY, n.y - n.r); maxY = Math.max(maxY, n.y + n.r);
 }
-const M = 10; // margen sugerido
+const M = 8;
 const suggest = {
-  x: 0, w: C.VIEWBOX.w,
-  y: Math.round(minY - M), h: Math.round((maxY - minY) + 2 * M),
+  x: Math.round(minX - M), y: Math.round(minY - M),
+  w: Math.round((maxX - minX) + 2 * M), h: Math.round((maxY - minY) + 2 * M),
 };
-
-const vb = C.VIEWBOX, outside = [];
-for (const n of nodes) {
-  if (n.x - n.r < vb.x || n.x + n.r > vb.x + vb.w ||
-      n.y - n.r < vb.y || n.y + n.r > vb.y + vb.h) outside.push(n);
-}
 
 const fmt = (n) => `${PHASE[n.ph]}(${n.x.toFixed(0)},${n.y.toFixed(0)} r${n.r})`;
 console.log(`nodos: ${nodes.length}`);
@@ -228,10 +230,6 @@ console.log(`solapes (gap < ${GAP_MIN}px): ${overlaps.length}`);
 overlaps.sort((x, y) => x.gap - y.gap).slice(0, 20)
   .forEach((o) => console.log(`  gap ${o.gap.toFixed(1)}  ${fmt(o.a)} vs ${fmt(o.b)}`));
 console.log(`bbox contenido: x[${minX.toFixed(0)}..${maxX.toFixed(0)}] ` +
-  `y[${minY.toFixed(0)}..${maxY.toFixed(0)}]  (alto ${(maxY - minY).toFixed(0)})`);
-console.log(`viewBox actual:   "${vb.x} ${vb.y} ${vb.w} ${vb.h}"`);
+  `y[${minY.toFixed(0)}..${maxY.toFixed(0)}]`);
 console.log(`viewBox sugerido: "${suggest.x} ${suggest.y} ${suggest.w} ${suggest.h}"`);
-console.log(`fuera del viewBox actual: ${outside.length}`);
-console.log(overlaps.length === 0
-  ? "OK ✅ sin encimes"
-  : "AJUSTAR ❌ (revisar solapes)");
+console.log(overlaps.length === 0 ? "OK ✅ sin encimes" : "AJUSTAR ❌");

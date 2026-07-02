@@ -17,14 +17,20 @@
   var CX = 192, CY = 345;       // centro
   var AX = 170, AY = 280;       // semiejes de la elipse exterior (16avos)
   var K = [1.0, 0.74, 0.50, 0.20]; // escala por fase: 16avos, oct, cuartos, semis
-  var L = [34, 40, 46, 46, 50]; // separador del partido por fase (+ final):
+  var L = [34, 40, 46, 44, 48]; // separador del partido por fase (+ final):
                                 // crece con RAD para que los 2 círculos de un
                                 // mismo partido no se fundan.
-  var RAD = [14, 16, 18, 20, 22]; // radio del círculo por fase: +2 constante →
-                                  // el área (∝r²) crece suave, sin saltos.
+  var RAD = [14, 16, 18, 19, 21]; // radio del círculo por fase: crece suave;
+                                  // el área (∝r²) sube sin saltos bruscos.
   var SEAMR = 1.18;             // costura = SEAMR · separación entre partidos
-  var CLUSTER = 0.11;           // junta los 2 dieciseisavos que comparten un
-                                // mismo octavos (separa mejor las llaves)
+  var CLUSTER = 0.11;           // gap dentro del par que comparte octavos
+                                // (compacto): hueco = da·(1-CLUSTER)
+  var INTER = 1.05;             // gap (en unidades da) entre los 2 pares de
+                                // octavos de un ala (división "diagonal")
+  var DV = 16;                  // "explode": corrimiento vertical de cada ala
+                                // hacia afuera (separa arriba/abajo)
+  var DH = 6;                   // "explode": corrimiento horizontal (izq/der,
+                                // menor que DV)
   var FIN_DX = 0;               // corrimiento de la final respecto al centro
 
   function el(tag, attrs) {
@@ -60,8 +66,9 @@
         mid: M,
       };
     }
-    function sep(p) { links.push({ x1: p.a[0], y1: p.a[1], x2: p.b[0], y2: p.b[1], strong: true }); }
-    function stem(from, to) { links.push({ x1: from[0], y1: from[1], x2: to[0], y2: to[1], strong: false }); }
+    // g1/g2 = grupo de "explode" de cada extremo (para correrlo luego).
+    function sep(p, g) { links.push({ x1: p.a[0], y1: p.a[1], x2: p.b[0], y2: p.b[1], strong: true, g1: g, g2: g }); }
+    function stem(from, to, g1, g2) { links.push({ x1: from[0], y1: from[1], x2: to[0], y2: to[1], strong: false, g1: g1, g2: g2 }); }
 
     // C = intersección más cercana (a los padres) de la mediatriz de P0P1 con
     // la elipse `scale`. P0, P1 = centros (sobre la elipse externa) de los 2
@@ -144,30 +151,30 @@
     }
     function arc0(qs) { return cum[Math.round(((qs % 360) / 360) * Ns)]; }
 
-    var da = (P / 4) / (3 + SEAMR), dg = SEAMR * da;
+    var da = (P / 4) / (3 + SEAMR);
 
     // 4 cuadrantes (inicio cardinal, partidos del ala). Las 2 alas de arriba
     // (topL,topR) alimentan la semifinal de arriba; las de abajo, la de abajo.
+    // El índice (0-3) es el grupo de "explode" (ver SHIFT abajo).
     var wings = [
-      { start: 180, ms: matches.slice(0, 4) },   // topL  (arriba-izq)
-      { start: 270, ms: matches.slice(4, 8) },   // topR  (arriba-der)
-      { start: 0, ms: matches.slice(12, 16) },   // botR  (abajo-der)
-      { start: 90, ms: matches.slice(8, 12) },   // botL  (abajo-izq)
+      { start: 180, ms: matches.slice(0, 4) },   // topL  (arriba-izq)  ala 0
+      { start: 270, ms: matches.slice(4, 8) },   // topR  (arriba-der)  ala 1
+      { start: 0, ms: matches.slice(12, 16) },   // botR  (abajo-der)   ala 2
+      { start: 90, ms: matches.slice(8, 12) },   // botL  (abajo-izq)   ala 3
     ];
 
+    // Huecos dentro de un ala: el par que comparte octavos va compacto
+    // (da·(1-CLUSTER)); la división entre los 2 pares de octavos es da·INTER.
+    // El resto del cuadrante (P/4 − span) es la costura entre alas.
+    var gIntra = da * (1 - CLUSTER);
+    var gInter = da * INTER;
+    var off = [0, gIntra, gIntra + gInter, 2 * gIntra + gInter];
+    var seam = (P / 4) - (2 * gIntra + gInter);
+
     // Por ala: coloca 16avos, octavos y el cuarto; guarda el medio del cuarto.
-    // Agrupa los 4 dieciseisavos de un ala en 2 parejas (cada par comparte
-    // octavos): gap intra-par = da·(1-CLUSTER), gap entre pares = da·(1+2·CLUSTER)
-    // → suma 3·da constante (no altera las costuras entre alas).
-    var off = [
-      0,
-      da * (1 - CLUSTER),
-      da * (1 - CLUSTER) + da * (1 + 2 * CLUSTER),
-      3 * da,
-    ];
-    wings.forEach(function (w) {
+    wings.forEach(function (w, wi) {
       var ang = [];
-      for (var j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + dg / 2 + off[j]));
+      for (var j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + seam / 2 + off[j]));
 
       // 16avos: 4 partidos (8 hojas) sobre la elipse exterior.
       var mid16 = [];
@@ -175,9 +182,9 @@
         var m = w.ms[j], pp = pair(1, ang[j], L[0]);
         mid16.push(pp.mid);
         // home en lado -tan (b), away en lado +tan (a).
-        nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], team: m.home, match: m });
-        nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], team: m.away, match: m });
-        sep(pp);
+        nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], team: m.home, match: m, g: wi });
+        nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], team: m.away, match: m, g: wi });
+        sep(pp, wi);
       }
 
       // octavos: 2 partidos; cada círculo = ganador de un 16avos. El centro va
@@ -193,11 +200,11 @@
         midOct.push(po.mid);
         var mLo = w.ms[2 * g], mHi = w.ms[2 * g + 1];
         // círculo b (-tan, ángulo menor) = ganador de mLo; a (+tan) = ganador de mHi.
-        nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, match: mLo });
-        nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, match: mHi });
-        sep(po);
-        stem(mid16[2 * g], po.b);
-        stem(mid16[2 * g + 1], po.a);
+        nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, match: mLo, g: wi });
+        nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, match: mHi, g: wi });
+        sep(po, wi);
+        stem(mid16[2 * g], po.b, wi, wi);
+        stem(mid16[2 * g + 1], po.a, wi, wi);
       }
 
       // cuarto: C = ápice de la mediatriz de los 2 centros de octavos padres
@@ -206,36 +213,54 @@
       var thq = apq ? thOf(K[2], apq) : (ang[0] + ang[1] + ang[2] + ang[3]) / 4;
       thq = nudgePole(K[2], thq, NUDGE_QTR); // corre los cuartos hacia el ecuador
       var pq = pair(K[2], thq, L[2]);
-      nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2] });
-      nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2] });
-      sep(pq);
-      stem(midOct[0], pq.b);
-      stem(midOct[1], pq.a);
+      nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], g: wi });
+      nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], g: wi });
+      sep(pq, wi);
+      stem(midOct[0], pq.b, wi, wi);
+      stem(midOct[1], pq.a, wi, wi);
       w.quarterMid = pq.mid;
+      w.g = wi;
     });
 
     // semifinales: arriba (alas 0,1) en θ=270; abajo (alas 3,2) en θ=90.
-    // final: 2 círculos HORIZONTALES (uno al lado del otro) centrados.
+    // final: 2 círculos HORIZONTALES (uno al lado del otro) centrados (grupo 6).
     var finMid = [CX + FIN_DX, CY];
     var fin = [[finMid[0] - L[4] / 2, CY], [finMid[0] + L[4] / 2, CY]];
-    nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4] });
-    nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4] });
-    links.push({ x1: fin[0][0], y1: fin[0][1], x2: fin[1][0], y2: fin[1][1], strong: true });
+    nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], g: 6 });
+    nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], g: 6 });
+    links.push({ x1: fin[0][0], y1: fin[0][1], x2: fin[1][0], y2: fin[1][1], strong: true, g1: 6, g2: 6 });
 
     [
-      { th: 270, left: wings[0], right: wings[1] },
-      { th: 90, left: wings[3], right: wings[2] },
+      { th: 270, left: wings[0], right: wings[1], g: 4 }, // semi arriba
+      { th: 90, left: wings[3], right: wings[2], g: 5 },  // semi abajo
     ].forEach(function (s) {
       var ps = pair(K[3], s.th, L[3]);
       // círculo izquierdo (menor x) = ala izquierda; derecho = ala derecha.
       var lft = ps.a[0] <= ps.b[0] ? ps.a : ps.b;
       var rgt = ps.a[0] <= ps.b[0] ? ps.b : ps.a;
-      nodes.push({ x: lft[0], y: lft[1], r: RAD[3] });
-      nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3] });
-      sep(ps);
-      stem(s.left.quarterMid, lft);
-      stem(s.right.quarterMid, rgt);
-      stem(ps.mid, finMid); // ambas semifinales convergen a la final
+      nodes.push({ x: lft[0], y: lft[1], r: RAD[3], g: s.g });
+      nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], g: s.g });
+      sep(ps, s.g);
+      stem(s.left.quarterMid, lft, s.left.g, s.g);
+      stem(s.right.quarterMid, rgt, s.right.g, s.g);
+      stem(ps.mid, finMid, s.g, 6); // ambas semifinales convergen a la final
+    });
+
+    // "Explode": corre cada grupo hacia afuera desde el centro. Alas en
+    // diagonal (DH,DV); semis sólo vertical (para no partirlas); final quieta.
+    // Abre un canal horizontal (arriba/abajo) y uno vertical (izq/der).
+    var SHIFT = [
+      { dx: -DH, dy: -DV }, { dx: DH, dy: -DV },   // alas 0,1 (arriba)
+      { dx: DH, dy: DV }, { dx: -DH, dy: DV },     // alas 2,3 (abajo)
+      { dx: 0, dy: -DV }, { dx: 0, dy: DV },        // semis arriba/abajo
+      { dx: 0, dy: 0 },                             // final
+    ];
+    nodes.forEach(function (n) {
+      var s = SHIFT[n.g]; n.x += s.dx; n.y += s.dy;
+    });
+    links.forEach(function (l) {
+      var s1 = SHIFT[l.g1], s2 = SHIFT[l.g2];
+      l.x1 += s1.dx; l.y1 += s1.dy; l.x2 += s2.dx; l.y2 += s2.dy;
     });
 
     return { nodes: nodes, links: links };
@@ -245,7 +270,7 @@
     var geo = computeLayout(data.matches || []);
 
     var svg = el("svg", {
-      viewBox: "0 45 384 599",
+      viewBox: "-5 34 393 622",
       width: "100%",
       style: "display:block;overflow:visible",
     });
