@@ -16,13 +16,16 @@
   // h/w≈1.6, sin encimes). Elipses verticales concéntricas por fase.
   var CX = 192, CY = 345;       // centro
   var AX = 170, AY = 280;       // semiejes de la elipse exterior (16avos)
-  var K = [1.0, 0.74, 0.46, 0.20]; // escala por fase: 16avos, oct, cuartos, semis
-  var L = [34, 44, 52, 60, 82]; // separador del partido por fase (+ final):
+  var K = [1.0, 0.74, 0.50, 0.20]; // escala por fase: 16avos, oct, cuartos, semis
+  var L = [34, 40, 46, 46, 50]; // separador del partido por fase (+ final):
                                 // crece con RAD para que los 2 círculos de un
                                 // mismo partido no se fundan.
-  var RAD = [14, 18, 22, 28, 37]; // radio del círculo por fase (crece hacia
-                                  // la final: +20% en 16avos, ~25%/fase, 2.7×)
+  var RAD = [14, 16, 18, 20, 22]; // radio del círculo por fase: +2 constante →
+                                  // el área (∝r²) crece suave, sin saltos.
   var SEAMR = 1.18;             // costura = SEAMR · separación entre partidos
+  var CLUSTER = 0.11;           // junta los 2 dieciseisavos que comparten un
+                                // mismo octavos (separa mejor las llaves)
+  var FIN_DX = 0;               // corrimiento de la final respecto al centro
 
   function el(tag, attrs) {
     var node = document.createElementNS(SVGNS, tag);
@@ -153,9 +156,18 @@
     ];
 
     // Por ala: coloca 16avos, octavos y el cuarto; guarda el medio del cuarto.
+    // Agrupa los 4 dieciseisavos de un ala en 2 parejas (cada par comparte
+    // octavos): gap intra-par = da·(1-CLUSTER), gap entre pares = da·(1+2·CLUSTER)
+    // → suma 3·da constante (no altera las costuras entre alas).
+    var off = [
+      0,
+      da * (1 - CLUSTER),
+      da * (1 - CLUSTER) + da * (1 + 2 * CLUSTER),
+      3 * da,
+    ];
     wings.forEach(function (w) {
       var ang = [];
-      for (var j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + dg / 2 + j * da));
+      for (var j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + dg / 2 + off[j]));
 
       // 16avos: 4 partidos (8 hojas) sobre la elipse exterior.
       var mid16 = [];
@@ -203,15 +215,16 @@
     });
 
     // semifinales: arriba (alas 0,1) en θ=270; abajo (alas 3,2) en θ=90.
-    // final: 2 círculos verticales al centro.
-    var fin = [[CX, CY - L[4] / 2], [CX, CY + L[4] / 2]];
+    // final: 2 círculos HORIZONTALES (uno al lado del otro) centrados.
+    var finMid = [CX + FIN_DX, CY];
+    var fin = [[finMid[0] - L[4] / 2, CY], [finMid[0] + L[4] / 2, CY]];
     nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4] });
     nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4] });
     links.push({ x1: fin[0][0], y1: fin[0][1], x2: fin[1][0], y2: fin[1][1], strong: true });
 
     [
-      { th: 270, left: wings[0], right: wings[1], finC: fin[0] },
-      { th: 90, left: wings[3], right: wings[2], finC: fin[1] },
+      { th: 270, left: wings[0], right: wings[1] },
+      { th: 90, left: wings[3], right: wings[2] },
     ].forEach(function (s) {
       var ps = pair(K[3], s.th, L[3]);
       // círculo izquierdo (menor x) = ala izquierda; derecho = ala derecha.
@@ -222,7 +235,7 @@
       sep(ps);
       stem(s.left.quarterMid, lft);
       stem(s.right.quarterMid, rgt);
-      stem(ps.mid, s.finC);
+      stem(ps.mid, finMid); // ambas semifinales convergen a la final
     });
 
     return { nodes: nodes, links: links };
@@ -232,7 +245,7 @@
     var geo = computeLayout(data.matches || []);
 
     var svg = el("svg", {
-      viewBox: "0 10 384 670",
+      viewBox: "0 45 384 599",
       width: "100%",
       style: "display:block;overflow:visible",
     });

@@ -1,26 +1,28 @@
 // Chequeo geométrico del bracket de llaves (herramienta de desarrollo, no se
 // despliega). Porta computeLayout() de static/llaves.js SIN DOM: sólo calcula
 // los centros y radios de cada círculo para un juego de constantes, y reporta
-// el gap mínimo entre parejas de círculos + los que se enciman + los que se
-// salen del viewBox. Uso: `node .claude/llaves_geom_check.mjs`.
+// el gap mínimo entre parejas de círculos, los que se enciman, el bounding-box
+// real del contenido y un viewBox sugerido ajustado. Uso: `node
+// .claude/llaves_geom_check.mjs`.
 
 // ---- Constantes candidatas (espejo de las de llaves.js) --------------------
 const C = {
   CX: 192, CY: 345,
   AX: 170, AY: 280,
-  K: [1.0, 0.74, 0.46, 0.20],
-  L: [34, 44, 52, 60, 82],
-  RAD: [14, 18, 22, 28, 37],
+  K: [1.0, 0.74, 0.50, 0.20],
+  L: [34, 40, 46, 46, 50],
+  RAD: [14, 16, 18, 20, 22],
   SEAMR: 1.18,
   NUDGE_OCT: 20, NUDGE_QTR: 10, POLE_THRESH: 40,
+  CLUSTER: 0.11,   // junta los 2 dieciseisavos que comparten octavos
+  FIN_DX: 0,       // corrimiento de la final respecto al centro
   VIEWBOX: { x: 0, y: 10, w: 384, h: 670 },
 };
 
 function computeLayout(C) {
   const { CX, CY, AX, AY, K, L, RAD, SEAMR, NUDGE_OCT, NUDGE_QTR,
-          POLE_THRESH } = C;
+          POLE_THRESH, CLUSTER, FIN_DX } = C;
   const nodes = [], links = [];
-  // 16 partidos ficticios: la geometría no depende de equipos/ganadores.
   const matches = Array.from({ length: 16 }, (_, i) => ({ id: i }));
 
   function ept(scale, th) {
@@ -115,6 +117,15 @@ function computeLayout(C) {
   function arc0(qs) { return cum[Math.round(((qs % 360) / 360) * Ns)]; }
 
   const da = (P / 4) / (3 + SEAMR), dg = SEAMR * da;
+  // Agrupa los 4 dieciseisavos de un ala en 2 parejas (cada par comparte
+  // octavos): gap intra-par = da·(1-CLUSTER), gap entre pares = da·(1+2·CLUSTER)
+  // → suma 3·da constante (no altera costuras entre alas).
+  const off = [
+    0,
+    da * (1 - CLUSTER),
+    da * (1 - CLUSTER) + da * (1 + 2 * CLUSTER),
+    3 * da,
+  ];
 
   const wings = [
     { start: 180, ms: matches.slice(0, 4) },
@@ -125,7 +136,7 @@ function computeLayout(C) {
 
   wings.forEach((w) => {
     const ang = [];
-    for (let j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + dg / 2 + j * da));
+    for (let j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + dg / 2 + off[j]));
 
     const mid16 = [];
     for (let j = 0; j < 4; j++) {
@@ -155,13 +166,15 @@ function computeLayout(C) {
     w.quarterMid = pq.mid;
   });
 
-  const fin = [[CX, CY - L[4] / 2], [CX, CY + L[4] / 2]];
+  // Final: pareja HORIZONTAL centrada.
+  const finMid = [CX + FIN_DX, CY];
+  const fin = [[finMid[0] - L[4] / 2, CY], [finMid[0] + L[4] / 2, CY]];
   nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], ph: 4 });
   nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], ph: 4 });
 
   [
-    { th: 270, left: wings[0], right: wings[1], finC: fin[0] },
-    { th: 90, left: wings[3], right: wings[2], finC: fin[1] },
+    { th: 270, left: wings[0], right: wings[1] },
+    { th: 90, left: wings[3], right: wings[2] },
   ].forEach((s) => {
     const ps = pair(K[3], s.th, L[3]);
     const lft = ps.a[0] <= ps.b[0] ? ps.a : ps.b;
@@ -174,9 +187,9 @@ function computeLayout(C) {
 }
 
 // ---- Chequeo ---------------------------------------------------------------
-const PHASE = ["16avos", "octavos", "cuartos", "semis", "final"];
+const PHASE = ["16avos", "octavos", "cuartos", "semis", "final", "3er"];
 const { nodes } = computeLayout(C);
-const GAP_MIN = 3; // holgura mínima aceptable entre círculos (px)
+const GAP_MIN = 3;
 
 let worst = Infinity, worstPair = null;
 const overlaps = [];
@@ -189,6 +202,18 @@ for (let i = 0; i < nodes.length; i++) {
   }
 }
 
+// Bounding-box real del contenido (círculos con su radio).
+let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+for (const n of nodes) {
+  minX = Math.min(minX, n.x - n.r); maxX = Math.max(maxX, n.x + n.r);
+  minY = Math.min(minY, n.y - n.r); maxY = Math.max(maxY, n.y + n.r);
+}
+const M = 10; // margen sugerido
+const suggest = {
+  x: 0, w: C.VIEWBOX.w,
+  y: Math.round(minY - M), h: Math.round((maxY - minY) + 2 * M),
+};
+
 const vb = C.VIEWBOX, outside = [];
 for (const n of nodes) {
   if (n.x - n.r < vb.x || n.x + n.r > vb.x + vb.w ||
@@ -200,13 +225,13 @@ console.log(`nodos: ${nodes.length}`);
 console.log(`gap mínimo entre círculos: ${worst.toFixed(1)}px` +
   (worstPair ? `  → ${fmt(worstPair[0])} vs ${fmt(worstPair[1])}` : ""));
 console.log(`solapes (gap < ${GAP_MIN}px): ${overlaps.length}`);
-overlaps
-  .sort((x, y) => x.gap - y.gap)
-  .slice(0, 20)
-  .forEach((o) =>
-    console.log(`  gap ${o.gap.toFixed(1)}  ${fmt(o.a)} vs ${fmt(o.b)}`));
-console.log(`fuera del viewBox: ${outside.length}`);
-outside.slice(0, 20).forEach((n) => console.log(`  ${fmt(n)}`));
-console.log(overlaps.length === 0 && outside.length === 0
-  ? "OK ✅ sin encimes y todo dentro del viewBox"
-  : "AJUSTAR ❌");
+overlaps.sort((x, y) => x.gap - y.gap).slice(0, 20)
+  .forEach((o) => console.log(`  gap ${o.gap.toFixed(1)}  ${fmt(o.a)} vs ${fmt(o.b)}`));
+console.log(`bbox contenido: x[${minX.toFixed(0)}..${maxX.toFixed(0)}] ` +
+  `y[${minY.toFixed(0)}..${maxY.toFixed(0)}]  (alto ${(maxY - minY).toFixed(0)})`);
+console.log(`viewBox actual:   "${vb.x} ${vb.y} ${vb.w} ${vb.h}"`);
+console.log(`viewBox sugerido: "${suggest.x} ${suggest.y} ${suggest.w} ${suggest.h}"`);
+console.log(`fuera del viewBox actual: ${outside.length}`);
+console.log(overlaps.length === 0
+  ? "OK ✅ sin encimes"
+  : "AJUSTAR ❌ (revisar solapes)");
