@@ -27,10 +27,12 @@ def _team(team, placeholder: str) -> dict:
     Si el FK está en BD devuelve nombre + bandera; si el cruce aún no se
     define, expone el placeholder de OF como nombre y sin bandera."""
     if team is not None:
+        # HD (80px webp) sólo en esta vista; el resto usa Team.flag_path (40px).
+        flag = f"flags_80/{team.flag_code}.webp" if team.flag_code else ""
         return {
             "code": team.flag_code,
             "name": team.name_es or team.name,
-            "flag_url": static(team.flag_path) if team.flag_path else "",
+            "flag_url": static(flag) if flag else "",
         }
     return {"name": placeholder or "", "flag_url": ""}
 

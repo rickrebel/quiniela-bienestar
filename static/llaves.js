@@ -15,10 +15,13 @@
   // Geometría (verificada: separadores Δ=0 por fase, costuras parejas,
   // h/w≈1.6, sin encimes). Elipses verticales concéntricas por fase.
   var CX = 192, CY = 345;       // centro
-  var AX = 170, AY = 330;       // semiejes de la elipse exterior (16avos)
+  var AX = 170, AY = 280;       // semiejes de la elipse exterior (16avos)
   var K = [1.0, 0.74, 0.46, 0.20]; // escala por fase: 16avos, oct, cuartos, semis
-  var L = [34, 32, 30, 26, 30]; // separador del partido por fase (+ final)
-  var RAD = [12, 12, 12, 12, 13]; // radio del círculo por fase
+  var L = [34, 44, 52, 60, 82]; // separador del partido por fase (+ final):
+                                // crece con RAD para que los 2 círculos de un
+                                // mismo partido no se fundan.
+  var RAD = [14, 18, 22, 28, 37]; // radio del círculo por fase (crece hacia
+                                  // la final: +20% en 16avos, ~25%/fase, 2.7×)
   var SEAMR = 1.18;             // costura = SEAMR · separación entre partidos
 
   function el(tag, attrs) {
