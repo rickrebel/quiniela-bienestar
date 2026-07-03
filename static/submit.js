@@ -23,6 +23,15 @@ const csrftoken = getCookie("csrftoken");
 // Prefijo de la quiniela activa (slug del path); base.html lo inyecta.
 const apiBase = "/" + (window.QUINIELA_SLUG || "");
 
+// Estados en que la página admite llenar (borrador): edición normal y
+// "upcoming" (se puede llenar aunque el envío aún no abra). Los inputs de
+// partidos ya iniciados o sin equipos reales llegan deshabilitados, así que
+// no disparan eventos aunque los listeners se registren.
+function isFillableState(content) {
+    const s = content && content.dataset.state;
+    return s === "editing" || s === "upcoming";
+}
+
 function buildPayload() {
     const windowOrder = document.querySelector(".content").dataset.window;
     const predictions = [];
@@ -139,7 +148,7 @@ function markWinner(matchEl) {
 // cualquier estado) y, si se está editando, lo actualiza en vivo al teclear.
 function initWinnerMarks() {
     const content = document.querySelector(".content");
-    const editing = content && content.dataset.state === "editing";
+    const editing = isFillableState(content);
     document.querySelectorAll(".match").forEach(matchEl => {
         markWinner(matchEl);
         if (!editing) return;
@@ -230,7 +239,7 @@ async function saveMatch(matchEl) {
 
 function initAutosave() {
     const content = document.querySelector(".content");
-    if (!content || content.dataset.state !== "editing") return;
+    if (!isFillableState(content)) return;
 
     document.querySelectorAll(".match").forEach(matchEl => {
         const container = matchEl.closest(".group, .knockout");

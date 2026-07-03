@@ -13,7 +13,7 @@
     function render() {
         let secs = Math.floor(deadline.diff(dayjs()) / 1000);
         if (secs <= 0) {
-            el.textContent = "El plazo para enviar terminó.";
+            el.textContent = "";
             return;
         }
         const days = Math.floor(secs / 86400);

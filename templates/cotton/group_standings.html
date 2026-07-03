@@ -14,6 +14,6 @@
         <button type="button" class="view-opt" data-variant="real">Real</button>
     </nav>
     {% for table in standings.tables %}
-    <c-standings-table :table="table" />
+    <c-standings-table :table="table" :focus_team_id="focus_team_id" />
     {% endfor %}
 </div>

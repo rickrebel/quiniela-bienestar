@@ -4,8 +4,7 @@
 {# visible la mix. Su CSS (.standings-table) sigue en styles.css: es #}
 {# chico, autocontenido y de baja duplicación. #}
 {# Uso: <c-standings-table :table="table" /> #}
-<table class="standings-table" data-variant="{{ table.variant }}"
-       {% if table.variant != 'mix' %}hidden{% endif %}>
+<table class="standings-table"{% if not bare %} data-variant="{{ table.variant }}"{% if table.variant != 'mix' %} hidden{% endif %}{% endif %}>
     <thead>
         <tr>
             <th class="st-team">Equipo</th>
@@ -15,7 +14,7 @@
     </thead>
     <tbody>
         {% for row in table.rows %}
-        <tr>
+        <tr{% if focus_team_id and row.team.id == focus_team_id %} class="is-self"{% endif %}>
             <td class="st-team cursor-pointer" data-dialog-team="{{ row.team.id }}">
                 <span class="st-pos">{{ forloop.counter }}</span>
                 {% if row.team.flag_path %}<img src="{% static row.team.flag_path %}" alt="">{% endif %}

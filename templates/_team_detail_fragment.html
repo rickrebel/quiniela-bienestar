@@ -24,6 +24,18 @@
     <c-match-card :match="m" :stage="m.stage" state="locked"
                   :is_group_stage="m.is_group" :by_date="m.is_group" />
     {% endfor %}
+    {% if phase.key == 'group' and standings %}
+    {# Solo la variante real, sin selector: en la ficha de un equipo no #}
+    {# tiene sentido "estimar". `bare` la deja siempre visible y fuera #}
+    {# del toggle global de standings.js. #}
+    <div class="border-t-[2.5px] border-base-content/20 px-3.5 pb-3 pt-2">
+        {% for table in standings.tables %}
+        {% if table.variant == 'real' %}
+        <c-standings-table :table="table" :focus_team_id="team.id" bare="1" />
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
     {% endfor %}
 
     {{ match_dialog_data|json_script:"team-dialog-match-data" }}

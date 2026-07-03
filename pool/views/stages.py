@@ -382,6 +382,20 @@ def _build_tabs(quiniela: Quiniela) -> list[dict]:
     return tabs
 
 
+def _opens_at_label(window: Window) -> str:
+    """Etiqueta local de apertura del envío para el aviso de UPCOMING.
+
+    Vacía si la ventana aún no fija ``opens_at`` (el aviso cae entonces a
+    "se habilitará pronto"). ``opens_at`` es UTC; se convierte a hora local
+    del sitio antes de formatear.
+    """
+    opens_at = window.resolved_opens_at()
+    if opens_at is None:
+        return ""
+    local = timezone.localtime(opens_at)
+    return f"{format_long_day(local)}, {format_time(local)}"
+
+
 @login_required
 @with_quiniela
 def window_view(request: HttpRequest, order: int) -> HttpResponse:
@@ -415,6 +429,14 @@ def window_view(request: HttpRequest, order: int) -> HttpResponse:
         attach_standings=False,
     )
     flat_matches = [m for s in sections for m in s["matches"]]
+
+    # La editabilidad de un cruce exige contendientes reales (equipos ya
+    # definidos en BD), no la resolución en memoria por variante: se captura
+    # antes de que el rellenado estimado sobrescriba equipos nulos.
+    for m in flat_matches:
+        m._real_teams = (
+            m.home_team_id is not None and m.away_team_id is not None
+        )
 
     variant = resolve_variant(request.GET.get("variant"))
     derivable = False
@@ -462,7 +484,9 @@ def window_view(request: HttpRequest, order: int) -> HttpResponse:
         resolve_sources(flat_matches, request.user, quiniela)
 
     for m in flat_matches:
-        m.editable = window_user.can_edit and not m.has_started
+        m.editable = (
+            window_user.can_edit and not m.has_started and m._real_teams
+        )
 
     deadline = window.resolved_send_deadline()
     context = {
@@ -472,6 +496,7 @@ def window_view(request: HttpRequest, order: int) -> HttpResponse:
         "stage": stages[0],
         "state": window_user.state,
         "can_edit": window_user.can_edit,
+        "opens_at_label": _opens_at_label(window),
         "sections": sections,
         "match_dialog_data": build_match_dialog_payload(
             flat_matches, request.user, quiniela
@@ -577,6 +602,7 @@ def groups_view(request: HttpRequest) -> HttpResponse:
         "stage": group_stages[0],
         "state": active_wu.state,
         "can_edit": active_wu.can_edit,
+        "opens_at_label": _opens_at_label(active_window),
         "sections": sections,
         "match_dialog_data": build_match_dialog_payload(
             flat_matches, request.user, quiniela
@@ -755,11 +781,32 @@ def team_detail_view(
     # deja auto-cargar sus fuentes al no ser el set completo de partidos.
     resolve_sources(matches, request.user, request.quiniela)
 
+    # Tabla de posiciones acumulada del grupo (las 6 fechas, no solo los
+    # partidos del equipo): el fragmento la muestra bajo la fase de grupos
+    # y resalta la fila del equipo.
+    group_matches = list(
+        Match.objects.filter(
+            stage__is_group=True,
+            home_team__group_name=team.group_name,
+        ).select_related("home_team", "away_team", "stage")
+    )
+    group_preds = {
+        p.match_id: p
+        for p in Prediction.objects.filter(
+            user=request.user, quiniela=request.quiniela,
+            match__in=group_matches,
+        )
+    }
+    standings = build_group_standings(
+        group_matches, group_preds
+    ).get(team.group_name)
+
     context = {
         "team": team,
         "phases": phases,
         "team_points": team_points,
         "team_played": team_played,
+        "standings": standings,
         "match_dialog_data": build_match_dialog_payload(
             matches, request.user, request.quiniela
         ),

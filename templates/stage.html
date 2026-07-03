@@ -10,10 +10,9 @@
 <main class="content" data-window="{{ window.order }}" data-state="{{ state }}">
     {% if state == 'upcoming' %}
     <p class="mx-auto mb-3 mt-1 text-center text-[13px] font-medium
-              text-secondary">Esta fase todavía no abre para predecir.</p>
-    {% elif state == 'locked' %}
-    <p class="mx-auto mb-3 mt-1 text-center text-[13px] font-medium
-              text-secondary">El plazo de esta fase terminó.</p>
+              text-secondary">Ya puedes llenar tus pronósticos.
+        {% if opens_at_label %}El envío se habilita el {{ opens_at_label }}.
+        {% else %}El envío se habilitará pronto.{% endif %}</p>
     {% endif %}
 
     {% if derivable %}
@@ -115,10 +114,11 @@
     {% endif %}
 </main>
 
-{# El footer solo se renderiza si tiene algo que mostrar: botón de envío, #}
-{# aviso "enviadas" (solo antes del cierre) o la nota de cuenta regresiva. #}
-{# Tras vencer el plazo de una fase ya enviada queda sin barra pegajosa. #}
-{% if state == 'editing' or state == 'sent' and not window.is_past_deadline or deadline_iso and state != 'sent' %}
+{# El footer solo se renderiza si tiene algo que mostrar: en edición (botón #}
+{# de envío + cuenta regresiva) o ya enviada antes del cierre (aviso #}
+{# "enviadas"). Una ventana vencida (locked) o aún no abierta al envío queda #}
+{# sin barra pegajosa. #}
+{% if state == 'editing' or state == 'sent' and not window.is_past_deadline %}
 <footer class="sticky bottom-0 z-[1000] border-t border-primary/40
                bg-base-100/90 px-2 pt-2.5
                pb-[calc(0.625rem+env(safe-area-inset-bottom))]">
@@ -136,7 +136,7 @@
         {% endif %}
     </div>
 
-    {% if deadline_iso and state != 'sent' %}
+    {% if deadline_iso and state == 'editing' %}
     {# deadline-note (no "countdown"): daisyUI trae un componente #}
     {# .countdown que pisaría la clase. countdown.js usa este hook. #}
     <div class="deadline-note mx-auto mt-1.5 text-center text-xs

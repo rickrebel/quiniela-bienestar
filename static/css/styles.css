@@ -79,6 +79,14 @@
 .thirds-table .cut td {
   border-bottom: 2px solid var(--color-primary);
 }
+/* Fila del equipo enfocado en el dialog de equipo: mismo lenguaje visual
+   que .qualified de mejores terceros. */
+.standings-table tr.is-self {
+  background: color-mix(in oklch, var(--color-accent) 10%, transparent);
+}
+.standings-table tr.is-self .st-name {
+  color: var(--color-primary);
+}
 /* Switch "Simular cruces": toggle propio (daisyUI .toggle no renderiza aquí).
    appearance:none deja el checkbox estilizable y habilita ::after (perilla). */
 .sim-switch {

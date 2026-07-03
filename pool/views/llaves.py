@@ -13,7 +13,7 @@ from pool.views.stages import _build_tabs
 @with_quiniela
 def llaves_view(request: HttpRequest) -> HttpResponse:
     context = {
-        "bracket": build_bracket(),
+        "bracket": build_bracket(request.user, request.quiniela),
         "tabs": _build_tabs(request.quiniela),
     }
     return render(request, "llaves.html", context)

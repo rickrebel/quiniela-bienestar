@@ -17,8 +17,9 @@ from __future__ import annotations
 
 from django.templatetags.static import static
 
+from pool.models import Prediction, Quiniela, User
 from pool.services.bracket import SOURCE_RE, winner_team
-from tournament.models import Match, Stage
+from tournament.models import Match, Stage, Team
 
 
 def _team(team, placeholder: str) -> dict:
@@ -44,6 +45,130 @@ def _winner(match: Match) -> dict | None:
     return _team(team, "") if team is not None else None
 
 
+def _predicted(match: Match, pred: Prediction | None) -> dict | None:
+    """Pronóstico del jugador para un dieciseisavos.
+
+    Devuelve su marcador estimado y la bandera del equipo que cree que
+    avanza (para pintar el slot de octavos aún sin resultado real). ``None``
+    si no hay pronóstico. El avance sale de ``_pred_pick`` (misma regla que el
+    resto del árbol), así la lógica no se bifurca."""
+    if pred is None or pred.home_goals is None:
+        return None
+    winner = _pred_pick(pred, match.home_team, match.away_team)
+    return {
+        "home_goals": pred.home_goals,
+        "away_goals": pred.away_goals,
+        "winner": _team(winner, "") if winner is not None else None,
+    }
+
+
+def _pred_pick(
+    pred: Prediction | None, home: Team | None, away: Team | None
+) -> Team | None:
+    """Equipo que el jugador pronostica que avanza, dados sus 2 contendientes
+    pronosticados: el de más goles, o su pick de penales (``advancing_team``)
+    si empató. ``None`` si no hay pronóstico o su avance no encaja con los
+    contendientes (p. ej. la cadena de pronóstico no llega hasta aquí)."""
+    if pred is None or pred.home_goals is None:
+        return None
+    if pred.home_goals > pred.away_goals:
+        return home
+    if pred.away_goals > pred.home_goals:
+        return away
+    picked = pred.advancing_team
+    if picked is None:
+        return None
+    if home is not None and picked.id == home.id:
+        return home
+    if away is not None and picked.id == away.id:
+        return away
+    return None
+
+
+def _tree(by_num: dict[int, Match], of_number: int) -> dict | None:
+    """Nodo del árbol de eliminatoria: el partido y (recursivo) sus 2 hijos,
+    las fuentes ``W##`` de sus dos ranuras (hijo local primero). Los
+    dieciseisavos son hojas. Mismo recorrido que ``_leaf_order`` → los grupos
+    del árbol quedan alineados con las rebanadas de la lista ``matches``."""
+    match = by_num.get(of_number)
+    if match is None:
+        return None
+    node: dict = {"match": match, "children": []}
+    if match.stage.key == Stage.LAST_32:
+        return node
+    for placeholder in (match.home_placeholder, match.away_placeholder):
+        matched = SOURCE_RE.match(placeholder or "")
+        if matched and matched.group(1) == "W":
+            child = _tree(by_num, int(matched.group(2)))
+            if child is not None:
+                node["children"].append(child)
+    return node
+
+
+def _advancers(
+    node: dict, preds: dict[int, Prediction]
+) -> tuple[Team | None, Team | None]:
+    """``(real, pronosticado)`` equipo que avanza de este partido.
+
+    ``real`` = ganador ya conocido (``winner_team``). ``pronosticado`` = el que
+    el jugador pasa entre sus 2 contendientes pronosticados (avances de los
+    hijos, recursivo), o ``None`` si su cadena de pronóstico no llega aquí."""
+    match = node["match"]
+    real = winner_team(match)
+    children = node["children"]
+    if children:
+        home_pred = _advancers(children[0], preds)[1]
+        away_pred = (
+            _advancers(children[1], preds)[1] if len(children) > 1 else None
+        )
+    else:
+        home_pred, away_pred = match.home_team, match.away_team
+    picked = _pred_pick(preds.get(match.id), home_pred, away_pred)
+    return real, picked
+
+
+def _slot(advancers: tuple[Team | None, Team | None]) -> dict:
+    """Par de banderas (real / estimada) para una ranura de fase avanzada."""
+    real, pred = advancers
+    return {
+        "real": _team(real, "") if real is not None else None,
+        "pred": _team(pred, "") if pred is not None else None,
+    }
+
+
+def _tree_payload(root: dict, preds: dict[int, Prediction]) -> dict | None:
+    """Avances (real/estimado) de octavos→final para pintar las fases sin
+    marcador. Alineado con los 4 grupos-de-4 del layout radial (orden del
+    árbol): ``cuartos[i]`` (grupo Gi) trae ``octavos`` (avance de sus 2
+    partidos de octavos → llenan los 2 círculos del cuarto) y ``cuarto``
+    (avance del cuarto → llena un círculo de semifinal); ``semis[k]`` es el
+    avance de cada semifinal (llena un círculo de la final). ``None`` si el
+    árbol no tiene la forma esperada (final → 2 semis → 2 cuartos c/u)."""
+    semis = root["children"]
+    if len(semis) != 2 or any(len(s["children"]) != 2 for s in semis):
+        return None
+    cuarto_nodes = semis[0]["children"] + semis[1]["children"]
+    groups = []
+    for cuarto in cuarto_nodes:
+        octavos = cuarto["children"]
+        if len(octavos) != 2:
+            return None
+        groups.append({
+            "octavos": [
+                _slot(_advancers(octavos[0], preds)),
+                _slot(_advancers(octavos[1], preds)),
+            ],
+            "cuarto": _slot(_advancers(cuarto, preds)),
+        })
+    return {
+        "cuartos": groups,
+        "semis": [
+            _slot(_advancers(semis[0], preds)),
+            _slot(_advancers(semis[1], preds)),
+        ],
+    }
+
+
 def _leaf_order(by_num: dict[int, Match], of_number: int) -> list[int]:
     """Orden de las hojas (of_number de LAST_32) bajo un nodo del árbol.
 
@@ -63,11 +188,13 @@ def _leaf_order(by_num: dict[int, Match], of_number: int) -> list[int]:
     return order
 
 
-def build_bracket() -> dict:
+def build_bracket(user: User, quiniela: Quiniela) -> dict:
     """Payload JSON-able para ``llaves.js`` (vía ``json_script``).
 
     Toma de la BD los 16 dieciseisavos ordenados por el árbol real y resuelve
-    equipos/banderas/marcadores y el ganador que sube a octavos.
+    equipos/banderas/marcadores y el ganador que sube a octavos. Adjunta, por
+    partido, el pronóstico del jugador (``pred``) para pintar el marcador
+    estimado y la bandera de su avance mientras no haya resultado real.
     """
     ko_keys = [
         Stage.LAST_32, Stage.LAST_16, Stage.QUARTER_FINALS,
@@ -87,6 +214,14 @@ def build_bracket() -> dict:
             n for n, m in by_num.items() if m.stage.key == Stage.LAST_32
         )
 
+    preds_by_match = {
+        p.match_id: p
+        for p in Prediction.objects.filter(
+            user=user, quiniela=quiniela,
+            match_id__in=[m.id for m in by_num.values()],
+        ).select_related("advancing_team")
+    }
+
     matches = []
     for number in order:
         m = by_num[number]
@@ -99,6 +234,15 @@ def build_bracket() -> dict:
                 "home_goals": m.home_goals,
                 "away_goals": m.away_goals,
                 "winner": _winner(m),
+                "pred": _predicted(m, preds_by_match.get(m.id)),
             }
         )
-    return {"matches": matches}
+
+    # Fases sin marcador (cuartos→final): avance real/estimado por ranura.
+    tree = None
+    if len(order) == 16:
+        root = _tree(by_num, Match.FINAL_NUMBER)
+        if root is not None:
+            tree = _tree_payload(root, preds_by_match)
+
+    return {"matches": matches, "tree": tree}

@@ -381,7 +381,10 @@ class WindowUser(models.Model):
 
     @property
     def can_edit(self) -> bool:
-        return self.state == self.EDITING
+        """Se puede llenar (borrador) mientras la ventana siga viva y sin
+        enviar, sin importar ``opens_at``: la apertura solo habilita el
+        envío (``can_send``), no el llenado."""
+        return self.state in (self.UPCOMING, self.EDITING)
 
     @property
     def can_send(self) -> bool:

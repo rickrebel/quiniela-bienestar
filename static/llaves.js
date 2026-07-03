@@ -47,7 +47,9 @@
     return node;
   }
 
-  function computeLayout(matches) {
+  function computeLayout(data) {
+    let matches = data.matches || [];
+    let tree = data.tree || null; // avances de cuartos→final (real/estimado)
     let nodes = [], links = [];
 
     function ept(scale, th) {
@@ -159,11 +161,14 @@
     // 4 cuadrantes (inicio cardinal, partidos del ala). Las 2 alas de arriba
     // (topL,topR) alimentan la semifinal de arriba; las de abajo, la de abajo.
     // El índice (0-3) es el grupo de "explode" (ver SHIFT abajo).
+    // `gi` = grupo-de-4 del árbol (rebanada de `matches`) que alimenta el ala;
+    // indexa tree.cuartos[] para las fases sin marcador. Difiere del índice de
+    // ala porque la geometría cruza abajo (ala 2↔G3, ala 3↔G2).
     let wings = [
-      { start: 180, ms: matches.slice(0, 4) },   // topL  (arriba-izq)  ala 0
-      { start: 270, ms: matches.slice(4, 8) },   // topR  (arriba-der)  ala 1
-      { start: 0, ms: matches.slice(12, 16) },   // botR  (abajo-der)   ala 2
-      { start: 90, ms: matches.slice(8, 12) },   // botL  (abajo-izq)   ala 3
+      { start: 180, ms: matches.slice(0, 4), gi: 0 },   // topL  ala 0
+      { start: 270, ms: matches.slice(4, 8), gi: 1 },   // topR  ala 1
+      { start: 0, ms: matches.slice(12, 16), gi: 3 },   // botR  ala 2
+      { start: 90, ms: matches.slice(8, 12), gi: 2 },   // botL  ala 3
     ];
 
     // Huecos dentro de un ala: el par que comparte octavos va compacto
@@ -202,9 +207,11 @@
         let po = pair(K[1], th, L[1]);
         midOct.push(po.mid);
         let mLo = w.ms[2 * g], mHi = w.ms[2 * g + 1];
-        // círculo b (-tan, ángulo menor) = ganador de mLo; a (+tan) = ganador de mHi.
-        nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, match: mLo, g: wi });
-        nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, match: mHi, g: wi });
+        // círculo b (-tan, ángulo menor) = ganador de mLo; a (+tan) = ganador
+        // de mHi. predWinner = avance pronosticado (se pinta difuminado hasta
+        // que haya ganador real).
+        nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, predWinner: (mLo.pred && mLo.pred.winner) || null, match: mLo, g: wi });
+        nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, predWinner: (mHi.pred && mHi.pred.winner) || null, match: mHi, g: wi });
         sep(po, wi);
         stem(mid16[2 * g], po.b, wi, wi, mLo.played);
         stem(mid16[2 * g + 1], po.a, wi, wi, mHi.played);
@@ -216,8 +223,12 @@
       let thq = apq ? thOf(K[2], apq) : (ang[0] + ang[1] + ang[2] + ang[3]) / 4;
       thq = nudgePole(K[2], thq, NUDGE_QTR); // corre los cuartos hacia el ecuador
       let pq = pair(K[2], thq, L[2]);
-      nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], g: wi });
-      nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], g: wi });
+      // Círculos del cuarto = avance de los 2 partidos de octavos del grupo
+      // (b ↔ octavos g0, a ↔ octavos g1); real si ya se jugó, si no estimado.
+      let grp = tree && tree.cuartos ? tree.cuartos[w.gi] : null;
+      let o0 = grp ? grp.octavos[0] : null, o1 = grp ? grp.octavos[1] : null;
+      nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], winner: o0 && o0.real, predWinner: o0 && o0.pred, g: wi });
+      nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], winner: o1 && o1.real, predWinner: o1 && o1.pred, g: wi });
       sep(pq, wi);
       stem(midOct[0], pq.b, wi, wi);
       stem(midOct[1], pq.a, wi, wi);
@@ -229,8 +240,12 @@
     // final: 2 círculos HORIZONTALES (uno al lado del otro) centrados (grupo 6).
     let finMid = [CX + FIN_DX, CY];
     let fin = [[finMid[0] - L[4] / 2, CY], [finMid[0] + L[4] / 2, CY]];
-    nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], g: 6 });
-    nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], g: 6 });
+    // Círculos de la final = avance de cada semifinal (izq ↔ semi de arriba,
+    // der ↔ semi de abajo); los 2 finalistas real/estimado.
+    let sem = tree && tree.semis ? tree.semis : null;
+    let s0 = sem ? sem[0] : null, s1 = sem ? sem[1] : null;
+    nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], winner: s0 && s0.real, predWinner: s0 && s0.pred, g: 6 });
+    nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], winner: s1 && s1.real, predWinner: s1 && s1.pred, g: 6 });
     links.push({ x1: fin[0][0], y1: fin[0][1], x2: fin[1][0], y2: fin[1][1], strong: true, g1: 6, g2: 6 });
 
     [
@@ -242,8 +257,12 @@
       // círculo izquierdo (menor x) = ala izquierda; derecho = ala derecha.
       let lft = ps.a[0] <= ps.b[0] ? ps.a : ps.b;
       let rgt = ps.a[0] <= ps.b[0] ? ps.b : ps.a;
-      nodes.push({ x: lft[0], y: lft[1], r: RAD[3], g: s.g });
-      nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], g: s.g });
+      // Cada círculo de la semi = avance del cuarto de esa ala (real/estimado).
+      let lc = tree && tree.cuartos ? tree.cuartos[s.left.gi] : null;
+      let rc = tree && tree.cuartos ? tree.cuartos[s.right.gi] : null;
+      let lq = lc ? lc.cuarto : null, rq = rc ? rc.cuarto : null;
+      nodes.push({ x: lft[0], y: lft[1], r: RAD[3], winner: lq && lq.real, predWinner: lq && lq.pred, g: s.g });
+      nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], winner: rq && rq.real, predWinner: rq && rq.pred, g: s.g });
       sep(ps, s.g);
       stem(s.left.quarterMid, lft, s.left.g, s.g);
       stem(s.right.quarterMid, rgt, s.right.g, s.g);
@@ -272,8 +291,8 @@
     return { nodes: nodes, links: links };
   }
 
-  function render(root, panel, data) {
-    let geo = computeLayout(data.matches || []);
+  function render(root, data) {
+    let geo = computeLayout(data);
 
     let svg = el("svg", {
       viewBox: "4 45 376 601",
@@ -298,17 +317,14 @@
     defs.appendChild(glow);
     svg.appendChild(defs);
 
-    let selected = { match: null };
     let nodeEls = [];
 
     function paint() {
       nodeEls.forEach(function (e) {
-        let isSel = e.match && selected.match && e.match === selected.match;
-        let hot = isSel || e.winner; // resaltado: glow + contorno dorado
-        e.bg.style.stroke = isSel
-          ? "var(--color-primary)"
-          : "color-mix(in oklch, var(--color-base-content) 28%, transparent)";
-        e.bg.style.strokeWidth = isSel ? "2.5" : "1";
+        let hot = e.winner; // resaltado del ganador real: glow + contorno dorado
+        e.bg.style.stroke =
+          "color-mix(in oklch, var(--color-base-content) 28%, transparent)";
+        e.bg.style.strokeWidth = "1";
         // El glow es un círculo aparte (detrás de la bandera): se enciende con
         // el filtro y se apaga bajando su opacidad a 0.
         if (e.glow) {
@@ -319,14 +335,8 @@
         e.ring.style.stroke = hot
           ? "var(--color-primary)"
           : "color-mix(in oklch, var(--color-base-content) 45%, transparent)";
-        e.ring.style.strokeWidth = isSel ? "2" : (e.winner ? "0.9" : "1");
+        e.ring.style.strokeWidth = hot ? "0.9" : "1";
       });
-    }
-
-    function selectMatch(m) {
-      selected.match = m;
-      paint();
-      renderPanel(panel, m);
     }
 
     geo.links.forEach(function (l) {
@@ -345,11 +355,17 @@
     });
 
     geo.nodes.forEach(function (n) {
-      let team = n.team || n.winner || null;
-      let g = el("g", { style: "cursor:" + (n.match ? "pointer" : "default") });
-      // Bandera de equipo real → abre el team-dialog (delegación global en
-      // team_dialog.js). El click sigue seleccionando el partido en el panel;
-      // como es un `click` (no drag), no interfiere con paneo/explode del SVG.
+      // real = equipo confirmado (16avos: el matchup ya es real; octavos: el
+      // ganador ya resuelto). Si aún no hay resultado, cae al avance
+      // PRONOSTICADO (predWinner) → se pinta difuminado como estimación.
+      let real = n.team || n.winner || null;
+      let team = real || n.predWinner || null;
+      let isEstimate = !real && !!team;
+      let g = el("g", {
+        style: "cursor:" + (team && team.id ? "pointer" : "default"),
+      });
+      // Bandera de equipo (real o estimada) → abre el team-dialog (delegación
+      // global en team_dialog.js). Única interacción de la vista.
       if (team && team.id) g.setAttribute("data-dialog-team", team.id);
       let bg = el("circle", {
         cx: n.x, cy: n.y, r: n.r, style: "fill:var(--color-base-300)",
@@ -361,7 +377,7 @@
       let isWinner = !!(n.team && n.match && n.match.played &&
         n.match.winner && n.match.winner.code &&
         n.team.code && n.match.winner.code === n.team.code);
-      let entry = { match: n.match || null, bg: bg, ring: null, glow: null, winner: isWinner };
+      let entry = { bg: bg, ring: null, glow: null, winner: isWinner };
 
       if (team && team.flag_url) {
         // Detrás de la bandera, en orden: 1) fuente del glow (radio un poco
@@ -378,46 +394,52 @@
         entry.ring = ring;
         let img = el("image", {
           x: n.x - n.r, y: n.y - n.r, width: n.r * 2, height: n.r * 2,
-          preserveAspectRatio: "xMidYMid slice", style: "clip-path:circle(50%)",
+          preserveAspectRatio: "xMidYMid slice",
+          // Estimación (avance pronosticado, aún sin ganador real) → difuminada.
+          style: "clip-path:circle(50%)" + (isEstimate ? ";opacity:0.85" : ""),
         });
         img.setAttribute("href", team.flag_url);
         img.setAttributeNS("http://www.w3.org/1999/xlink", "href", team.flag_url);
         g.appendChild(img);
       }
 
-      // Marcador real: sobre la línea AB que une los 2 centros del partido, de
-      // punto medio M sale la PERPENDICULAR a AB (normal, hacia afuera OUT px):
-      // ahí queda la divisoria D entre los 2 números. Sobre la paralela a AB
-      // por D van los números, ALONG px a cada lado de D (cada uno hacia su
-      // bandera). Solo 16avos jugados; color del ganador (primary) vs perdedor
-      // (tenue), mismo lenguaje que el glow.
-      if (n.team && n.match && n.match.played && n.team.flag_url && n.mid) {
-        let goals = n.team.code === n.match.home.code
-          ? n.match.home_goals : n.match.away_goals;
-        // u = unitario sobre AB hacia esta bandera; (px,py) = normal a AB
-        // orientada hacia afuera del óvalo (dot con M−centro > 0).
-        let tx = n.x - n.mid[0], ty = n.y - n.mid[1];
-        let td = Math.hypot(tx, ty) || 1;
-        let ux = tx / td, uy = ty / td;
-        let px = -uy, py = ux;
-        if (px * (n.mid[0] - CX) + py * (n.mid[1] - CY) < 0) { px = -px; py = -py; }
-        let ALONG = 6, OUT = 16;
-        let num = el("text", {
-          x: n.mid[0] + px * OUT + ux * ALONG,
-          y: n.mid[1] + py * OUT + uy * ALONG,
-          "text-anchor": "middle", "dominant-baseline": "central",
-          style: "font-size:9px;font-weight:600;fill:" + (isWinner
-            ? "var(--color-primary)"
-            : "color-mix(in oklch, var(--color-base-content) 55%, transparent)"),
-        });
-        num.textContent = goals;
-        g.appendChild(num);
-      }
-
-      if (n.match) {
-        (function (m) {
-          g.addEventListener("click", function () { selectMatch(m); });
-        })(n.match);
+      // Marcador (solo 16avos, que tienen n.mid): si el partido se jugó, el
+      // real en blanco pleno; si no, el PRONOSTICADO por el jugador en el mismo
+      // lugar, en blanco "diluido" para distinguir estimación de realidad.
+      // Geometría: sobre la línea AB que une los 2 centros, de su punto medio M
+      // sale la PERPENDICULAR a AB (normal, hacia afuera OUT px) → divisoria D;
+      // los números van sobre la paralela a AB por D, ALONG px a cada lado.
+      if (n.team && n.team.flag_url && n.mid) {
+        let isHome = n.team.code === n.match.home.code;
+        let played = n.match.played;
+        let goals = null;
+        if (played) {
+          goals = isHome ? n.match.home_goals : n.match.away_goals;
+        } else if (n.match.pred) {
+          goals = isHome ? n.match.pred.home_goals : n.match.pred.away_goals;
+        }
+        if (goals !== null && goals !== undefined) {
+          // u = unitario sobre AB hacia esta bandera; (px,py) = normal a AB
+          // orientada hacia afuera del óvalo (dot con M−centro > 0).
+          let tx = n.x - n.mid[0], ty = n.y - n.mid[1];
+          let td = Math.hypot(tx, ty) || 1;
+          let ux = tx / td, uy = ty / td;
+          let px = -uy, py = ux;
+          if (px * (n.mid[0] - CX) + py * (n.mid[1] - CY) < 0) { px = -px; py = -py; }
+          let ALONG = 6, OUT = 16;
+          let num = el("text", {
+            x: n.mid[0] + px * OUT + ux * ALONG,
+            y: n.mid[1] + py * OUT + uy * ALONG,
+            "text-anchor": "middle", "dominant-baseline": "central",
+            style: "font-size:10px;font-weight:600;fill:" + (played
+              ? (isWinner
+                  ? "var(--color-primary)"
+                  : "var(--color-base-content)")
+              : "color-mix(in oklch, var(--color-base-content) 45%, transparent)"),
+          });
+          num.textContent = goals;
+          g.appendChild(num);
+        }
       }
 
       nodeEls.push(entry);
@@ -440,58 +462,18 @@
     root.innerHTML = "";
     root.appendChild(svg);
     paint();
-    renderPanel(panel, null);
-  }
-
-  function flagImg(url) {
-    if (!url) return "";
-    return (
-      '<img src="' + url +
-      '" alt="" style="width:30px;height:20px;border-radius:3px;' +
-      "object-fit:cover;flex:none;border:1px solid " +
-      "color-mix(in oklch, var(--color-base-content) 45%, transparent)\">"
-    );
-  }
-
-  function renderPanel(panel, m) {
-    let muted = "color-mix(in oklch, var(--color-base-content) 60%, transparent)";
-    if (!m) {
-      panel.innerHTML =
-        '<div style="text-align:center;font-size:12px;letter-spacing:0.04em;' +
-        "color:" + muted + '">Toca una bandera para ver el partido</div>';
-      return;
-    }
-    let played = m.played;
-    let score = played ? m.home_goals + " — " + m.away_goals : "VS";
-    let scoreColor = played ? "var(--color-primary)" : muted;
-
-    panel.innerHTML =
-      '<div style="text-align:center;font-size:9px;letter-spacing:0.22em;' +
-      "color:" + muted +
-      ';text-transform:uppercase;margin-bottom:2px">16avos de final</div>' +
-      '<div style="display:flex;align-items:center;justify-content:center;gap:8px">' +
-      '<div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end">' +
-      '<span style="font-size:13px;color:var(--color-base-content);text-align:right">' +
-      m.home.name + "</span>" + flagImg(m.home.flag_url) + "</div>" +
-      '<div style="font-weight:600;font-size:16px;color:' + scoreColor +
-      ';min-width:56px;text-align:center;white-space:nowrap">' + score + "</div>" +
-      '<div style="display:flex;align-items:center;gap:6px;flex:1">' +
-      flagImg(m.away.flag_url) +
-      '<span style="font-size:13px;color:var(--color-base-content)">' +
-      m.away.name + "</span></div></div>";
   }
 
   document.addEventListener("DOMContentLoaded", function () {
     let dataEl = document.getElementById("bracket-data");
     let root = document.getElementById("bracket-svg");
-    let panel = document.getElementById("bracket-panel");
-    if (!dataEl || !root || !panel) return;
+    if (!dataEl || !root) return;
     let data;
     try {
       data = JSON.parse(dataEl.textContent);
     } catch (e) {
       return;
     }
-    render(root, panel, data);
+    render(root, data);
   });
 })();
