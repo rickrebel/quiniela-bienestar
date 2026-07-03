@@ -364,7 +364,7 @@
         // bandera); 2) contorno fino nítido. La bandera va encima de ambos.
         let glowSrc = el("circle", {
           cx: n.x, cy: n.y, r: n.r + 1,
-          style: "fill:none;stroke:#000;stroke-width:1.4;opacity:0",
+          style: "fill:none;stroke:#000;stroke-width:2;opacity:0",
         });
         g.appendChild(glowSrc);
         entry.glow = glowSrc;

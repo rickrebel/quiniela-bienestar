@@ -1,0 +1,10 @@
+{# Regreso discreto a la ventana vigente de la quiniela ACTUAL (la del #}
+{# slug del path, no la del dominio/usuario): mismo destino que el login. #}
+{# El estilo lo pone quien lo usa vía `class`. #}
+{# Uso: <c-back-link class="btn btn-sm btn-circle btn-outline" /> #}
+<c-vars title="Regresar" />
+<a class="{{ class }}"
+   href="{% url 'quiniela_root' request.quiniela.slug %}"
+   title="{{ title }}">
+    <c-icon name="chevron_left" />
+</a>

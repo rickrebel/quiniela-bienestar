@@ -16,10 +16,8 @@
 <main class="history">
     <header class="history-top">
         <div class="history-controls">
-            {# Regreso discreto: al destino del login (ventana vigente). #}
-            <a class="history-back" href="{% url 'root' %}" title="Regresar">
-                <c-icon name="chevron_left" />
-            </a>
+            {# Regreso discreto: a la ventana vigente de la quiniela actual. #}
+            <c-back-link class="history-back" />
             <select id="history-users" multiple
                     placeholder="Comparar participantes…" autocomplete="off"></select>
             <div class="history-xmode" data-view-switch>
