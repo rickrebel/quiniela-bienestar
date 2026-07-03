@@ -127,12 +127,33 @@ def _advancers(
     return real, picked
 
 
-def _slot(advancers: tuple[Team | None, Team | None]) -> dict:
-    """Par de banderas (real / estimada) para una ranura de fase avanzada."""
-    real, pred = advancers
+def _score(match: Match, preds: dict[int, Prediction]) -> dict | None:
+    """Marcador de un partido para pintarlo sobre su par de círculos: el real
+    si ya se jugó (``played=True``), o el pronosticado por el jugador si no
+    (``played=False``). ``home``/``away`` quedan orientados como el partido en
+    BD (``home`` = primer círculo del par). ``None`` si no hay ninguno."""
+    if match.status == "FINISHED" and match.home_goals is not None:
+        return {
+            "home": match.home_goals, "away": match.away_goals,
+            "played": True,
+        }
+    pred = preds.get(match.id)
+    if pred is not None and pred.home_goals is not None:
+        return {
+            "home": pred.home_goals, "away": pred.away_goals,
+            "played": False,
+        }
+    return None
+
+
+def _slot(node: dict, preds: dict[int, Prediction]) -> dict:
+    """Ranura de fase avanzada: banderas de avance (real / estimada) y el
+    marcador (real o pronosticado) del propio partido del nodo."""
+    real, pred = _advancers(node, preds)
     return {
         "real": _team(real, "") if real is not None else None,
         "pred": _team(pred, "") if pred is not None else None,
+        "score": _score(node["match"], preds),
     }
 
 
@@ -155,17 +176,18 @@ def _tree_payload(root: dict, preds: dict[int, Prediction]) -> dict | None:
             return None
         groups.append({
             "octavos": [
-                _slot(_advancers(octavos[0], preds)),
-                _slot(_advancers(octavos[1], preds)),
+                _slot(octavos[0], preds),
+                _slot(octavos[1], preds),
             ],
-            "cuarto": _slot(_advancers(cuarto, preds)),
+            "cuarto": _slot(cuarto, preds),
         })
     return {
         "cuartos": groups,
         "semis": [
-            _slot(_advancers(semis[0], preds)),
-            _slot(_advancers(semis[1], preds)),
+            _slot(semis[0], preds),
+            _slot(semis[1], preds),
         ],
+        "final": _score(root["match"], preds),
     }
 
 

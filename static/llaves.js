@@ -184,14 +184,24 @@
       let ang = [];
       for (let j = 0; j < 4; j++) ang.push(arc2th(arc0(w.start) + seam / 2 + off[j]));
 
+      // Grupo-de-4 del árbol: avances y marcadores (real/estimado) de las fases
+      // sin par de 16avos; alimenta octavos, cuarto y —vía la semi— la final.
+      let grp = tree && tree.cuartos ? tree.cuartos[w.gi] : null;
+
       // 16avos: 4 partidos (8 hojas) sobre la elipse exterior.
       let mid16 = [];
       for (let j = 0; j < 4; j++) {
         let m = w.ms[j], pp = pair(1, ang[j], L[0]);
         mid16.push(pp.mid);
+        // Marcador del partido: real si se jugó, si no el pronosticado.
+        let sc = m.played
+          ? { home: m.home_goals, away: m.away_goals, played: true }
+          : (m.pred
+              ? { home: m.pred.home_goals, away: m.pred.away_goals, played: false }
+              : null);
         // home en lado -tan (b), away en lado +tan (a).
-        nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], team: m.home, match: m, g: wi, mid: pp.mid });
-        nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], team: m.away, match: m, g: wi, mid: pp.mid });
+        nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], team: m.home, match: m, g: wi, mid: pp.mid, score: sc, side: "home" });
+        nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], team: m.away, match: m, g: wi, mid: pp.mid, score: sc, side: "away" });
         sep(pp, wi, m.played);
       }
 
@@ -207,11 +217,13 @@
         let po = pair(K[1], th, L[1]);
         midOct.push(po.mid);
         let mLo = w.ms[2 * g], mHi = w.ms[2 * g + 1];
-        // círculo b (-tan, ángulo menor) = ganador de mLo; a (+tan) = ganador
-        // de mHi. predWinner = avance pronosticado (se pinta difuminado hasta
-        // que haya ganador real).
-        nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, predWinner: (mLo.pred && mLo.pred.winner) || null, match: mLo, g: wi });
-        nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, predWinner: (mHi.pred && mHi.pred.winner) || null, match: mHi, g: wi });
+        // Los 2 círculos = participantes del octavos (avance real/estimado de
+        // mLo y mHi). predWinner = avance pronosticado (difuminado hasta que
+        // haya ganador real). El marcador del octavos (grp.octavos[g].score) va
+        // sobre su par: home = mLo (círculo b), away = mHi (círculo a).
+        let osc = grp ? grp.octavos[g].score : null;
+        nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, predWinner: (mLo.pred && mLo.pred.winner) || null, mid: po.mid, score: osc, side: "home", g: wi });
+        nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, predWinner: (mHi.pred && mHi.pred.winner) || null, mid: po.mid, score: osc, side: "away", g: wi });
         sep(po, wi);
         stem(mid16[2 * g], po.b, wi, wi, mLo.played);
         stem(mid16[2 * g + 1], po.a, wi, wi, mHi.played);
@@ -225,10 +237,11 @@
       let pq = pair(K[2], thq, L[2]);
       // Círculos del cuarto = avance de los 2 partidos de octavos del grupo
       // (b ↔ octavos g0, a ↔ octavos g1); real si ya se jugó, si no estimado.
-      let grp = tree && tree.cuartos ? tree.cuartos[w.gi] : null;
+      // El marcador del cuarto (grp.cuarto.score) va sobre su par.
       let o0 = grp ? grp.octavos[0] : null, o1 = grp ? grp.octavos[1] : null;
-      nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], winner: o0 && o0.real, predWinner: o0 && o0.pred, g: wi });
-      nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], winner: o1 && o1.real, predWinner: o1 && o1.pred, g: wi });
+      let qsc = grp ? grp.cuarto.score : null;
+      nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], winner: o0 && o0.real, predWinner: o0 && o0.pred, mid: pq.mid, score: qsc, side: "home", g: wi });
+      nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], winner: o1 && o1.real, predWinner: o1 && o1.pred, mid: pq.mid, score: qsc, side: "away", g: wi });
       sep(pq, wi);
       stem(midOct[0], pq.b, wi, wi);
       stem(midOct[1], pq.a, wi, wi);
@@ -244,25 +257,29 @@
     // der ↔ semi de abajo); los 2 finalistas real/estimado.
     let sem = tree && tree.semis ? tree.semis : null;
     let s0 = sem ? sem[0] : null, s1 = sem ? sem[1] : null;
-    nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], winner: s0 && s0.real, predWinner: s0 && s0.pred, g: 6 });
-    nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], winner: s1 && s1.real, predWinner: s1 && s1.pred, g: 6 });
+    let fsc = tree ? tree.final : null; // marcador de la final (real/estimado)
+    nodes.push({ x: fin[0][0], y: fin[0][1], r: RAD[4], winner: s0 && s0.real, predWinner: s0 && s0.pred, mid: finMid, score: fsc, side: "home", g: 6 });
+    nodes.push({ x: fin[1][0], y: fin[1][1], r: RAD[4], winner: s1 && s1.real, predWinner: s1 && s1.pred, mid: finMid, score: fsc, side: "away", g: 6 });
     links.push({ x1: fin[0][0], y1: fin[0][1], x2: fin[1][0], y2: fin[1][1], strong: true, g1: 6, g2: 6 });
 
     [
       // arriba → círculo izq. de la final; abajo → círculo der.
-      { th: 270, left: wings[0], right: wings[1], g: 4, finTo: fin[0] },
-      { th: 90, left: wings[3], right: wings[2], g: 5, finTo: fin[1] },
+      { th: 270, left: wings[0], right: wings[1], g: 4, finTo: fin[0], si: 0 },
+      { th: 90, left: wings[3], right: wings[2], g: 5, finTo: fin[1], si: 1 },
     ].forEach(function (s) {
       let ps = pair(K[3], s.th, L[3]);
       // círculo izquierdo (menor x) = ala izquierda; derecho = ala derecha.
       let lft = ps.a[0] <= ps.b[0] ? ps.a : ps.b;
       let rgt = ps.a[0] <= ps.b[0] ? ps.b : ps.a;
       // Cada círculo de la semi = avance del cuarto de esa ala (real/estimado).
+      // El marcador de la semi (tree.semis[si].score) va sobre su par: home =
+      // ala izquierda (lft), away = derecha (rgt).
       let lc = tree && tree.cuartos ? tree.cuartos[s.left.gi] : null;
       let rc = tree && tree.cuartos ? tree.cuartos[s.right.gi] : null;
       let lq = lc ? lc.cuarto : null, rq = rc ? rc.cuarto : null;
-      nodes.push({ x: lft[0], y: lft[1], r: RAD[3], winner: lq && lq.real, predWinner: lq && lq.pred, g: s.g });
-      nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], winner: rq && rq.real, predWinner: rq && rq.pred, g: s.g });
+      let ssc = tree && tree.semis ? tree.semis[s.si].score : null;
+      nodes.push({ x: lft[0], y: lft[1], r: RAD[3], winner: lq && lq.real, predWinner: lq && lq.pred, mid: ps.mid, score: ssc, side: "home", g: s.g });
+      nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], winner: rq && rq.real, predWinner: rq && rq.pred, mid: ps.mid, score: ssc, side: "away", g: s.g });
       sep(ps, s.g);
       stem(s.left.quarterMid, lft, s.left.g, s.g);
       stem(s.right.quarterMid, rgt, s.right.g, s.g);
@@ -395,44 +412,43 @@
         let img = el("image", {
           x: n.x - n.r, y: n.y - n.r, width: n.r * 2, height: n.r * 2,
           preserveAspectRatio: "xMidYMid slice",
-          // Estimación (avance pronosticado, aún sin ganador real) → difuminada.
-          style: "clip-path:circle(50%)" + (isEstimate ? ";opacity:0.85" : ""),
+          // Estimación (avance pronosticado, aún sin ganador real) → mucho más
+          // transparente que una bandera real (que va a opacidad plena).
+          style: "clip-path:circle(50%)" + (isEstimate ? ";opacity:0.28" : ""),
         });
         img.setAttribute("href", team.flag_url);
         img.setAttributeNS("http://www.w3.org/1999/xlink", "href", team.flag_url);
         g.appendChild(img);
       }
 
-      // Marcador (solo 16avos, que tienen n.mid): si el partido se jugó, el
-      // real en blanco pleno; si no, el PRONOSTICADO por el jugador en el mismo
-      // lugar, en blanco "diluido" para distinguir estimación de realidad.
-      // Geometría: sobre la línea AB que une los 2 centros, de su punto medio M
-      // sale la PERPENDICULAR a AB (normal, hacia afuera OUT px) → divisoria D;
-      // los números van sobre la paralela a AB por D, ALONG px a cada lado.
-      if (n.team && n.team.flag_url && n.mid) {
-        let isHome = n.team.code === n.match.home.code;
-        let played = n.match.played;
-        let goals = null;
-        if (played) {
-          goals = isHome ? n.match.home_goals : n.match.away_goals;
-        } else if (n.match.pred) {
-          goals = isHome ? n.match.pred.home_goals : n.match.pred.away_goals;
-        }
+      // Marcador del partido junto a su par de círculos, en TODAS las fases con
+      // par y marcador (16avos→final): el real si ya se jugó (blanco pleno, el
+      // lado ganador en primary), o el PRONOSTICADO si no (blanco "diluido").
+      // El número de este círculo sale de su lado (home = b/izq, away = a/der).
+      // Geometría: de M (medio del par) sale la PERPENDICULAR a AB hacia afuera
+      // del óvalo (OUT px) y el número se corre ALONG px hacia su propio
+      // círculo. Par horizontal (final, M≈centro): la normal apunta hacia abajo.
+      if (team && team.flag_url && n.mid && n.score) {
+        let goals = n.side === "home" ? n.score.home : n.score.away;
         if (goals !== null && goals !== undefined) {
-          // u = unitario sobre AB hacia esta bandera; (px,py) = normal a AB
-          // orientada hacia afuera del óvalo (dot con M−centro > 0).
+          let played = n.score.played;
+          // Resalta el número del lado ganador (solo jugado y sin empate).
+          let hot = played && n.score.home !== n.score.away &&
+            ((n.side === "home") === (n.score.home > n.score.away));
           let tx = n.x - n.mid[0], ty = n.y - n.mid[1];
           let td = Math.hypot(tx, ty) || 1;
           let ux = tx / td, uy = ty / td;
           let px = -uy, py = ux;
-          if (px * (n.mid[0] - CX) + py * (n.mid[1] - CY) < 0) { px = -px; py = -py; }
+          let dot = px * (n.mid[0] - CX) + py * (n.mid[1] - CY);
+          if (Math.abs(dot) < 0.001) { px = 0; py = 1; }
+          else if (dot < 0) { px = -px; py = -py; }
           let ALONG = 6, OUT = 16;
           let num = el("text", {
             x: n.mid[0] + px * OUT + ux * ALONG,
             y: n.mid[1] + py * OUT + uy * ALONG,
             "text-anchor": "middle", "dominant-baseline": "central",
             style: "font-size:10px;font-weight:600;fill:" + (played
-              ? (isWinner
+              ? (hot
                   ? "var(--color-primary)"
                   : "var(--color-base-content)")
               : "color-mix(in oklch, var(--color-base-content) 45%, transparent)"),
