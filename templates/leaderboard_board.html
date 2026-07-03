@@ -15,7 +15,7 @@
 
     {% for row in rows %}
     <div class="board-row{% if row.user == user %} board-row--me{% endif %}{% if row.user.is_virtual %} board-row--virtual{% endif %}">
-        <span class="board-pos">{% if row.trend_batch %}<span class="board-trend board-trend--{{ row.trend_batch }}" data-baseline="batch">{% if row.trend_batch == 'up' %}{% include 'icons/arrow_up.html' %}{% else %}{% include 'icons/arrow_down.html' %}{% endif %}</span>{% endif %}{% if row.trend_day %}<span class="board-trend board-trend--{{ row.trend_day }}" data-baseline="day">{% if row.trend_day == 'up' %}{% include 'icons/arrow_up.html' %}{% else %}{% include 'icons/arrow_down.html' %}{% endif %}</span>{% endif %}<span class="board-rank">{% if row.user.is_virtual %}-{% elif row.position == 1 %}🥇{% elif row.position == 2 %}🥈{% elif row.position == 3 %}🥉{% else %}{{ row.position }}{% endif %}</span></span>
+        <span class="board-pos">{% if row.trend_batch %}<span class="board-trend board-trend--{{ row.trend_batch }}" data-baseline="batch">{% if row.trend_batch == 'up' %}{% include 'icons/arrow_up.html' %}{% else %}{% include 'icons/arrow_down.html' %}{% endif %}</span>{% endif %}{% if row.trend_day %}<span class="board-trend board-trend--{{ row.trend_day }}" data-baseline="day">{% if row.trend_day == 'up' %}{% include 'icons/arrow_up.html' %}{% else %}{% include 'icons/arrow_down.html' %}{% endif %}</span>{% endif %}<span class="board-rank">{% if row.user.is_virtual %}-{% elif row.position == 1 %}🥇{% elif row.position == 2 %}🥈{% elif row.position == 3 %}🥉{% elif last_position and row.position == last_position %}🥖{% else %}{{ row.position }}{% endif %}</span></span>
         <span class="board-name">
             {{ row.user.first_name|default:row.user.email }}
         </span>

@@ -76,6 +76,16 @@ class Leaderboard:
     def row_for(self, user: User) -> LeaderboardRow | None:
         return next((r for r in self.rows if r.user.id == user.id), None)
 
+    @property
+    def last_position(self) -> int:
+        """Lugar del último participante: mayor posición entre quienes han
+        jugado, excluido el perfil virtual. 0 si nadie ha jugado."""
+        played = [
+            r.position for r in self.rows
+            if r.has_played and not r.user.is_virtual
+        ]
+        return max(played) if played else 0
+
 
 def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
     """Posiciones de los miembros de ``quiniela``. La posición depende solo

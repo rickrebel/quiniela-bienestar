@@ -18,6 +18,7 @@ def leaderboard_view(request: HttpRequest) -> HttpResponse:
         # board.rows para el context processor `standing`).
         "rows": [r for r in board.rows if r.has_played],
         "max_points": board.max_points,
+        "last_position": board.last_position,
         "tabs": _build_tabs(request.quiniela),
     }
     return render(request, "leaderboard.html", context)

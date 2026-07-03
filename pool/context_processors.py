@@ -82,6 +82,7 @@ def standing(request) -> dict:
         return {
             "my_standing": board.row_for(user),
             "board_max": board.max_points,
+            "board_last": board.last_position,
             # Quien no ha jugado nada no aparece en la tabla.
             "board_rows": [row for row in board.rows if row.has_played],
         }

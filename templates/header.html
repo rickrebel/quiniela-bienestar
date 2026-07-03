@@ -146,7 +146,7 @@
                 aria-label="Cerrar">✕</button>
     </div>
     <div class="send-dialog-body">
-        {% include 'leaderboard_board.html' with rows=board_rows max_points=board_max %}
+        {% include 'leaderboard_board.html' with rows=board_rows max_points=board_max last_position=board_last %}
     </div>
 </dialog>
 {% endif %}
