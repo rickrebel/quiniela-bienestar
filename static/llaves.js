@@ -194,8 +194,12 @@
         let m = w.ms[j], pp = pair(1, ang[j], L[0]);
         mid16.push(pp.mid);
         // Marcador del partido: real si se jugó, si no el pronosticado.
+        // pen_winner: si el partido acabó en empate y hubo ganador (solo por
+        // penales), su code, para pintar su número en dorado abajo.
         let sc = m.played
-          ? { home: m.home_goals, away: m.away_goals, played: true }
+          ? { home: m.home_goals, away: m.away_goals, played: true,
+              pen_winner: (m.home_goals === m.away_goals && m.winner)
+                ? m.winner.code : null }
           : (m.pred
               ? { home: m.pred.home_goals, away: m.pred.away_goals, played: false }
               : null);
@@ -432,9 +436,13 @@
         let goals = n.side === "home" ? n.score.home : n.score.away;
         if (goals !== null && goals !== undefined) {
           let played = n.score.played;
-          // Resalta el número del lado ganador (solo jugado y sin empate).
-          let hot = played && n.score.home !== n.score.away &&
-            ((n.side === "home") === (n.score.home > n.score.away));
+          // Resalta el número del lado ganador: el de más goles, o —en empate
+          // resuelto por penales— la bandera que coincide con pen_winner.
+          let penWin = !!(n.score.pen_winner && team.code &&
+            team.code === n.score.pen_winner);
+          let hot = played && (penWin ||
+            (n.score.home !== n.score.away &&
+              ((n.side === "home") === (n.score.home > n.score.away))));
           let tx = n.x - n.mid[0], ty = n.y - n.mid[1];
           let td = Math.hypot(tx, ty) || 1;
           let ux = tx / td, uy = ty / td;

@@ -139,10 +139,19 @@ def _score(match: Match, preds: dict[int, Prediction]) -> dict | None:
     (``played=False``). ``home``/``away`` quedan orientados como el partido en
     BD (``home`` = primer círculo del par). ``None`` si no hay ninguno."""
     if match.status == "FINISHED" and match.home_goals is not None:
-        return {
+        data = {
             "home": match.home_goals, "away": match.away_goals,
             "played": True,
         }
+        # Empate resuelto por penales: el marcador no delata al que avanzó,
+        # así que se adjunta su code para pintar su número en dorado
+        # (llaves.js), aunque ambos números sean iguales.
+        if (match.home_goals == match.away_goals
+                and match.decided_by == Match.PENALTY_SHOOTOUT):
+            win = winner_team(match)
+            if win is not None:
+                data["pen_winner"] = win.flag_code
+        return data
     pred = preds.get(match.id)
     if pred is not None and pred.home_goals is not None:
         return {
