@@ -185,8 +185,8 @@
         let m = w.ms[j], pp = pair(1, ang[j], L[0]);
         mid16.push(pp.mid);
         // home en lado -tan (b), away en lado +tan (a).
-        nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], team: m.home, match: m, g: wi });
-        nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], team: m.away, match: m, g: wi });
+        nodes.push({ x: pp.b[0], y: pp.b[1], r: RAD[0], team: m.home, match: m, g: wi, mid: pp.mid });
+        nodes.push({ x: pp.a[0], y: pp.a[1], r: RAD[0], team: m.away, match: m, g: wi, mid: pp.mid });
         sep(pp, wi, m.played);
       }
 
@@ -262,6 +262,7 @@
     ];
     nodes.forEach(function (n) {
       let s = SHIFT[n.g]; n.x += s.dx; n.y += s.dy;
+      if (n.mid) n.mid = [n.mid[0] + s.dx, n.mid[1] + s.dy];
     });
     links.forEach(function (l) {
       let s1 = SHIFT[l.g1], s2 = SHIFT[l.g2];
@@ -346,6 +347,10 @@
     geo.nodes.forEach(function (n) {
       let team = n.team || n.winner || null;
       let g = el("g", { style: "cursor:" + (n.match ? "pointer" : "default") });
+      // Bandera de equipo real → abre el team-dialog (delegación global en
+      // team_dialog.js). El click sigue seleccionando el partido en el panel;
+      // como es un `click` (no drag), no interfiere con paneo/explode del SVG.
+      if (team && team.id) g.setAttribute("data-dialog-team", team.id);
       let bg = el("circle", {
         cx: n.x, cy: n.y, r: n.r, style: "fill:var(--color-base-300)",
       });
@@ -378,6 +383,35 @@
         img.setAttribute("href", team.flag_url);
         img.setAttributeNS("http://www.w3.org/1999/xlink", "href", team.flag_url);
         g.appendChild(img);
+      }
+
+      // Marcador real: sobre la línea AB que une los 2 centros del partido, de
+      // punto medio M sale la PERPENDICULAR a AB (normal, hacia afuera OUT px):
+      // ahí queda la divisoria D entre los 2 números. Sobre la paralela a AB
+      // por D van los números, ALONG px a cada lado de D (cada uno hacia su
+      // bandera). Solo 16avos jugados; color del ganador (primary) vs perdedor
+      // (tenue), mismo lenguaje que el glow.
+      if (n.team && n.match && n.match.played && n.team.flag_url && n.mid) {
+        let goals = n.team.code === n.match.home.code
+          ? n.match.home_goals : n.match.away_goals;
+        // u = unitario sobre AB hacia esta bandera; (px,py) = normal a AB
+        // orientada hacia afuera del óvalo (dot con M−centro > 0).
+        let tx = n.x - n.mid[0], ty = n.y - n.mid[1];
+        let td = Math.hypot(tx, ty) || 1;
+        let ux = tx / td, uy = ty / td;
+        let px = -uy, py = ux;
+        if (px * (n.mid[0] - CX) + py * (n.mid[1] - CY) < 0) { px = -px; py = -py; }
+        let ALONG = 6, OUT = 16;
+        let num = el("text", {
+          x: n.mid[0] + px * OUT + ux * ALONG,
+          y: n.mid[1] + py * OUT + uy * ALONG,
+          "text-anchor": "middle", "dominant-baseline": "central",
+          style: "font-size:9px;font-weight:600;fill:" + (isWinner
+            ? "var(--color-primary)"
+            : "color-mix(in oklch, var(--color-base-content) 55%, transparent)"),
+        });
+        num.textContent = goals;
+        g.appendChild(num);
       }
 
       if (n.match) {

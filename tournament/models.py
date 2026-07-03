@@ -166,6 +166,11 @@ class Team(models.Model):
         """Ruta estática del PNG de bandera (vacía si no hay código)."""
         return f"flags_40/{self.flag_code}.png" if self.flag_code else ""
 
+    @property
+    def flag_path_hd(self) -> str:
+        """Ruta estática del WEBP HD 80px (vacía si no hay código)."""
+        return f"flags_80/{self.flag_code}.webp" if self.flag_code else ""
+
 
 class Match(models.Model):
     """Partido del torneo. Estructura de OF; resultados de FD.

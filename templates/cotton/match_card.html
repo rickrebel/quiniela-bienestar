@@ -58,7 +58,8 @@
     <div class="match grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]
                 items-center gap-[7px] bg-neutral"
          data-match-id="{{ match.id }}">
-        <div class="team flex items-center justify-end gap-1.5 text-right">
+        <div class="team flex items-center justify-end gap-1.5 text-right{% if match.home_team %} cursor-pointer{% endif %}"
+             {% if match.home_team %}data-dialog-team="{{ match.home_team.id }}"{% endif %}>
             {% if match.home_team %}
             <span class="{{ match.home_mark }} text-[15px] font-semibold
                          leading-[1.1]">{{ match.home_team.name_es }}</span>
@@ -119,7 +120,8 @@
             {% endif %}
         </div>
 
-        <div class="team flex items-center gap-1.5">
+        <div class="team flex items-center gap-1.5{% if match.away_team %} cursor-pointer{% endif %}"
+             {% if match.away_team %}data-dialog-team="{{ match.away_team.id }}"{% endif %}>
             {% if match.away_team %}
             {% if match.away_team.flag_path %}
             <img class="max-h-6 max-w-[30px] rounded-[3px]"

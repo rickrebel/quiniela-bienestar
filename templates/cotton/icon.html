@@ -2,5 +2,10 @@
 {# base.html). El nombre debe estar en icon_names del <link> o se #}
 {# renderiza como texto. Tamaño/color por class (font-size manda). #}
 {# Uso: <c-icon name="chevron_right" class="text-base text-primary" /> #}
+{# `class` con default vacío: sin esto, al anidar c-icon dentro de otro #}
+{# componente cotton (p. ej. c-back-link) la variable `class` del padre #}
+{# se filtra por contexto y sus clases (btn-circle…) caían en el span, #}
+{# pintando un segundo círculo. #}
+<c-vars class="" />
 <span class="material-symbols-outlined select-none leading-none {{ class }}"
       aria-hidden="true">{{ name }}</span>

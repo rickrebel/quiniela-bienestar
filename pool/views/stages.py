@@ -5,6 +5,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.http import (
     Http404,
     HttpRequest,
@@ -684,6 +685,86 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
         "tabs": _build_tabs(request.quiniela),
     }
     return render(request, "por_fecha.html", context)
+
+
+@login_required
+@with_quiniela
+def team_detail_view(
+    request: HttpRequest, team_id: int
+) -> HttpResponse:
+    """Fragmento HTML de un equipo: bandera HD + todos sus partidos.
+
+    Lo pide ``team_dialog.js`` por fetch al clic en una bandera o un
+    nombre de equipo. Mismo decorado de solo lectura que
+    ``por_fecha_view`` (día/hora locales, predicción propia,
+    ``annotate_result``, ``resolve_sources``) y el mismo dialog de
+    partido: el fragmento incrusta su ``build_match_dialog_payload`` para
+    que cada tarjeta abra su detalle.
+    """
+    team = get_object_or_404(Team, pk=team_id)
+    matches = list(
+        Match.objects.filter(Q(home_team=team) | Q(away_team=team))
+        .select_related("home_team", "away_team", "stadium", "stage")
+        .order_by("datetime", "of_number")
+    )
+    preds = {
+        p.match_id: p
+        for p in Prediction.objects.filter(
+            user=request.user, quiniela=request.quiniela,
+            match__in=matches,
+        ).prefetch_related("rules")
+    }
+    # Agrupa por fase: las 3 jornadas de grupo se funden en "Fase de
+    # grupos"; cada eliminatoria es su propia fase. El queryset viene por
+    # fecha, así que las corridas por fase son contiguas.
+    phases: list[dict] = []
+    current: dict | None = None
+    team_points = 0
+    team_played = 0
+    for match in matches:
+        local_dt = match.datetime + timedelta(
+            hours=match.stadium.utc_offset
+        )
+        match.local_day = format_day(local_dt)
+        match.local_time = format_time(local_dt)
+        match.is_group = match.stage.is_group
+        prediction = preds.get(match.id)
+        if prediction is not None:
+            match.predicted_home = prediction.home_goals
+            match.predicted_away = prediction.away_goals
+        annotate_result(match, prediction)
+
+        phase_key = "group" if match.is_group else match.stage_id
+        if current is None or current["key"] != phase_key:
+            current = {
+                "key": phase_key,
+                "label": ("Fase de grupos" if match.is_group
+                          else match.stage.name),
+                "matches": [],
+                "points": 0,
+            }
+            phases.append(current)
+        current["matches"].append(match)
+        if match.is_finished:
+            team_played += 1
+            if match.user_points is not None:
+                current["points"] += match.user_points
+                team_points += match.user_points
+
+    # Rival aún sin definir del cruce (ganador real o contendientes); se
+    # deja auto-cargar sus fuentes al no ser el set completo de partidos.
+    resolve_sources(matches, request.user, request.quiniela)
+
+    context = {
+        "team": team,
+        "phases": phases,
+        "team_points": team_points,
+        "team_played": team_played,
+        "match_dialog_data": build_match_dialog_payload(
+            matches, request.user, request.quiniela
+        ),
+    }
+    return render(request, "_team_detail_fragment.html", context)
 
 
 @login_required

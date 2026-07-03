@@ -1,0 +1,12 @@
+{# Shell del dialog de equipo: bandera grande + todos sus partidos como #}
+{# tarjetas de solo lectura. team_dialog.js hace fetch a /<slug>/equipo/ #}
+{# <id>/ e inyecta el fragmento en el body; las tarjetas conservan su #}
+{# [data-dialog-match] y siguen abriendo el match-dialog. #}
+<dialog id="team-dialog" class="send-dialog team-dialog">
+    <div class="send-dialog-head">
+        <span id="team-dialog-title"></span>
+        <button class="dialog-x" type="button" data-team-close
+                aria-label="Cerrar">✕</button>
+    </div>
+    <div class="send-dialog-body" id="team-dialog-body"></div>
+</dialog>

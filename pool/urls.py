@@ -35,6 +35,11 @@ urlpatterns = [
         name="group_standings",
     ),
     path("ventana/<int:order>/", stages.window_view, name="window"),
+    path(
+        "equipo/<int:team_id>/",
+        stages.team_detail_view,
+        name="team_detail",
+    ),
     path("save/", predictions.save_predictions, name="save"),
     path(
         "prediction/<int:match_id>/",

@@ -23,9 +23,18 @@
             byId.set(String(m.id), m);
         }
     }
-    if (!byId.size) return;
     const title = document.getElementById("match-dialog-title");
     const body = document.getElementById("match-dialog-body");
+
+    // Alta dinámica: team_dialog.js suma los partidos del equipo traídos
+    // por fetch para que sus tarjetas también abran este dialog. Por eso
+    // no cortamos aunque byId venga vacío (p. ej. página sin partidos hoy).
+    window.matchDialog = {
+        add(rows) {
+            if (!Array.isArray(rows)) return;
+            for (const m of rows) byId.set(String(m.id), m);
+        },
+    };
 
     /* Espejos de constantes del server: LIVE_WINDOW (2 h) en
        pool/views/stages.py y RECORD_DELAY (105 min) en
@@ -489,6 +498,9 @@
         // un tap en los inputs no debe abrir el dialog. El resumen de
         // envío clona .match-card, así que ahí tampoco aplica.
         if (target.closest("input, #send-dialog")) return false;
+        // Un clic en un nombre/bandera de equipo abre el dialog de equipo
+        // (team_dialog.js), no el de partido, aun dentro de una tarjeta.
+        if (target.closest("[data-dialog-team]")) return false;
         const trigger = target.closest("[data-dialog-match]");
         if (!trigger) return false;
         const data = byId.get(trigger.dataset.dialogMatch);

@@ -16,7 +16,7 @@
     <tbody>
         {% for row in table.rows %}
         <tr>
-            <td class="st-team">
+            <td class="st-team cursor-pointer" data-dialog-team="{{ row.team.id }}">
                 <span class="st-pos">{{ forloop.counter }}</span>
                 {% if row.team.flag_path %}<img src="{% static row.team.flag_path %}" alt="">{% endif %}
                 <span class="st-name">{{ row.team.name_es }}</span>

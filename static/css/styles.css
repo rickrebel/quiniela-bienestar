@@ -450,11 +450,28 @@
 /* Leaderboard/reglas dentro de su Dialog: cierre con X en el header (sin
    botón inferior). */
 #leaderboard-dialog .send-dialog-head,
-#rules-dialog .send-dialog-head {
+#rules-dialog .send-dialog-head,
+#team-dialog .send-dialog-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+/* En móvil el chrome del dialog robaba ancho a las tarjetas (que ya traen
+   su propio padding lateral interno): se ensancha el dialog y se quita el
+   padding lateral del body y el margen lateral de cada tarjeta. */
+#team-dialog {
+  width: min(440px, 98vw);
+}
+#team-dialog .send-dialog-body {
+  padding-left: 2px;
+  padding-right: 2px;
+}
+#team-dialog .match-card {
+  margin-inline: 0;
+}
+#team-dialog .pred-group-head {
+  margin-inline: 2px;
 }
 .dialog-x {
   flex-shrink: 0;

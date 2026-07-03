@@ -120,6 +120,7 @@
 {# de hoy; las tarjetas de página suman sus datos en su propio json_script. #}
 {{ today_dialog_data|json_script:"today-dialog-data" }}
 {% include 'match_dialog.html' %}
+{% include 'team_dialog.html' %}
 
 {# Dialog de reglas: lo abre la opción "Reglas" del menú de usuario #}
 {# (app.js). Contenido compartido con la página /reglas/. #}

@@ -1,0 +1,30 @@
+{% load static %}
+{# Fragmento del dialog de equipo: hero (bandera HD + nombre + grupo) y #}
+{# sus partidos agrupados por fase (las 3 jornadas de grupo se funden en #}
+{# "Fase de grupos"), como tarjetas de solo lectura. team_dialog.js lo #}
+{# inyecta por fetch, lee nombre/puntos del root para la cabecera del #}
+{# dialog, y fusiona el json_script final en el match-dialog para que #}
+{# cada tarjeta abra su detalle (window.matchDialog.add). #}
+<div class="team-detail" data-team-name="{{ team.name_es }}"
+     data-team-points="{% if team_played %}{{ team_points|floatformat:'-1' }} pts{% endif %}">
+    <div class="mx-2 mb-1 mt-1 flex items-center gap-3">
+        {% if team.flag_path_hd %}
+        <img class="team-detail-flag h-14 w-auto rounded-md"
+             src="{% static team.flag_path_hd %}" alt="{{ team.name_es }}">
+        {% endif %}
+        <div class="flex flex-col">
+            <span class="team-detail-name text-lg font-bold leading-tight">{{ team.name_es }}</span>
+            <span class="text-sm text-base-content/60">Grupo {{ team.group_name }}</span>
+        </div>
+    </div>
+
+    {% for phase in phases %}
+    <h6 class="pred-group-head">{{ phase.label }}{% if phase.points %}<span class="ml-auto normal-case tracking-normal">{{ phase.points|floatformat:"-1" }} pts</span>{% endif %}</h6>
+    {% for m in phase.matches %}
+    <c-match-card :match="m" :stage="m.stage" state="locked"
+                  :is_group_stage="m.is_group" :by_date="m.is_group" />
+    {% endfor %}
+    {% endfor %}
+
+    {{ match_dialog_data|json_script:"team-dialog-match-data" }}
+</div>

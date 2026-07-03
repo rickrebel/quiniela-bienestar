@@ -30,6 +30,7 @@ def _team(team, placeholder: str) -> dict:
         # HD (80px webp) sólo en esta vista; el resto usa Team.flag_path (40px).
         flag = f"flags_80/{team.flag_code}.webp" if team.flag_code else ""
         return {
+            "id": team.id,
             "code": team.flag_code,
             "name": team.name_es or team.name,
             "flag_url": static(flag) if flag else "",
