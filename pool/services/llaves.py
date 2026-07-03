@@ -110,17 +110,23 @@ def _advancers(
 ) -> tuple[Team | None, Team | None]:
     """``(real, pronosticado)`` equipo que avanza de este partido.
 
-    ``real`` = ganador ya conocido (``winner_team``). ``pronosticado`` = el que
-    el jugador pasa entre sus 2 contendientes pronosticados (avances de los
-    hijos, recursivo), o ``None`` si su cadena de pronóstico no llega aquí."""
+    ``real`` = ganador ya conocido (``winner_team``). ``pronosticado`` = el
+    que el jugador pasa entre los 2 contendientes de sus slots: el avance
+    REAL del hijo si ya se conoce (el pronóstico se capturó contra los
+    equipos reales, y ``advancing_team`` se valida contra ellos), o su
+    avance pronosticado mientras no haya resultado. ``None`` si la cadena
+    no llega hasta aquí."""
     match = node["match"]
     real = winner_team(match)
     children = node["children"]
     if children:
-        home_pred = _advancers(children[0], preds)[1]
-        away_pred = (
-            _advancers(children[1], preds)[1] if len(children) > 1 else None
-        )
+        home_real, home_pick = _advancers(children[0], preds)
+        home_pred = home_real if home_real is not None else home_pick
+        if len(children) > 1:
+            away_real, away_pick = _advancers(children[1], preds)
+            away_pred = away_real if away_real is not None else away_pick
+        else:
+            away_pred = None
     else:
         home_pred, away_pred = match.home_team, match.away_team
     picked = _pred_pick(preds.get(match.id), home_pred, away_pred)

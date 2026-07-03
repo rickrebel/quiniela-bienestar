@@ -5,7 +5,8 @@ description: How the /llaves knockout bracket visualization is built — the rad
   circles/flags, the "explode" separation between wings, and the calibrated 16avos
   spacing. Use whenever working on the llaves / bracket / eliminatorias / árbol radial /
   óvalo view, the circle sizes per phase, the ellipse shape, the flag rings, the
-  spacing between matches/groups/top-bottom/left-right, or the geometry-check script.
+  spacing between matches/groups/top-bottom/left-right, the predicted advancer
+  flags / advancing chain, or the geometry-check script.
 ---
 
 # llaves-bracket
@@ -13,30 +14,57 @@ description: How the /llaves knockout bracket visualization is built — the rad
 The `/<slug>/llaves/` page draws the knockout bracket as a **vertical oval
 (ellipse) tree** in SVG with vanilla JS (no React, no d3). Each match is a pair
 of circles (the two teams' flags); winners advance inward toward the final at
-the center. It is a *display* of the real bracket — deeper rounds render as
-empty placeholder circles until the cruces resolve.
+the center. Slots without a real result show the **player's predicted
+advancer** as a faded flag (opacity 0.28) and their predicted score; real
+results replace them at full opacity.
 
 ## Files
 
 | File | Role |
 |------|------|
 | `static/llaves.js` | All geometry + rendering. The heart of the view. |
-| `pool/services/llaves.py` | `build_bracket()` → JSON payload (the 16 LAST_32 matches ordered by the real tree). |
-| `templates/llaves.html` | Shell: `#bracket-svg`, `#bracket-panel`, `{{ bracket\|json_script:"bracket-data" }}`, back button. |
+| `pool/services/llaves.py` | `build_bracket(user, quiniela)` → JSON payload: 16 LAST_32 matches (tree order) + `tree` of real/predicted advancers. |
+| `pool/services/bracket.py` | Shared KO helpers: `winner_team`, `SOURCE_RE` (`W##`/`L##` placeholders). |
+| `pool/tests/test_llaves.py` | In-memory tests of the advancing chain (`_advancers`). |
+| `templates/llaves.html` | Shell: `#bracket-svg` (with `data-copa`), `{{ bracket\|json_script:"bracket-data" }}`, floating back button. |
 | `.claude/llaves_geom_check.mjs` | **Dev-only** headless geometry check (no DOM): measures overlaps, spacings and the bbox. Run with `node`. |
 
-Data flow: `views` → `build_bracket()` → `json_script#bracket-data` →
-`llaves.js` reads/parses it on `DOMContentLoaded` → `computeLayout()` →
-`render()`.
+Data flow: `views` → `build_bracket(user, quiniela)` →
+`json_script#bracket-data` → `llaves.js` reads/parses it on `DOMContentLoaded`
+→ `computeLayout()` → `render()`.
 
 ## Data side (`pool/services/llaves.py`)
 
-`build_bracket()` returns `{ "matches": [...16...] }`. The **order** is what
-`llaves.js`'s wing layout consumes — derived from the real tree by walking `W##`
+`build_bracket(user, quiniela)` returns `{ "matches": [...16...], "tree": {...} }`.
+
+**`matches`** — the 16 LAST_32 matches. The **order** is what `llaves.js`'s
+wing layout consumes — derived from the real tree by walking `W##`
 placeholders from the final down to the leaves (`_leaf_order`), so adjacent
-pairs feed the same octavos. Each match dict: `home`/`away` (`{name, flag_url,
-code}` or placeholder text + empty flag), `played`, `home_goals`, `away_goals`,
-`winner`.
+pairs feed the same octavos. Each match dict: `home`/`away` (`{id, name,
+flag_url, code}` or placeholder text + empty flag), `played`, `home_goals`,
+`away_goals`, `winner`, and `pred` (the player's prediction: `home_goals`,
+`away_goals`, `winner` = who they pass to octavos, or `null`).
+
+**`tree`** — advancers for the scoreless deeper phases, aligned with the 4
+groups-of-4 of the layout: `cuartos[i]` (group Gi) has `octavos` (2 slots →
+the cuarto's 2 circles) and `cuarto` (1 slot → a semifinal circle);
+`semis[k]` fills a final circle; `final` is just a score. Each **slot** is
+`{real, pred, score}`: the real advancer of that node's match, the predicted
+one, and the score to paint over its pair (real if `FINISHED`, else the
+player's, via `_score`).
+
+### The advancing chain (`_advancers` / `_pred_pick`)
+
+Per node, `_advancers` returns `(real, predicted)` advancer. The contender
+feeding each slot is the child's **real winner when known, falling back to
+the child's predicted advancer** — this re-anchoring is load-bearing:
+predictions are captured against the real teams (`save_prediction` validates
+`advancing_team` against `match.home_team_id`/`away_team_id`), so
+interpreting them against the fantasy chain paints wrong flags and breaks
+the penalty-pick match-up. `_pred_pick` resolves one prediction: higher
+goals → that contender; draw → `advancing_team` if it equals a contender;
+otherwise `None` (chain broken → empty circle). Covered by
+`pool/tests/test_llaves.py`.
 
 **Flags are HD here only.** `_team()` builds `flags_80/{flag_code}.webp` (80px)
 *for this view*; the rest of the project uses `Team.flag_path` = `flags_40/...png`.
@@ -55,7 +83,7 @@ separator length `L[phase]`, while the oval elongates to use mobile height.
 var CX = 192, CY = 345;          // center
 var AX = 170, AY = 280;          // semi-axes of the OUTER ellipse (16avos)
 var K   = [1.0, 0.74, 0.49, 0.20]; // ellipse scale per phase: 16avos, oct, cuartos, semis
-var L   = [34, 40, 46, 50, 64];  // pair separator per phase (+ final)
+var L   = [34, 40, 46, 50, 76];  // pair separator per phase (+ final)
 var RAD = [14, 16, 18, 20, 23];  // circle radius per phase (+ final)
 var SEAMR = 1.18;                // base seam scale (sets `da`)
 var CLUSTER = 0.103;             // tightness of the octavos-pair (intra gap = da·(1-CLUSTER))
@@ -79,6 +107,11 @@ Phase index order everywhere is **`[16avos, octavos, cuartos, semis, final]`**.
   angle; **`i` is also the "explode" group** (see below):
   `0 topL(180)`, `1 topR(270)`, `2 botR(0)`, `3 botL(90)`. The two top wings
   (0,1) feed the top semifinal; the two bottom (3,2) feed the bottom one.
+  Each wing also carries **`gi`**, the tree group-of-4 (the `matches` slice
+  and the `tree.cuartos[]` index) — it differs from the wing index at the
+  bottom because the geometry crosses there (wing 2 ↔ G3, wing 3 ↔ G2).
+  Node `side` (`home`/`away`) picks which number of the pair's `score` each
+  circle shows: home = circle `b`, away = circle `a`.
 - **Placement inside a wing** — `off = [0, gIntra, gIntra+gInter, 2·gIntra+gInter]`
   where `gIntra = da·(1-CLUSTER)` (the two 16avos that share an octavos, tight)
   and `gInter = da·INTER` (the "diagonal" division between the wing's two
@@ -136,12 +169,22 @@ the four constants.
 - Sets the SVG `viewBox` (currently `"4 45 376 601"`) — **must be re-fit** to the
   content bbox whenever geometry changes, or there's dead space / clipping. The
   check script prints a suggested viewBox.
-- Draws `links` first (thin stems, thicker separators), then `nodes` (a
-  `base-300` bg circle + the flag `<image>` clipped to a circle + a `ring`).
-  Flag `<image>` size derives from `n.r` → circles scale automatically with
-  `RAD`.
-- Click a match circle → `selectMatch` highlights it and fills `#bracket-panel`.
-  The panel label is hardcoded **"16avos de final"**.
+- Draws `links` first (played matches get solid strokes, pending ones faint),
+  then `nodes` (a `base-300` bg circle + glow source + `ring` + the flag
+  `<image>` clipped to a circle). Flag `<image>` size derives from `n.r` →
+  circles scale automatically with `RAD`.
+- Per node, the flag is `n.team || n.winner` (real) or, failing that,
+  `n.predWinner` painted at **opacity 0.28** (estimate). The real winner of a
+  played match gets a primary ring + `#win-glow` halo (`paint()`).
+- **Scores** render next to each pair on every phase that has one: real if
+  played (winning side in primary), predicted in diluted `base-content`. The
+  number sits on the outward perpendicular from the pair's `mid`, shifted
+  `ALONG` toward its own circle.
+- The only interaction: any circle with a real-or-estimated team sets
+  `data-dialog-team` → opens the team dialog (global delegation in
+  `team_dialog.js`). There is no side panel.
+- The copa image (`data-copa` on `#bracket-svg`) is drawn between the final's
+  two circles, decorative.
 
 ## Geometry-check script (tuning workflow)
 
@@ -161,7 +204,9 @@ Workflow to change sizes/spacing safely:
 4. `node --check static/llaves.js`.
 
 Keep the script's constants in sync with `llaves.js` when documenting a new
-baseline. The script is dev-only — it is not shipped or collected.
+baseline. Known drift: the script still has `L[4]=64` while `llaves.js` uses
+`76` (the final's pair was widened to fit the copa) — don't copy 64 back.
+The script is dev-only — it is not shipped or collected.
 
 ## Gotchas
 
@@ -172,6 +217,9 @@ baseline. The script is dev-only — it is not shipped or collected.
   gentle.
 - **`AY > AX`** makes the oval taller than wide (mobile). Reducing `AY` flattens
   it; re-fit the viewBox afterward.
-- **Deeper-round circles are empty** (no team/flag) by design; only 16avos carry
-  home/away flags and octavos carry winners.
+- **Never interpret a stored prediction against the fantasy chain.** Score
+  predictions and `advancing_team` refer to the match's real slots/teams at
+  capture time; `_advancers` must keep preferring the child's real winner
+  over the predicted one when building contenders, or flags come out wrong
+  and draw+penalty picks stop matching (see `test_llaves.py`).
 - Flags come from `flags_80` **only in `llaves.py`** — see the flags note above.
