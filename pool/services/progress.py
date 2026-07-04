@@ -14,7 +14,7 @@ from django.templatetags.static import static
 
 from pool.models import (
     Prediction, Quiniela, ScoreSnapshot, User, UserQuiniela)
-from pool.services.evaluation import multiplier_by_stage
+from pool.services.evaluation import multiplier_resolver
 from pool.services.leaderboard import build_leaderboard
 from tournament.models import Match
 
@@ -34,6 +34,9 @@ def _match_entry(match: Match) -> dict:
         return static(team.flag_path) if team and team.flag_path else ""
 
     return {
+        # ``id`` conecta cada etiqueta del eje X con el match-dialog
+        # (data-dialog-match); su payload viaja aparte en la vista.
+        "id": match.id,
         "home": code(match.home_team if match.home_team_id else None,
                      match.home_placeholder),
         "away": code(match.away_team if match.away_team_id else None,
@@ -79,8 +82,13 @@ def _start_cutoff(quiniela: Quiniela):
     return None
 
 
-def build_progress(quiniela: Quiniela, me: User) -> dict:
-    """Estructura serializable para la gráfica de ``quiniela``.
+def build_progress(
+    quiniela: Quiniela, me: User
+) -> tuple[dict, list[Match]]:
+    """Estructura serializable para la gráfica de ``quiniela`` y la lista
+    de partidos finalizados que la componen (esta última la usa la vista
+    para armar el payload del match-dialog del eje X; ya viene con el
+    ``select_related`` que ``build_match_dialog_payload`` necesita).
 
     - ``ticks``: tandas en orden; el tick 0 es la salida (todos en cero)
       para que las líneas nazcan de un origen común. Cada tick trae su
@@ -108,9 +116,10 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
     )
 
     # Tandas: partidos con el mismo ``datetime`` comparten tick (el
-    # acumulado es por tanda, no por partido). El ``multiplier`` de la
-    # ventana pondera el ancho del bloque en el eje X (resuelto por fase).
-    mult_by_stage = multiplier_by_stage(quiniela)
+    # acumulado es por tanda, no por partido). El ``multiplier`` pondera el
+    # ancho del bloque en el eje X (resuelto por partido: el tercer lugar
+    # puede pesar distinto de la final aunque compartan ``Stage``).
+    resolve_multiplier = multiplier_resolver(quiniela)
     tick_of_dt: dict = {}
     ticks: list[dict] = [
         {"date": "", "stage": "Salida", "phase": "Salida",
@@ -130,7 +139,7 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
                 "stage": m.stage.short_name,
                 "phase": phase,
                 "matches": [],
-                "multiplier": float(mult_by_stage.get(m.stage_id, 1)),
+                "multiplier": float(resolve_multiplier(m)),
             })
         ticks[tick_of_dt[m.datetime]]["matches"].append(_match_entry(m))
 
@@ -178,7 +187,8 @@ def build_progress(quiniela: Quiniela, me: User) -> dict:
             if row.user.id != me.id and row.user.id not in defaults:
                 defaults.append(row.user.id)
 
-    return {"ticks": ticks, "series": series, "defaults": defaults}
+    return {"ticks": ticks, "series": series,
+            "defaults": defaults}, finished
 
 
 def _saved_selection(me: User, quiniela: Quiniela) -> list[int] | None:

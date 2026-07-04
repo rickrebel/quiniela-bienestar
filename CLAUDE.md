@@ -136,8 +136,13 @@ The project venv lives at `venv/` inside the repo (interpreter:
   `anexo_c.py:assign_thirds(qualified_groups)`; LAST_32 resolution +
   variant-aware thirds table wired in `views/stages.py:stage_view`.
 - **`Window.multiplier`** (Decimal, default 1) is a per-window scoring weight
-  (1, 1.5, 2 … 10×), resolved per stage by `evaluation.py:multiplier_by_stage`
-  (the window of that quiniela whose `stages` contain `match.stage`).
+  (1, 1.5, 2 … 10×), resolved **per match** by
+  `evaluation.py:multiplier_resolver` (the window of that quiniela whose
+  `stages` contain `match.stage`). The nullable
+  `Window.third_place_multiplier` overrides it for the third-place match
+  only (`Match.is_third_place`, of_number 103) — same FINAL tab and send,
+  different weight; null = inherit. Set via admin;
+  `seed_windows` never writes either field.
   `evaluation.py` stores `Prediction.points = base × multiplier` (Decimal).
   Display as `{{ value|floatformat:"-1" }}` → "5" / "16.5".
 - **`Prediction.advancing_team`** (FK→Team, nullable) records who the player

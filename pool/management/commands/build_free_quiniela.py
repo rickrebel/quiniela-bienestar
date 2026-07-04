@@ -113,6 +113,7 @@ class Command(BaseCommand):
                     "short_name": src.short_name,
                     "color": src.color,
                     "multiplier": src.multiplier,
+                    "third_place_multiplier": src.third_place_multiplier,
                     "opens_at": OPENS_AT,
                     "send_deadline": NO_DEADLINE,
                 },

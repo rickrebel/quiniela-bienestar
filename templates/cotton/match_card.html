@@ -58,19 +58,23 @@
     <div class="match grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]
                 items-center gap-[7px] bg-neutral"
          data-match-id="{{ match.id }}">
-        <div class="team flex items-center justify-end gap-1.5 text-right{% if match.home_team %} cursor-pointer{% endif %}"
-             {% if match.home_team %}data-dialog-team="{{ match.home_team.id }}"{% endif %}>
+        <div class="team flex items-center justify-end gap-1.5 text-right">
             {% if match.home_team %}
-            <span class="{{ match.home_mark }} text-[15px] font-semibold
-                         leading-[1.1]">{{ match.home_team.name_es }}</span>
-            {% if match.home_team.flag_path %}
-            <img class="max-h-6 max-w-[30px] rounded-[3px]"
-                 src="{% static match.home_team.flag_path %}"
-                 alt="{{ match.home_team.name_es }}">
-            {% elif match.home_team.crest %}
-            <img class="max-h-6 max-w-[30px] rounded-[3px]"
-                 src="{{ match.home_team.crest }}" alt="">
-            {% endif %}
+            {# Solo nombre+bandera abren el dialog de equipo; el resto de la #}
+            {# columna queda para el dialog de partido (data-dialog-match). #}
+            <div class="flex items-center gap-1.5 cursor-pointer"
+                 data-dialog-team="{{ match.home_team.id }}">
+                <span class="{{ match.home_mark }} text-[15px] font-semibold
+                             leading-[1.1]">{{ match.home_team.name_es }}</span>
+                {% if match.home_team.flag_path %}
+                <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                     src="{% static match.home_team.flag_path %}"
+                     alt="{{ match.home_team.name_es }}">
+                {% elif match.home_team.crest %}
+                <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                     src="{{ match.home_team.crest }}" alt="">
+                {% endif %}
+            </div>
             {% elif match.home_contenders %}
             <c-contenders :teams="match.home_contenders" align="end" />
             {% else %}
@@ -120,19 +124,21 @@
             {% endif %}
         </div>
 
-        <div class="team flex items-center gap-1.5{% if match.away_team %} cursor-pointer{% endif %}"
-             {% if match.away_team %}data-dialog-team="{{ match.away_team.id }}"{% endif %}>
+        <div class="team flex items-center gap-1.5">
             {% if match.away_team %}
-            {% if match.away_team.flag_path %}
-            <img class="max-h-6 max-w-[30px] rounded-[3px]"
-                 src="{% static match.away_team.flag_path %}"
-                 alt="{{ match.away_team.name_es }}">
-            {% elif match.away_team.crest %}
-            <img class="max-h-6 max-w-[30px] rounded-[3px]"
-                 src="{{ match.away_team.crest }}" alt="">
-            {% endif %}
-            <span class="{{ match.away_mark }} text-[15px] font-semibold
-                         leading-[1.1]">{{ match.away_team.name_es }}</span>
+            <div class="flex items-center gap-1.5 cursor-pointer"
+                 data-dialog-team="{{ match.away_team.id }}">
+                {% if match.away_team.flag_path %}
+                <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                     src="{% static match.away_team.flag_path %}"
+                     alt="{{ match.away_team.name_es }}">
+                {% elif match.away_team.crest %}
+                <img class="max-h-6 max-w-[30px] rounded-[3px]"
+                     src="{{ match.away_team.crest }}" alt="">
+                {% endif %}
+                <span class="{{ match.away_mark }} text-[15px] font-semibold
+                             leading-[1.1]">{{ match.away_team.name_es }}</span>
+            </div>
             {% elif match.away_contenders %}
             <c-contenders :teams="match.away_contenders" align="start" />
             {% else %}

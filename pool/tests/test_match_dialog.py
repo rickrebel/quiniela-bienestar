@@ -49,14 +49,14 @@ class GroupPredictionsTests(SimpleTestCase):
 
 
 class DiffLabelTests(SimpleTestCase):
-    def test_home_wins_plural(self):
-        self.assertEqual(diff_label(2, "MEX", "CAN"), "MEX  +2 goles")
+    def test_plural(self):
+        self.assertEqual(diff_label(2), "+2 goles")
 
-    def test_away_wins_singular(self):
-        self.assertEqual(diff_label(-1, "MEX", "CAN"), "CAN  +1 gol")
+    def test_singular_uses_magnitude(self):
+        self.assertEqual(diff_label(-1), "+1 gol")
 
     def test_draw(self):
-        self.assertEqual(diff_label(0, "MEX", "CAN"), "Empate")
+        self.assertEqual(diff_label(0), "Empate")
 
 
 class PointsDisplayTests(SimpleTestCase):
@@ -175,7 +175,7 @@ class DialogPayloadPrivacyTests(TestCase):
         payload = self._payload_for(self.closed_match)
         self.assertEqual([g["diff"] for g in payload["groups"]], [1, -1])
         self.assertEqual([g["label"] for g in payload["groups"]],
-                         ["MEX  +1 gol", "CAN  +1 gol"])
+                         ["+1 gol", "+1 gol"])
 
     def test_is_knockout_follows_stage(self):
         self.assertFalse(self._payload_for(self.open_match)["is_knockout"])

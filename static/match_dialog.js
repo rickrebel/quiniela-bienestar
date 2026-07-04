@@ -172,14 +172,45 @@
         return span;
     }
 
+    function flagImg(src) {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "";
+        return img;
+    }
+
+    /* Línea de puntos + chips. Reutilizada abajo de cada marcador o, cuando
+       la diferencia del grupo no coincide con la final (todos los subgrupos
+       puntúan igual), una sola vez centrada en el header. El texto va dorado
+       si sumó y atenuado en "0 pts"; los chips agrupados aparte para separar
+       ambos bloques. */
+    function evalLine(points, chips) {
+        const line = el("div", "pred-sub-eval");
+        const pts = el("span", "pred-pts", `${points.total} pts`);
+        pts.classList.add(points.total > 0 ? "pred-pts--gold"
+                                           : "pred-pts--muted");
+        line.append(pts);
+        const chipGroup = el("div", "pred-chips");
+        for (const chip of chips) chipGroup.append(predChip(chip));
+        line.append(chipGroup);
+        return line;
+    }
+
     /* Un subgrupo = un marcador exacto. Arriba el marcador a la izquierda
        y los nombres en columnas a la derecha; abajo, centrada, la línea
-       de puntos + 3 chips (solo si el partido terminó). */
-    function subgroupRow(sub) {
+       de puntos + chips — salvo que ``showEval`` sea falso (los puntos ya
+       viven en el header porque son idénticos para todo el grupo). El
+       marcador va dorado si es idéntico al real, atenuado si no acertó. */
+    function subgroupRow(sub, showEval, finished, score) {
         const row = el("div", "pred-sub");
 
         const top = el("div", "pred-sub-top");
         const result = el("div", "pred-sub-result");
+        if (finished) {
+            const hit = sub.home === score.home && sub.away === score.away;
+            result.classList.add(hit ? "pred-sub-result--hit"
+                                     : "pred-sub-result--miss");
+        }
         // Spans (no "a - b") para controlar el espaciado del guión.
         result.append(
             el("span", null, String(sub.home)),
@@ -196,12 +227,8 @@
         top.append(names);
         row.append(top);
 
-        if (sub.points) {
-            const evalLine = el("div", "pred-sub-eval");
-            evalLine.append(el("span", "pred-pts",
-                `${sub.points.total} pts`));
-            for (const chip of sub.chips) evalLine.append(predChip(chip));
-            row.append(evalLine);
+        if (showEval && sub.points) {
+            row.append(evalLine(sub.points, sub.chips));
         }
         return row;
     }
@@ -420,37 +447,63 @@
                 "Nadie guardó predicción para este partido."));
             return wrap;
         }
+        // Diferencia real (para decidir dónde van los puntos): si no coincide
+        // con la del grupo, todos sus subgrupos puntúan igual y el desglose
+        // se muestra una vez, centrado en el header.
+        const finalDiff = data.finished
+            ? data.score.home - data.score.away : null;
+
         for (const group of data.groups) {
             const head = el("h6", "pred-group-head");
+            const gtitle = el("span", "pred-group-title");
             if (group.advancing_side) {
                 // Empate repartido por equipo que avanza: "Empate pasa 🏴 COD"
                 // (la bandera va en medio, no al inicio).
-                head.append(el("span", null, "Empate pasa"));
+                gtitle.append(el("span", null, "Empate pasa"));
                 const f = group.advancing_side === "home"
                     ? data.home.flag : data.away.flag;
-                if (f) {
-                    const img = document.createElement("img");
-                    img.src = f;
-                    img.alt = "";
-                    head.append(img);
-                }
-                head.append(el("span", null, group.advancing_code));
+                if (f) gtitle.append(flagImg(f));
+                gtitle.append(el("span", null, group.advancing_code));
+            } else if (group.diff === 0) {
+                // Empate: solo banderas (local · "Empate" · visitante), sin
+                // códigos.
+                if (data.home.flag) gtitle.append(flagImg(data.home.flag));
+                gtitle.append(el("span", null, group.label));
+                if (data.away.flag) gtitle.append(flagImg(data.away.flag));
             } else {
-                // Banderita del que gana en este grupo, antes del texto; en
-                // empate no hay.
-                const flag = group.diff > 0 ? data.home.flag
-                    : group.diff < 0 ? data.away.flag : null;
-                if (flag) {
-                    const img = document.createElement("img");
-                    img.src = flag;
-                    img.alt = "";
-                    head.append(img);
+                // Ventaja local: "🏴 COD  +N goles"; visitante, invertido:
+                // "+N goles  COD 🏴" (bandera siempre pegada al código).
+                const winner = group.diff > 0 ? data.home : data.away;
+                const team = el("span", "pred-group-team");
+                const flag = winner.flag ? flagImg(winner.flag) : null;
+                const code = el("span", null, winner.fifa_code);
+                const diff = el("span", null, group.label);
+                if (group.diff > 0) {
+                    if (flag) team.append(flag);
+                    team.append(code);
+                    gtitle.append(team, diff);
+                } else {
+                    team.append(code);
+                    if (flag) team.append(flag);
+                    gtitle.append(diff, team);
                 }
-                head.append(el("span", null, group.label));
+            }
+            // La diferencia coincide con la real (o empate vs empate): quien
+            // atinó la diferencia se resalta con el título en dorado.
+            if (data.finished && finalDiff === group.diff) {
+                gtitle.classList.add("pred-group-title--hit");
+            }
+            head.append(gtitle);
+
+            const first = group.subgroups[0];
+            const headerEval = data.finished && finalDiff !== group.diff;
+            if (headerEval && first && first.points) {
+                head.append(evalLine(first.points, first.chips));
             }
             wrap.append(head);
             for (const sub of group.subgroups) {
-                wrap.append(subgroupRow(sub));
+                wrap.append(subgroupRow(
+                    sub, !headerEval, data.finished, data.score));
             }
         }
         return wrap;

@@ -7,6 +7,7 @@ completa (resetea y reevalúa todo), se llama tras cada captura de
 resultado.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from itertools import groupby
@@ -33,17 +34,32 @@ def rule_maps(quiniela: Quiniela) -> tuple[dict[str, int], dict[str, "Rule"]]:
     return points_by_code, rules_by_code
 
 
-def multiplier_by_stage(quiniela: Quiniela) -> dict[int, Decimal]:
-    """``stage_id`` → multiplicador de la ventana que la cubre en la quiniela.
+def multiplier_resolver(
+    quiniela: Quiniela,
+) -> Callable[[Match], Decimal]:
+    """Fábrica del resolvedor de multiplicador por partido.
 
-    Resuelve el peso por fase sin consultar la BD por partido: una sola
-    pasada sobre las ventanas (con ``stages`` prefetcheadas).
+    El peso normal es el de la ventana que cubre la fase del partido, salvo
+    el tercer lugar cuando la ventana define ``third_place_multiplier`` (los
+    dos partidos de la final comparten ``Stage``/``Window``, pero se quiere
+    ponderar el tercer lugar aparte). Precalcula los dicts en una sola
+    pasada sobre las ventanas (con ``stages`` prefetcheadas) y devuelve una
+    función barata por partido.
     """
-    result: dict[int, Decimal] = {}
+    by_stage: dict[int, Decimal] = {}
+    third_by_stage: dict[int, Decimal] = {}
     for window in quiniela.windows.all():
         for stage in window.stages.all():
-            result[stage.id] = window.multiplier
-    return result
+            by_stage[stage.id] = window.multiplier
+            if window.third_place_multiplier is not None:
+                third_by_stage[stage.id] = window.third_place_multiplier
+
+    def resolve(match: Match) -> Decimal:
+        if match.is_third_place and match.stage_id in third_by_stage:
+            return third_by_stage[match.stage_id]
+        return by_stage.get(match.stage_id, Decimal("1"))
+
+    return resolve
 
 
 def _hit_codes(
@@ -156,7 +172,7 @@ def recompute_all() -> None:
         "quiniela_rules__rule", "windows__stages")
     for quiniela in quinielas:
         points_by_code, rules_by_code = rule_maps(quiniela)
-        stage_multiplier = multiplier_by_stage(quiniela)
+        resolve_multiplier = multiplier_resolver(quiniela)
         to_update = []
         through_rows = []
         predictions = Prediction.objects.filter(
@@ -166,8 +182,7 @@ def recompute_all() -> None:
             evaluation = evaluate_scoreline(
                 pred.home_goals, pred.away_goals, match, points_by_code,
                 advancing_team_id=pred.advancing_team_id,
-                multiplier=stage_multiplier.get(
-                    match.stage_id, Decimal("1")))
+                multiplier=resolve_multiplier(match))
             if evaluation is None:
                 continue
             pred.base_points = evaluation.base

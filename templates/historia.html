@@ -55,6 +55,9 @@
     </div>
 
     {{ progress|json_script:"history-data" }}
+    {# Datos del match-dialog de los partidos del eje X (banderas #}
+    {# clicleables). match_dialog.js los toma de este json_script. #}
+    {{ match_dialog_data|json_script:"match-dialog-data" }}
 </main>
 
 {% endblock %}

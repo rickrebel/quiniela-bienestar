@@ -9,15 +9,15 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 
 from django.db.models import Q
 
 from pool.models import Prediction, Quiniela, User, UserQuiniela
-from pool.services.evaluation import multiplier_by_stage
+from pool.services.evaluation import multiplier_resolver
 from tournament.models import Match
 
 ZERO = Decimal("0")
-ONE = Decimal("1")
 
 
 @dataclass
@@ -104,17 +104,22 @@ def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
             away_goals__isnull=False,
         ).values_list(
             "id", "home_goals", "away_goals", "datetime",
-            "stadium__utc_offset", "stage_id",
+            "stadium__utc_offset", "stage_id", "of_number",
         )
     )
-    results = {mid: (home, away) for mid, home, away, _, _, _ in finished}
-    # El peso de cada fase es por quiniela (la ventana que la cubre), no un
-    # atributo global del partido.
-    stage_multiplier = multiplier_by_stage(quiniela)
+    results = {
+        mid: (home, away) for mid, home, away, _, _, _, _ in finished}
+    # El peso es por partido, no solo por fase: el tercer lugar comparte
+    # ``Stage``/``Window`` con la final pero puede pesar distinto
+    # (``Window.third_place_multiplier``).
+    resolve_multiplier = multiplier_resolver(quiniela)
     max_points = sum(
         (Decimal(4) if home == away else Decimal(5))
-        * stage_multiplier.get(stage_id, ONE)
-        for _, home, away, _, _, stage_id in finished
+        * resolve_multiplier(SimpleNamespace(
+            stage_id=stage_id,
+            is_third_place=of_number == Match.THIRD_PLACE_NUMBER,
+        ))
+        for _, home, away, _, _, stage_id, of_number in finished
     ) if finished else ZERO
 
     # Baselines para la flecha de tendencia. "batch" = última tanda (los
@@ -128,12 +133,12 @@ def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
     if finished:
         local_date = {
             mid: (dt + timedelta(hours=offset or 0)).date()
-            for mid, _, _, dt, offset, _ in finished
+            for mid, _, _, dt, offset, _, _ in finished
         }
-        last_datetime = max(dt for _, _, _, dt, _, _ in finished)
+        last_datetime = max(dt for _, _, _, dt, _, _, _ in finished)
         last_day = max(local_date.values())
         batch_ids = {
-            mid for mid, _, _, dt, _, _ in finished if dt == last_datetime
+            mid for mid, _, _, dt, _, _, _ in finished if dt == last_datetime
         }
         day_ids = {mid for mid in results if local_date[mid] == last_day}
 

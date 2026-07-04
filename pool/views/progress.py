@@ -9,6 +9,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
 from pool.models import UserQuiniela
+from pool.services.match_dialog import build_match_dialog_payload
 from pool.services.progress import MAX_COMPARE, build_progress
 from pool.views.scope import with_quiniela
 
@@ -21,8 +22,13 @@ def history_view(request: HttpRequest) -> HttpResponse:
     incrustados (``json_script``). ``ensure_csrf_cookie`` garantiza la
     cookie para el autoguardado de la selección (la página no carga
     ``submit.js``)."""
-    data = build_progress(request.quiniela, request.user)
-    return render(request, "historia.html", {"progress": data})
+    data, matches = build_progress(request.quiniela, request.user)
+    # Payload del match-dialog de las banderas del eje X: match_dialog.js lo
+    # lee de #match-dialog-data al hacer clic en un partido.
+    dialog = build_match_dialog_payload(
+        matches, request.user, request.quiniela)
+    return render(request, "historia.html",
+                  {"progress": data, "match_dialog_data": dialog})
 
 
 @login_required

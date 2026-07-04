@@ -16,7 +16,7 @@ from django.templatetags.static import static
 
 from pool.models import Prediction, Quiniela, User
 from pool.services.evaluation import (
-    ScorelineEval, evaluate_scoreline, multiplier_by_stage, rule_maps)
+    ScorelineEval, evaluate_scoreline, multiplier_resolver, rule_maps)
 from pool.services.scoring import chips_from_codes
 from pool.utils import format_day, format_time
 from tournament.models import Match
@@ -57,18 +57,18 @@ def group_predictions(rows: list[dict]) -> list[dict]:
     return groups
 
 
-def diff_label(diff: int, home: str, away: str) -> str:
-    """Encabezado de grupo: '+N gol(es)' o 'Empate'.
+def diff_label(diff: int) -> str:
+    """Magnitud del encabezado de grupo: '+N gol(es)' o 'Empate'.
 
-    La bandera del equipo ganador la antepone el cliente (usa ``diff``);
-    la CSS lo pasa a mayúsculas → '🏴 +2 GOLES'.
+    Solo el texto de la diferencia; el cliente arma bandera, código y su
+    orden (invertido cuando la ventaja es del visitante) a partir de
+    ``diff``. La CSS lo pasa a mayúsculas → '+2 GOLES'.
     """
     if diff == 0:
         return "Empate"
-    team = home if diff > 0 else away
     n = abs(diff)
     unit = "gol" if n == 1 else "goles"
-    return f"{team}  +{n} {unit}"
+    return f"+{n} {unit}"
 
 
 def points_display(evaluation: ScorelineEval | None) -> dict | None:
@@ -288,7 +288,7 @@ def build_match_dialog_payload(
     records = user.can_record_results or user.is_superuser
     points_by_code = rule_maps(quiniela)[0]
     quiniela_has_penalty = "PENALTY" in points_by_code
-    mult_by_stage = multiplier_by_stage(quiniela)
+    resolve_multiplier = multiplier_resolver(quiniela)
     result = []
     for match in matches:
         finished = (
@@ -298,7 +298,7 @@ def build_match_dialog_payload(
         )
         payload = _match_payload(match, finished, records)
         if payload["revealed"]:
-            multiplier = mult_by_stage.get(match.stage_id, ONE)
+            multiplier = resolve_multiplier(match)
             is_draw = finished and match.home_goals == match.away_goals
             # El empate se parte en un grupo grande por equipo que avanza
             # (encabezado 'Empate pasa <code>') si la quiniela tiene la regla
@@ -315,11 +315,7 @@ def build_match_dialog_payload(
                     final_groups.extend(_advancing_groups(
                         group, match, points_by_code, multiplier, finished))
                     continue
-                group["label"] = diff_label(
-                    group["diff"],
-                    payload["home"]["fifa_code"],
-                    payload["away"]["fifa_code"],
-                )
+                group["label"] = diff_label(group["diff"])
                 # Mismo marcador en todo el subgrupo: el desglose se calcula
                 # una vez, no por persona.
                 if finished:

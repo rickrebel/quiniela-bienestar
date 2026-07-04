@@ -137,15 +137,22 @@
     const FLAG_W = 20, FLAG_H = 15;
     function xLabel(c, x, yTop) {
         const m = c.match;
+        // Con partido, la etiqueta se envuelve en un grupo clicleable que
+        // abre el match-dialog (delegación por data-dialog-match en
+        // match_dialog.js; el payload viaja en #match-dialog-data).
+        const wrap = inner => m && m.id != null
+            ? `<g class="hist-xflags" data-dialog-match="${m.id}"`
+                + ` style="cursor:pointer">${inner}</g>`
+            : inner;
         if (m && m.home_flag && m.away_flag) {
             const fx = (x - FLAG_W / 2).toFixed(1);
             const img = (href, y, code) =>
                 `<image href="${href}" x="${fx}" y="${y}" width="${FLAG_W}" height="${FLAG_H}" preserveAspectRatio="xMidYMid meet"><title>${code}</title></image>`;
-            return img(m.home_flag, yTop + 3, m.home)
-                + img(m.away_flag, yTop + 20, m.away);
+            return wrap(img(m.home_flag, yTop + 3, m.home)
+                + img(m.away_flag, yTop + 20, m.away));
         }
         const txt = m ? `${m.home} ${m.away}` : c.label;
-        return `<text class="hist-xlabel" x="${x.toFixed(1)}" y="${yTop + 16}">${txt}</text>`;
+        return wrap(`<text class="hist-xlabel" x="${x.toFixed(1)}" y="${yTop + 16}">${txt}</text>`);
     }
 
     function render() {

@@ -3,8 +3,8 @@
 Las definiciones viven aquí (como ``load_rules``): correr de nuevo el
 comando sincroniza el agrupamiento vía ``update_or_create`` sobre
 ``(quiniela, order)``, sin pisar el calendario/peso que el admin haya
-ajustado (``opens_at``/``send_deadline``/``multiplier`` no van en
-``defaults``).
+ajustado (``opens_at``/``send_deadline``/``multiplier``/
+``third_place_multiplier`` no van en ``defaults``).
 
 Estructura única compartida = las 8 fases atómicas. La diferencia entre
 quinielas es **cómo las agrupan**: la original concentra las 3 jornadas

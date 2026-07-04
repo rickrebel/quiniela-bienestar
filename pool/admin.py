@@ -32,7 +32,7 @@ class QuinielaAdmin(admin.ModelAdmin):
 class WindowAdmin(admin.ModelAdmin):
     list_display = (
         "quiniela", "order", "window_name", "multiplier",
-        "opens_at", "send_deadline")
+        "third_place_multiplier", "opens_at", "send_deadline")
     list_filter = ("quiniela",)
     ordering = ("quiniela", "order")
     filter_horizontal = ("stages",)

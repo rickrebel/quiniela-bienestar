@@ -1020,26 +1020,55 @@
   color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
   font-size: 12px;
 }
-/* Encabezado de grupo de predicciones: alineado a la izquierda, blanco,
-   con divisor neutro ligero. */
+/* Encabezado de grupo de predicciones: título a la izquierda y, cuando la
+   diferencia real no coincide, los puntos centrados (grid 3 columnas). */
 .pred-group-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 
   margin: 14px 0 2px;
   padding-top: 8px;
-  border-top: 1px solid color-mix(in oklch, var(--color-primary) 35%, transparent);
+  /* Divisor entre grandes grupos: color info (el mismo del título cuando no
+     se atina / está por jugar), sólido y grueso para que destaque. */
+  border-top: 2px solid color-mix(in oklch, var(--color-info) 60%, var(--color-base-100));
+}
+/* Título del grupo: azul frío (info), distinto del dorado que marca tu
+   nombre, los puntos ganados y el resultado real. Separa banderas/código de
+   la diferencia con su propio gap. */
+.pred-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: start;
 
-  color: var(--color-primary);
-  opacity: 0.85;
+  color: color-mix(in oklch, var(--color-info) 88%, transparent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-/* Banderita del grupo (al inicio en "gana"; en medio en "Empate pasa").
-   El flex del encabezado la centra vertical y la separa a ambos lados.
+/* Diferencia acertada (coincide con la real): dorado para señalar quién
+   atinó. */
+.pred-group-title--hit {
+  color: var(--color-primary);
+}
+/* Bandera + código juntos (gap chico); la "+N goles" queda separada por el
+   gap mayor del título. */
+.pred-group-team {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Puntos en el header (diferencia no coincidente): pegados a la derecha
+   (dan aire al título de la izquierda) y sin heredar mayúsculas ni color. */
+.pred-group-head .pred-sub-eval {
+  justify-self: end;
+  text-transform: none;
+  letter-spacing: normal;
+}
+/* Banderita del grupo (junto al código en "gana"; a los lados en "Empate").
    inline-block: el preflight de Tailwind vuelve block toda img. */
 .pred-group-head img {
   display: inline-block;
@@ -1064,7 +1093,8 @@
   align-items: start;
 }
 /* Marcador del pronóstico: blanco y compacto (guión pegado, atenuado),
-   a diferencia del resultado real arriba (dorado). */
+   a diferencia del resultado real arriba (dorado). Con partido jugado, se
+   tiñe según acierto (ver --hit/--miss). */
 .match-dialog .pred-sub-result {
   display: inline-flex;
   align-items: baseline;
@@ -1079,20 +1109,44 @@
   line-height: 1;
   white-space: nowrap;
 }
+/* Marcador idéntico al real: dorado (ambos números). */
+.match-dialog .pred-sub-result--hit {
+  color: var(--color-primary);
+}
+/* Marcador que no coincide con el real: leve atenuación. */
+.match-dialog .pred-sub-result--miss {
+  color: color-mix(in oklch, var(--color-base-content) 72%, transparent);
+}
 .match-dialog .pred-sub-dash {
   opacity: 0.55;
 }
+/* Separación media entre el bloque de puntos y el de chips. */
 .match-dialog .pred-sub-eval {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 8px;
+}
+/* Chips juntos entre sí (gap chico); el gap grande de arriba los separa del
+   texto de puntos. */
+.match-dialog .pred-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 .match-dialog .pred-pts {
   color: var(--color-base-content);
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+/* Dorado siempre que sumó puntos (>0). */
+.match-dialog .pred-pts--gold {
+  color: var(--color-primary);
+}
+/* "0 pts" atenuado, como los chips inactivos. */
+.match-dialog .pred-pts--muted {
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
 }
 /* Rótulo "avanza X" en la rama de empate por penales. */
 .match-dialog .pred-advancing {
@@ -1103,13 +1157,18 @@
   letter-spacing: 0.03em;
 }
 /* Chips iguales a <c-chip>: dorado encendido, atenuado apagado/na. */
+/* Los tres chips a la misma altura: min-height fija + centrado, con los
+   iconos algo más grandes y el texto ("Dif"/"Pen") algo menor. */
 .match-dialog .pred-chip {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   border-radius: 6px;
   padding: 2px 5px;
+  min-height: 17px;
+  line-height: 1;
 
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -1127,8 +1186,8 @@
   opacity: 0.5;
 }
 .match-dialog .pred-chip svg {
-  width: 11px;
-  height: 11px;
+  width: 13px;
+  height: 13px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2.5;

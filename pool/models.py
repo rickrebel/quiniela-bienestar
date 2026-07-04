@@ -273,6 +273,11 @@ class Window(models.Model):
         help_text="Ponderador de la ventana: los puntos se multiplican por "
                   "este factor (1, 1.5, 2 … hasta 10).",
     )
+    third_place_multiplier = models.DecimalField(
+        max_digits=3, decimal_places=1, null=True, blank=True,
+        help_text="Ponderador del partido por el tercer lugar; vacío = "
+                  "usa el multiplicador de la ventana.",
+    )
     opens_at = models.DateTimeField(null=True, blank=True)
     send_deadline = models.DateTimeField(null=True, blank=True)
 
