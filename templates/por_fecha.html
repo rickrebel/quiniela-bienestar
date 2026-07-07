@@ -17,6 +17,13 @@
         <span class="h-px flex-1 bg-primary/30"></span>
         <h2 class="text-[15px] font-bold uppercase tracking-[0.4px]
                    text-accent/80">{{ section.label }}</h2>
+        {% if section.finished %}<span class="text-xs font-bold tracking-[0.3px] text-accent/80">{{ section.points|floatformat:"-1" }} pts</span>{% endif %}
+        <button type="button" data-filtered-board data-ambito="fase"
+                data-valor="{{ section.stage_id }}"
+                class="inline-flex items-center text-accent/70"
+                title="Mini leaderboard" aria-label="Mini leaderboard">
+            <c-icon name="leaderboard" class="text-sm" />
+        </button>
         <span class="h-px flex-1 bg-primary/30"></span>
     </div>
     {% for group in section.date_groups %}
@@ -24,7 +31,7 @@
              class="mb-2 overflow-hidden rounded-[14px] border
                     border-base-content/15 bg-base-200">
         <h6 class="chip-title flex w-full items-center px-3.5 py-1.5
-                   text-[15px] font-medium">{{ group.label }}{% if group.finished %}<span class="ml-auto text-xs font-bold tracking-[0.3px] text-accent/80">{{ group.points|floatformat:"-1" }} pts</span>{% endif %}</h6>
+                   text-[15px] font-medium">{{ group.label }}{% if group.finished %}<span class="ml-auto text-xs font-bold tracking-[0.3px] text-accent/80">{{ group.points|floatformat:"-1" }} pts</span>{% endif %}<button type="button" data-filtered-board data-ambito="fecha" data-valor="{{ group.date|date:'Y-m-d' }}" class="{% if group.finished %}ml-1.5{% else %}ml-auto{% endif %} inline-flex items-center text-accent/70" title="Mini leaderboard" aria-label="Mini leaderboard"><c-icon name="leaderboard" class="text-sm" /></button></h6>
         {% for m in group.matches %}
         <c-match-card :match="m" :stage="m.stage" state="locked"
                       :is_group_stage="m.is_group" :by_date="m.is_group" />

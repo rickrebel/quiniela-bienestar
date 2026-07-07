@@ -1,0 +1,15 @@
+{% load static %}
+{# Región de la tabla del board filtrado: es lo único que filtered_board.js #}
+{# recambia (part=board) al cambiar el filtro, para no destruir el TomSelect #}
+{# del selector de equipo. #}
+<p class="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.4px]
+          text-accent/70">
+    {% if filtro_label %}Filtro: {{ filtro_label }}{% else %}Leaderboard completo{% endif %}
+</p>
+{% if rows %}
+{% include 'leaderboard_board.html' with filtered=True %}
+{% else %}
+<p class="py-6 text-center text-sm text-base-content/60">
+    Sin partidos terminados para este filtro
+</p>
+{% endif %}

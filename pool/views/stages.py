@@ -662,6 +662,8 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
                 "stage_id": match.stage_id,
                 "label": match.stage.name,
                 "date_groups": [],
+                "points": 0,
+                "finished": 0,
             }
             sections.append(section)
             date_group = None
@@ -681,6 +683,8 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
         if match.is_finished:
             date_group["finished"] += 1
             date_group["points"] += match.user_points or 0
+            section["finished"] += 1
+            section["points"] += match.user_points or 0
 
     # Ganador/contendientes del cruce origen, reutilizando los partidos y
     # predicciones ya cargados (sin queries extra).

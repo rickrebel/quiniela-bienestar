@@ -7,15 +7,17 @@ partidos FINISHED con marcador.
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 
 from django.db.models import Q
+from django.templatetags.static import static
 
 from pool.models import Prediction, Quiniela, User, UserQuiniela
 from pool.services.evaluation import multiplier_resolver
-from tournament.models import Match
+from pool.utils import format_long_day
+from tournament.models import Match, Stage, Team
 
 ZERO = Decimal("0")
 
@@ -87,7 +89,10 @@ class Leaderboard:
         return max(played) if played else 0
 
 
-def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
+def build_leaderboard(
+    quiniela: Quiniela, *, match_ids: list[int] | None = None,
+    with_trends: bool = True,
+) -> Leaderboard:
     """Posiciones de los miembros de ``quiniela``. La posición depende solo
     de los puntos, con ranking denso (1-2-2-3: los empates comparten lugar
     y no recorren al siguiente). Exactos y diferencias solo ordenan
@@ -96,13 +101,21 @@ def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
     Cada quiniela es independiente: solo entran sus miembros
     (``UserQuiniela``) y solo cuentan sus predicciones. El perfil virtual
     entra a la tabla (ordenado por sus puntos) pero queda fuera del
-    ranking: conserva ``position=0`` y no desplaza a nadie."""
+    ranking: conserva ``position=0`` y no desplaza a nadie.
+
+    ``match_ids`` acota el board a un subconjunto de partidos (leaderboard
+    filtrado): ``max_points`` y la suma de puntos se recalculan sobre ese
+    corte. ``with_trends=False`` omite las flechas de tendencia (el board
+    filtrado no las muestra)."""
+    finished_query = Match.objects.filter(
+        status="FINISHED",
+        home_goals__isnull=False,
+        away_goals__isnull=False,
+    )
+    if match_ids is not None:
+        finished_query = finished_query.filter(id__in=match_ids)
     finished = list(
-        Match.objects.filter(
-            status="FINISHED",
-            home_goals__isnull=False,
-            away_goals__isnull=False,
-        ).values_list(
+        finished_query.values_list(
             "id", "home_goals", "away_goals", "datetime",
             "stadium__utc_offset", "stage_id", "of_number",
         )
@@ -130,7 +143,7 @@ def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
     # bloque en todo el torneo), no hay con qué comparar y no se muestra.
     batch_ids: set[int] = set()
     day_ids: set[int] = set()
-    if finished:
+    if finished and with_trends:
         local_date = {
             mid: (dt + timedelta(hours=offset or 0)).date()
             for mid, _, _, dt, offset, _, _ in finished
@@ -203,8 +216,10 @@ def build_leaderboard(quiniela: Quiniela) -> Leaderboard:
             row.position = previous.position + 1
         previous = row
 
-    _assign_trends(ordered, batch_ids, results, prev_batch_points, "batch")
-    _assign_trends(ordered, day_ids, results, prev_day_points, "day")
+    if with_trends:
+        _assign_trends(
+            ordered, batch_ids, results, prev_batch_points, "batch")
+        _assign_trends(ordered, day_ids, results, prev_day_points, "day")
     return Leaderboard(rows=ordered, max_points=max_points)
 
 
@@ -230,3 +245,93 @@ def _assign_trends(
         if row.user.is_virtual:
             continue
         setattr(row, f"trend_{attr}", _trend(prev_positions[row.user.id], row.position))
+
+
+def resolve_filter(
+    quiniela: Quiniela, ambito: str, valor: str,
+) -> tuple[list[int], str]:
+    """Traduce un ámbito de filtro a su set de ``match_ids`` + etiqueta.
+
+    Ámbitos: ``fase`` (por ``Stage``), ``fecha`` (ISO local de sede),
+    ``equipo`` (por ``Team``) y ``grupo`` (letra A–L). Los partidos son del
+    torneo, no de la quiniela, así que el corte es global; ``build_leaderboard``
+    intersecta luego con los FINISHED. Un ámbito o valor inválido lanza
+    ``ValueError`` (el view lo traduce a 400)."""
+    if ambito == "fase":
+        try:
+            stage = Stage.objects.get(pk=int(valor))
+        except (Stage.DoesNotExist, ValueError, TypeError):
+            raise ValueError("Fase inválida")
+        ids = list(
+            Match.objects.filter(stage=stage).values_list("id", flat=True))
+        return ids, stage.name
+    if ambito == "fecha":
+        try:
+            target = date.fromisoformat(valor)
+        except (ValueError, TypeError):
+            raise ValueError("Fecha inválida")
+        # Sin campo de fecha local en la BD: se calcula el corrimiento por
+        # sede en memoria, igual que el trend diario.
+        rows = Match.objects.values_list(
+            "id", "datetime", "stadium__utc_offset")
+        ids = [
+            mid for mid, dt, offset in rows
+            if (dt + timedelta(hours=offset or 0)).date() == target
+        ]
+        return ids, format_long_day(target)
+    if ambito == "equipo":
+        try:
+            team = Team.objects.get(pk=int(valor))
+        except (Team.DoesNotExist, ValueError, TypeError):
+            raise ValueError("Equipo inválido")
+        ids = list(
+            Match.objects.filter(
+                Q(home_team=team) | Q(away_team=team)
+            ).values_list("id", flat=True))
+        return ids, team.name_es or team.name
+    if ambito == "grupo":
+        letter = (valor or "").upper()
+        if letter not in dict(Team.GROUP_CHOICES):
+            raise ValueError("Grupo inválido")
+        # ``is_group`` evita contar un cruce de knockout entre dos equipos
+        # del mismo grupo.
+        ids = list(
+            Match.objects.filter(
+                stage__is_group=True, home_team__group_name=letter,
+            ).values_list("id", flat=True))
+        return ids, f"Grupo {letter}"
+    raise ValueError("Ámbito inválido")
+
+
+def filter_options(quiniela: Quiniela) -> dict:
+    """Opciones para los selects del board filtrado (universales, no por
+    quiniela): fases ordenadas, letras A–L presentes, equipos (id, nombre,
+    bandera) y el rango de fechas locales para acotar el ``<input
+    type="date">``."""
+    stages = list(Stage.objects.order_by("order").values("id", "name"))
+    # order_by explícito: sin él, el ordering del modelo (que incluye
+    # ``name_es``) se cuela en el SELECT y rompe el DISTINCT.
+    groups = sorted(
+        Team.objects.exclude(group_name="").order_by("group_name")
+        .values_list("group_name", flat=True).distinct()
+    )
+    teams = [
+        {
+            "id": t.id,
+            "name": t.name_es or t.name,
+            "flag": static(t.flag_path) if t.flag_path else "",
+        }
+        for t in Team.objects.order_by("name_es")
+    ]
+    local_dates = [
+        (dt + timedelta(hours=offset or 0)).date()
+        for dt, offset in Match.objects.values_list(
+            "datetime", "stadium__utc_offset")
+    ]
+    return {
+        "stages": stages,
+        "groups": groups,
+        "teams": teams,
+        "date_min": min(local_dates).isoformat() if local_dates else "",
+        "date_max": max(local_dates).isoformat() if local_dates else "",
+    }

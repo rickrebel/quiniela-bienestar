@@ -313,6 +313,10 @@ function buildSummary() {
         if (header) {
             const head = header.cloneNode(true);
             head.querySelector(".chevron")?.remove();
+            // El resumen no lleva botones vivos: quita el "Mini leaderboard"
+            // que el header de knockout trae junto al contador.
+            head.querySelectorAll("[data-filtered-board]").forEach(
+                btn => btn.remove());
             body.appendChild(head);
         }
         cards.forEach(card => body.appendChild(freezeCard(card)));

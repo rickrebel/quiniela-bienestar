@@ -18,6 +18,16 @@
         </div>
     </div>
 
+    <div class="mx-2 mb-2 flex">
+        <button type="button" data-filtered-board data-ambito="equipo"
+                data-valor="{{ team.id }}"
+                class="inline-flex items-center gap-1 text-xs font-semibold
+                       text-accent/70">
+            <c-icon name="leaderboard" class="text-sm" />
+            Mini leaderboard
+        </button>
+    </div>
+
     {% for phase in phases %}
     <h6 class="pred-group-head">{{ phase.label }}{% if phase.points %}<span class="ml-auto normal-case tracking-normal">{{ phase.points|floatformat:"-1" }} pts</span>{% endif %}</h6>
     {% for m in phase.matches %}

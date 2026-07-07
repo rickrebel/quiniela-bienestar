@@ -21,6 +21,11 @@ urlpatterns = [
     path("reglas/", stages.reglas, name="reglas"),
     path("calendario/", stages.por_fecha_view, name="by_date"),
     path("posiciones/", leaderboard.leaderboard_view, name="standings"),
+    path(
+        "posiciones/filtrado/",
+        leaderboard.filtered_board_view,
+        name="filtered_board",
+    ),
     path("historia/", progress.history_view, name="history"),
     path("llaves/", llaves.llaves_view, name="llaves"),
     path(

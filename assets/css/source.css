@@ -569,6 +569,11 @@ body.history-immersive.is-rotated .history {
 
 /* Opción dentro del desplegable de Tom Select. */
 .hist-opt { display: flex; align-items: center; gap: 0.5rem; }
+/* Opción de equipo en el mini leaderboard. El preflight de Tailwind hace
+   display:block toda <img>: sin esto la bandera cae a su propia línea y,
+   sin ancho fijo, se dibuja gigante. */
+.ts-team-opt { display: flex; align-items: center; gap: 0.5rem; }
+.ts-team-opt img { display: inline-block; width: 1.25rem; }
 .hist-opt-pos {
   font-variant-numeric: tabular-nums;
   font-size: 11px;
