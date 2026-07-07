@@ -89,11 +89,31 @@
         return line;
     }
 
+    /* Flecha de navegación al partido vecino (cronológico global). Nace
+       deshabilitada; loadNav la enciende cuando el endpoint confirma que
+       el vecino existe. */
+    function navButton(dir) {
+        const btn = el("button", `dialog-nav dialog-nav--${dir}`);
+        btn.type = "button";
+        btn.disabled = true;
+        btn.dataset.nav = dir;
+        btn.setAttribute("aria-label",
+            dir === "prev" ? "Partido anterior" : "Partido siguiente");
+        const icon = el("span", "material-symbols-outlined",
+            dir === "prev" ? "chevron_left" : "chevron_right");
+        icon.setAttribute("aria-hidden", "true");
+        btn.append(icon);
+        return btn;
+    }
+
     function detailsSection(data) {
         const wrap = el("div", "match-dialog-details");
         wrap.append(el("span", "day-phase", data.phase));
 
+        // Absolutas sobre .day-teams: quedan a la altura del marcador,
+        // en los extremos (los nombres se pegan al centro del grid).
         const teams = el("div", "day-teams");
+        teams.append(navButton("prev"), navButton("next"));
         teams.append(teamLine(data.home, "home"));
         teams.append(el("span", "day-vs", "vs"));
         teams.append(teamLine(data.away, "away"));
@@ -535,6 +555,7 @@
     }
 
     function open(data) {
+        currentId = String(data.id);
         title.replaceChildren(...dialogHeader(data));
         body.replaceChildren(detailsSection(data));
         if (data.finished) body.append(finishedSection(data));
@@ -543,8 +564,90 @@
             body.append(recordSection(data));
         }
         body.append(predictionsSection(data));
+        loadNav(currentId);
         dialog.showModal();
     }
+
+    /* --- Navegación anterior/siguiente (flechas + swipe) --- */
+
+    // Vecinos cronológicos por partido, del endpoint
+    // /<slug>/partido/<id>/dialog/. El mismo fetch trae el payload del
+    // partido, que alimenta byId para los que la página no cargó.
+    let currentId = null;
+    let navLoading = false;
+    const navById = new Map();
+
+    async function fetchNav(id) {
+        if (!navById.has(id)) {
+            const slug = window.QUINIELA_SLUG || "";
+            const response = await fetch(`/${slug}/partido/${id}/dialog/`);
+            if (!response.ok) {
+                throw new Error("No se pudo cargar el partido.");
+            }
+            const payload = await response.json();
+            navById.set(id, {
+                prev_id: payload.prev_id, next_id: payload.next_id,
+            });
+            if (!byId.has(id)) byId.set(id, payload.match);
+        }
+        return navById.get(id);
+    }
+
+    function updateNavButtons(nav) {
+        for (const btn of body.querySelectorAll(".dialog-nav")) {
+            const key = btn.dataset.nav === "prev" ? "prev_id" : "next_id";
+            btn.disabled = !(nav && nav[key]);
+        }
+    }
+
+    async function loadNav(id) {
+        try {
+            const nav = await fetchNav(id);
+            // El usuario pudo navegar mientras cargaba: solo aplica si el
+            // dialog sigue mostrando este partido.
+            if (currentId === id) updateNavButtons(nav);
+        } catch (err) {
+            // Sin red las flechas simplemente quedan apagadas.
+        }
+    }
+
+    async function navigate(dir) {
+        if (navLoading) return;
+        const nav = navById.get(currentId);
+        const targetId = nav
+            && nav[dir === "prev" ? "prev_id" : "next_id"];
+        if (!targetId) return;
+        navLoading = true;
+        try {
+            const id = String(targetId);
+            await fetchNav(id);  // asegura payload en byId + su nav
+            const data = byId.get(id);
+            if (data) open(data);
+        } catch (err) {
+            // Fetch fallido: se queda el partido actual.
+        } finally {
+            navLoading = false;
+        }
+    }
+
+    // Swipe horizontal = navegar (móvil). Se ignora si el gesto arranca
+    // en un input (form de captura) o si domina el eje vertical (scroll).
+    let touchStart = null;
+    dialog.addEventListener("touchstart", e => {
+        touchStart = e.target.closest("input") ? null : {
+            x: e.changedTouches[0].clientX,
+            y: e.changedTouches[0].clientY,
+        };
+    }, { passive: true });
+    dialog.addEventListener("touchend", e => {
+        if (!touchStart) return;
+        const dx = e.changedTouches[0].clientX - touchStart.x;
+        const dy = e.changedTouches[0].clientY - touchStart.y;
+        touchStart = null;
+        if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
+            navigate(dx < 0 ? "next" : "prev");
+        }
+    }, { passive: true });
 
     function maybeOpen(target) {
         // La tarjeta entera es trigger, pero capturar marcador manda:
@@ -569,6 +672,11 @@
         // Clic en el backdrop: el target es el propio dialog.
         if (e.target === dialog) {
             dialog.close();
+            return;
+        }
+        const navBtn = e.target.closest(".dialog-nav");
+        if (navBtn && dialog.contains(navBtn)) {
+            navigate(navBtn.dataset.nav);
             return;
         }
         maybeOpen(e.target);

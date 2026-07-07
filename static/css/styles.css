@@ -459,6 +459,7 @@
    botón inferior). */
 #leaderboard-dialog .send-dialog-head,
 #rules-dialog .send-dialog-head,
+#filtered-board-dialog .send-dialog-head,
 #team-dialog .send-dialog-head {
   display: flex;
   justify-content: space-between;
@@ -934,8 +935,10 @@
   letter-spacing: 0.5px;
   text-transform: uppercase;
 }
-/* Equipos y "vs" en una línea; goles centrados bajo su columna. */
+/* Equipos y "vs" en una línea; goles centrados bajo su columna.
+   position: relative ancla las flechas de navegación (.dialog-nav). */
 .match-dialog .day-teams {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   column-gap: 12px;
@@ -943,6 +946,38 @@
   align-items: center;
 
   width: 100%;
+}
+/* Flechas al partido vecino, a la altura del marcador. Fuera de flujo
+   (absolute): no ensanchan el grid; los nombres viven pegados al centro,
+   así que los extremos quedan libres. */
+.dialog-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
+  cursor: pointer;
+}
+.dialog-nav--prev { left: -10px; }
+.dialog-nav--next { right: -10px; }
+.dialog-nav .material-symbols-outlined {
+  font-size: 30px;
+}
+.dialog-nav:hover:not(:disabled) {
+  background: var(--color-base-300);
+  color: var(--color-base-content);
+}
+.dialog-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
 }
 .match-dialog .day-team-line {
   display: inline-flex;

@@ -9,6 +9,8 @@
     const dialog = document.getElementById("team-dialog");
     if (!dialog) return;
     const titleEl = document.getElementById("team-dialog-title");
+    const ptsEl = document.getElementById("team-dialog-pts");
+    const boardBtn = document.getElementById("team-dialog-board");
     const body = document.getElementById("team-dialog-body");
 
     let loading = false;
@@ -19,6 +21,8 @@
         loading = true;
         body.replaceChildren();
         if (titleEl) titleEl.textContent = "";
+        if (ptsEl) ptsEl.textContent = "";
+        if (boardBtn) boardBtn.hidden = true;
         try {
             const slug = window.QUINIELA_SLUG || "";
             const response = await fetch(`/${slug}/equipo/${teamId}/`);
@@ -31,12 +35,16 @@
             if (data && window.matchDialog) {
                 window.matchDialog.add(JSON.parse(data.textContent));
             }
-            // Cabecera del dialog: nombre + puntos acumulados (del root).
+            // Cabecera del dialog: nombre, puntos y el botón del mini
+            // leaderboard (icono solo), todo leído del root del fragmento.
             const root = body.querySelector(".team-detail");
-            if (titleEl && root) {
-                const name = root.dataset.teamName || "";
-                const pts = root.dataset.teamPoints || "";
-                titleEl.textContent = pts ? `${name} · ${pts}` : name;
+            if (root) {
+                if (titleEl) titleEl.textContent = root.dataset.teamName || "";
+                if (ptsEl) ptsEl.textContent = root.dataset.teamPoints || "";
+                if (boardBtn) {
+                    boardBtn.dataset.valor = root.dataset.teamId || "";
+                    boardBtn.hidden = !boardBtn.dataset.valor;
+                }
             }
             dialog.showModal();
         } catch (err) {

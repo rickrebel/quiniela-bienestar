@@ -1,0 +1,61 @@
+{# Fila de filtro del mini leaderboard, compartida por el dialog #}
+{# (_filtered_board.html, show_enable=False: siempre llega con un filtro #}
+{# aplicado) y por /posiciones (leaderboard.html, show_enable=True: el #}
+{# checkbox "Filtrar" conmuta entre el board completo y el filtrado). #}
+{# filtered_board.js ata los listeners y conmuta `hidden`/`disabled`; #}
+{# los selects de equipo y grupo van SIN clases daisyUI porque TomSelect #}
+{# copia el classList a su wrapper y `.select` lo rompe (overflow:hidden #}
+{# recorta el dropdown). #}
+<div class="mb-3 flex flex-nowrap items-center gap-2 border-b
+            border-base-content/10 pb-3 text-sm">
+    {% if show_enable %}
+    <label class="flex shrink-0 cursor-pointer items-center gap-1.5
+                  font-medium">
+        <input type="checkbox" class="checkbox checkbox-xs"
+               data-filter-enable{% if ambito %} checked{% endif %}>
+        Filtrar
+    </label>
+    {% endif %}
+    <select class="select select-bordered select-xs w-24 shrink-0"
+            data-filter-ambito aria-label="Ámbito del filtro"
+            {% if show_enable and not ambito %}disabled{% endif %}>
+        <option value="fase"{% if ambito == 'fase' %} selected{% endif %}>Fase</option>
+        <option value="fecha"{% if ambito == 'fecha' %} selected{% endif %}>Fecha</option>
+        <option value="equipo"{% if ambito == 'equipo' %} selected{% endif %}>Equipo</option>
+        <option value="grupo"{% if ambito == 'grupo' %} selected{% endif %}>Grupo</option>
+    </select>
+
+    {# Solo el control del ámbito activo se muestra (JS conmuta `hidden`); #}
+    {# los demás quedan ocultos y deshabilitados. Sin ámbito aún (inline #}
+    {# apagado) se muestra el de "fase", el default del select de arriba. #}
+    <div class="filter-control min-w-0 flex-1" data-control="fase"
+         {% if ambito and ambito != 'fase' %}hidden{% endif %}>
+        <select class="select select-bordered select-xs w-full"
+                data-filter-control="fase" aria-label="Fase"
+                {% if ambito != 'fase' %}disabled{% endif %}>
+            {% for stage in stages %}
+            <option value="{{ stage.id }}"{% if ambito == 'fase' and valor == stage.id|stringformat:'s' %} selected{% endif %}>{{ stage.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="filter-control min-w-0 flex-1" data-control="fecha"
+         {% if ambito != 'fecha' %}hidden{% endif %}>
+        <input type="date" class="input input-bordered input-xs w-36"
+               data-filter-control="fecha" aria-label="Fecha"
+               min="{{ date_min }}" max="{{ date_max }}"
+               value="{% if ambito == 'fecha' %}{{ valor }}{% else %}{{ date_default }}{% endif %}"
+               {% if ambito != 'fecha' %}disabled{% endif %}>
+    </div>
+    {# Selects vacíos: filtered_board.js los puebla con TomSelect desde #}
+    {# los json_script del contenedor, cargado en diferido. #}
+    <div class="filter-control min-w-0 flex-1" data-control="grupo"
+         {% if ambito != 'grupo' %}hidden{% endif %}>
+        <select data-filter-control="grupo" aria-label="Grupo"
+                {% if ambito == 'grupo' %}data-selected="{{ valor }}"{% else %}disabled{% endif %}></select>
+    </div>
+    <div class="filter-control min-w-0 flex-1" data-control="equipo"
+         {% if ambito != 'equipo' %}hidden{% endif %}>
+        <select data-filter-control="equipo" aria-label="Equipo"
+                {% if ambito == 'equipo' %}data-selected="{{ valor }}"{% else %}disabled{% endif %}></select>
+    </div>
+</div>

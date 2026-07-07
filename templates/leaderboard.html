@@ -7,7 +7,19 @@
 <c-stage-tabs :tabs="tabs" />
 
 <main class="content">
-    {% include 'leaderboard_board.html' %}
+    {# Fila de filtro inline (la única con checkbox). Con el filtro activo #}
+    {# filtered_board.js oculta el board completo (con tendencias) y llena #}
+    {# la región con el fragmento filtrado; al apagarlo lo restaura. #}
+    <div class="filtered-board" data-inline-board>
+        {% include '_filter_row.html' with show_enable=True %}
+        <div data-board-full>
+            {% include 'leaderboard_board.html' %}
+        </div>
+        <div data-board-region hidden></div>
+        {{ teams|json_script:"filtered-team-options" }}
+        {{ groups|json_script:"filtered-group-options" }}
+        {{ dates|json_script:"filtered-date-options" }}
+    </div>
 </main>
 
 {% endblock %}

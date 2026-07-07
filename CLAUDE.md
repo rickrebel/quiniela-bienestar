@@ -222,6 +222,16 @@ The project venv lives at `venv/` inside the repo (interpreter:
   What remains there: unmigrated views (board, rules), DOM that
   `match_dialog.js` builds (`day-*`, `pred-*`, `record-*`), the dialogs'
   shell (`send-dialog`), `.submit-btn` and `#snackbar`.
+- **Never put daisyUI classes on a TomSelect-ified `<select>`** (mini
+  leaderboards, historia): TomSelect copies the classList to its wrapper
+  and `.select` breaks it (`overflow:hidden` clips the dropdown). Theme
+  overrides for the CDN CSS live in `source.css` prefixed by container
+  (`.history` / `.filtered-board`). Feature guide: `mini-leaderboards`
+  skill.
+- **`static/css/tailwind.css` is a dist that goes stale silently**: after
+  touching templates or `assets/css/source.css`, run
+  `manage.py tailwind build` also in dev — missing new classes = broken
+  UI with no error.
 - **Don't name anything `.countdown`** (daisyUI component clashes; the
   deadline footer uses `.deadline-note`). Tailwind's preflight also makes
   every `img` display:block — inline flags need an explicit

@@ -43,15 +43,15 @@ class FilteredLeaderboardTests(TestCase):
         )
         cls.team_a = Team.objects.create(
             name="Mexico", name_es="México", fifa_code="MEX", group_name="A",
-            confederation="concacaf",
+            confederation="concacaf", flag_code="mx",
         )
         cls.team_b = Team.objects.create(
             name="Canada", name_es="Canadá", fifa_code="CAN", group_name="A",
-            confederation="concacaf",
+            confederation="concacaf", flag_code="ca",
         )
         cls.team_c = Team.objects.create(
             name="Brazil", name_es="Brasil", fifa_code="BRA", group_name="B",
-            confederation="conmebol",
+            confederation="conmebol", flag_code="br",
         )
 
         # Local de sede (offset -6): m_g1 el 11-jun, m_g2 el 12-jun, m_ko el
@@ -185,10 +185,26 @@ class FilteredLeaderboardTests(TestCase):
         options = filter_options(self.quiniela)
         self.assertEqual(
             [s["name"] for s in options["stages"]], ["Jornada 1", "Octavos"])
-        self.assertEqual(options["groups"], ["A", "B"])
+        self.assertEqual(
+            [g["letter"] for g in options["groups"]], ["A", "B"])
         self.assertEqual(options["date_min"], "2026-06-11")
         self.assertEqual(options["date_max"], "2026-06-13")
+        # Hoy (posterior al mundial de prueba) se acota al máximo del rango.
+        self.assertEqual(options["date_default"], "2026-06-13")
         self.assertTrue(all("flag" in t for t in options["teams"]))
+        # Fechas con partidos (local de sede), ordenadas y sin duplicados:
+        # alimentan las flechas prev/next del título.
+        self.assertEqual(
+            options["dates"], ["2026-06-11", "2026-06-12", "2026-06-13"])
+
+    def test_group_options_flags_in_real_order(self):
+        options = filter_options(self.quiniela)
+        group_a = options["groups"][0]
+        # México (4 pts reales) va antes que Canadá (1 pt).
+        self.assertEqual(
+            group_a["flags"],
+            ["/static/flags_40/mx.png", "/static/flags_40/ca.png"],
+        )
 
     # ----- view -----------------------------------------------------------
 
@@ -204,6 +220,27 @@ class FilteredLeaderboardTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Filtro: Jornada 1")
         self.assertContains(response, "data-filter-ambito")
+        # El dialog no lleva checkbox "Filtrar": siempre hay filtro.
+        self.assertNotContains(response, "data-filter-enable")
+        # Con filtro activo el título trae flechas prev/next y el
+        # contenedor emite las fechas navegables.
+        self.assertContains(response, "data-filter-nav")
+        self.assertContains(response, "filtered-date-options")
+
+    def test_view_full_board_has_no_nav(self):
+        self.client.force_login(self.ana)
+        response = self.client.get(
+            "/bienestar/posiciones/filtrado/", {"part": "board"})
+        # Sin filtro_label ("Leaderboard completo") no hay qué navegar.
+        self.assertNotContains(response, "data-filter-nav")
+
+    def test_posiciones_has_inline_filter_row(self):
+        self.client.force_login(self.ana)
+        response = self.client.get("/bienestar/posiciones/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-filter-enable")
+        self.assertContains(response, "data-inline-board")
+        self.assertContains(response, "filtered-group-options")
 
     def test_view_part_board_only_region(self):
         self.client.force_login(self.ana)

@@ -1,10 +1,22 @@
 {# Shell del dialog de equipo: bandera grande + todos sus partidos como #}
 {# tarjetas de solo lectura. team_dialog.js hace fetch a /<slug>/equipo/ #}
 {# <id>/ e inyecta el fragmento en el body; las tarjetas conservan su #}
-{# [data-dialog-match] y siguen abriendo el match-dialog. #}
+{# [data-dialog-match] y siguen abriendo el match-dialog. El head lleva #}
+{# nombre | pts + botón de mini leaderboard | ✕ (space-between); JS llena #}
+{# título/puntos y el data-valor del botón desde el root del fragmento. #}
 <dialog id="team-dialog" class="send-dialog team-dialog">
     <div class="send-dialog-head">
         <span id="team-dialog-title"></span>
+        <span class="flex shrink-0 items-center gap-1.5">
+            <span id="team-dialog-pts" class="text-sm font-semibold
+                                              text-accent/80"></span>
+            <button type="button" id="team-dialog-board" hidden
+                    data-filtered-board data-ambito="equipo"
+                    class="inline-flex items-center text-accent/70"
+                    title="Mini leaderboards" aria-label="Mini leaderboards">
+                <c-icon name="leaderboard" class="text-base" />
+            </button>
+        </span>
         <button class="dialog-x" type="button" data-team-close
                 aria-label="Cerrar">✕</button>
     </div>

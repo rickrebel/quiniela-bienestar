@@ -29,6 +29,9 @@ def leaderboard_view(request: HttpRequest) -> HttpResponse:
         "last_position": board.last_position,
         "tabs": _build_tabs(request.quiniela),
     }
+    # Fila de filtro inline (la única con checkbox "Filtrar"): necesita
+    # las opciones de los selects igual que el dialog.
+    context.update(filter_options(request.quiniela))
     return render(request, "leaderboard.html", context)
 
 

@@ -45,6 +45,11 @@ urlpatterns = [
         stages.team_detail_view,
         name="team_detail",
     ),
+    path(
+        "partido/<int:match_id>/dialog/",
+        stages.match_dialog_json,
+        name="match_dialog",
+    ),
     path("save/", predictions.save_predictions, name="save"),
     path(
         "prediction/<int:match_id>/",

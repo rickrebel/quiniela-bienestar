@@ -2,10 +2,36 @@
 {# Región de la tabla del board filtrado: es lo único que filtered_board.js #}
 {# recambia (part=board) al cambiar el filtro, para no destruir el TomSelect #}
 {# del selector de equipo. #}
+{# Con filtro activo el título va centrado entre las flechas prev/next #}
+{# (valor vecino del ámbito activo). filtered_board.js las atiende con #}
+{# clic delegado y fija su disabled tras cada recambio de región. #}
+{% if filtro_label %}
+<div class="mb-2 flex items-center justify-between gap-2 px-1">
+    <button type="button" data-filter-nav="prev" disabled
+            aria-label="Anterior"
+            class="btn btn-ghost btn-xs btn-circle shrink-0
+                   disabled:opacity-25">
+        <span class="material-symbols-outlined select-none leading-none
+                     text-xl" aria-hidden="true">chevron_left</span>
+    </button>
+    <p class="min-w-0 truncate text-center text-xs font-semibold uppercase
+              tracking-[0.4px] text-accent/70">
+        Filtro: {{ filtro_label }}
+    </p>
+    <button type="button" data-filter-nav="next" disabled
+            aria-label="Siguiente"
+            class="btn btn-ghost btn-xs btn-circle shrink-0
+                   disabled:opacity-25">
+        <span class="material-symbols-outlined select-none leading-none
+                     text-xl" aria-hidden="true">chevron_right</span>
+    </button>
+</div>
+{% else %}
 <p class="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.4px]
           text-accent/70">
-    {% if filtro_label %}Filtro: {{ filtro_label }}{% else %}Leaderboard completo{% endif %}
+    Leaderboard completo
 </p>
+{% endif %}
 {% if rows %}
 {% include 'leaderboard_board.html' with filtered=True %}
 {% else %}

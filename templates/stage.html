@@ -57,6 +57,15 @@
                              filled="{{ section.filled }}"
                              total="{{ section.total }}" />
         </summary>
+        <div class="flex justify-end px-3.5 pb-1 pt-1.5">
+            <button type="button" data-filtered-board data-ambito="grupo"
+                    data-valor="{{ section.key }}"
+                    class="inline-flex items-center gap-1 text-xs
+                           font-semibold text-accent/70">
+                <c-icon name="leaderboard" class="text-sm" />
+                Mini leaderboard
+            </button>
+        </div>
     {% else %}
     <div class="knockout mb-2 overflow-hidden rounded-[14px] border
                 border-base-content/15 bg-base-200 pt-3">
@@ -88,18 +97,6 @@
 
         {% if section.standings %}
         <c-group-standings :standings="section.standings" />
-        {% endif %}
-
-        {% if is_group_stage %}
-        <div class="flex justify-end px-3.5 pb-3">
-            <button type="button" data-filtered-board data-ambito="grupo"
-                    data-valor="{{ section.key }}"
-                    class="inline-flex items-center gap-1 text-xs
-                           font-semibold text-accent/70">
-                <c-icon name="leaderboard" class="text-sm" />
-                Mini leaderboard
-            </button>
-        </div>
         {% endif %}
 
     {% if is_group_stage %}</details>{% else %}</div>{% endif %}

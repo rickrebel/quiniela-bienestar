@@ -11,6 +11,7 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
+    JsonResponse,
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
@@ -715,6 +716,39 @@ def por_fecha_view(request: HttpRequest) -> HttpResponse:
         "tabs": _build_tabs(request.quiniela),
     }
     return render(request, "por_fecha.html", context)
+
+
+@login_required
+@with_quiniela
+def match_dialog_json(
+    request: HttpRequest, match_id: int
+) -> JsonResponse:
+    """Payload del dialog de un partido + sus vecinos cronológicos.
+
+    Lo pide ``match_dialog.js`` al navegar con flechas/swipe: el orden es
+    global del torneo (``datetime``, ``id``), no el de la página, así que
+    desde cualquier vista se recorre el calendario completo. En los
+    extremos el vecino es ``None`` (la flecha se deshabilita).
+    """
+    ordered = list(
+        Match.objects.order_by("datetime", "id")
+        .values_list("id", flat=True))
+    try:
+        index = ordered.index(match_id)
+    except ValueError:
+        raise Http404("Partido inexistente")
+    match = (
+        Match.objects
+        .select_related("stage", "stadium", "home_team", "away_team")
+        .get(pk=match_id))
+    payload = build_match_dialog_payload(
+        [match], request.user, request.quiniela)[0]
+    return JsonResponse({
+        "match": payload,
+        "prev_id": ordered[index - 1] if index > 0 else None,
+        "next_id": (
+            ordered[index + 1] if index + 1 < len(ordered) else None),
+    })
 
 
 @login_required

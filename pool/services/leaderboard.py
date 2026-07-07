@@ -16,6 +16,7 @@ from django.templatetags.static import static
 
 from pool.models import Prediction, Quiniela, User, UserQuiniela
 from pool.services.evaluation import multiplier_resolver
+from pool.services.standings import build_group_standings
 from pool.utils import format_long_day
 from tournament.models import Match, Stage, Team
 
@@ -303,18 +304,46 @@ def resolve_filter(
     raise ValueError("Ámbito inválido")
 
 
+def _group_options() -> list[dict]:
+    """Opciones del select de grupo: letra + banderas de sus equipos,
+    ordenadas por la posición real de la tabla (``build_group_standings``
+    sin predicciones, variante ``real``). Los grupos salen del catálogo de
+    ``Team`` — no de los partidos — para no perder grupos sin calendario
+    cargado; sin ranking, el orden del equipo es estable al final."""
+    matches = list(
+        Match.objects.filter(stage__is_group=True)
+        .select_related("home_team", "away_team")
+    )
+    standings = build_group_standings(matches, {})
+    rank: dict[int, int] = {}
+    for gs in standings.values():
+        real = next(t for t in gs.tables if t.variant == "real")
+        rank.update({r.team.id: i for i, r in enumerate(real.rows)})
+
+    by_group: dict[str, list[Team]] = defaultdict(list)
+    for team in Team.objects.exclude(group_name=""):
+        by_group[team.group_name].append(team)
+    return [
+        {
+            "letter": letter,
+            "flags": [
+                static(t.flag_path)
+                for t in sorted(
+                    by_group[letter], key=lambda t: rank.get(t.id, 99))
+                if t.flag_path
+            ],
+        }
+        for letter in sorted(by_group)
+    ]
+
+
 def filter_options(quiniela: Quiniela) -> dict:
     """Opciones para los selects del board filtrado (universales, no por
-    quiniela): fases ordenadas, letras A–L presentes, equipos (id, nombre,
-    bandera) y el rango de fechas locales para acotar el ``<input
-    type="date">``."""
+    quiniela): fases ordenadas, grupos con sus banderas, equipos (id,
+    nombre, bandera) y el rango de fechas locales para acotar el ``<input
+    type="date">``, con hoy (acotado al rango) como valor inicial, más la
+    lista de fechas con partidos (flechas prev/next del título)."""
     stages = list(Stage.objects.order_by("order").values("id", "name"))
-    # order_by explícito: sin él, el ordering del modelo (que incluye
-    # ``name_es``) se cuela en el SELECT y rompe el DISTINCT.
-    groups = sorted(
-        Team.objects.exclude(group_name="").order_by("group_name")
-        .values_list("group_name", flat=True).distinct()
-    )
     teams = [
         {
             "id": t.id,
@@ -328,10 +357,18 @@ def filter_options(quiniela: Quiniela) -> dict:
         for dt, offset in Match.objects.values_list(
             "datetime", "stadium__utc_offset")
     ]
+    date_min = min(local_dates) if local_dates else None
+    date_max = max(local_dates) if local_dates else None
+    default = (
+        min(max(date.today(), date_min), date_max) if local_dates else None)
     return {
         "stages": stages,
-        "groups": groups,
+        "groups": _group_options(),
         "teams": teams,
-        "date_min": min(local_dates).isoformat() if local_dates else "",
-        "date_max": max(local_dates).isoformat() if local_dates else "",
+        "date_min": date_min.isoformat() if date_min else "",
+        "date_max": date_max.isoformat() if date_max else "",
+        "date_default": default.isoformat() if default else "",
+        # Solo fechas con partidos: las flechas prev/next del board
+        # filtrado saltan entre ellas sin caer en días vacíos.
+        "dates": sorted({d.isoformat() for d in local_dates}),
     }
