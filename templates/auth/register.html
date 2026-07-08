@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if closed %}
+<div class="form-body">
+    <h1 class="login-title"><span>⚽</span>quiniela</h1>
+    <p style="text-align: center;">
+        Los registros están cerrados.
+    </p>
+    <p style="text-align: center;">
+        <a href="{% url 'login' %}">¿Ya tienes cuenta? Inicia sesión</a>
+    </p>
+</div>
+{% else %}
 <form class="form-body" action="" method="post" novalidate>
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ next }}">
@@ -33,4 +44,5 @@
         <a href="{% url 'login' %}">¿Ya tienes cuenta? Inicia sesión</a>
     </p>
 </form>
+{% endif %}
 {% endblock %}

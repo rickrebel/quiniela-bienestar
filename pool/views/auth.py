@@ -9,7 +9,7 @@ from django.shortcuts import redirect, render
 from pool.forms import (
     EmailAccessForm, RecoveryConfirmForm, RecoveryRequestForm,
     RegistrationForm)
-from pool.models import PasswordRecoveryToken, UserQuiniela
+from pool.models import PasswordRecoveryToken, Quiniela, UserQuiniela
 from pool.services.recovery import (
     create_recovery_token, recovery_url, send_recovery_email)
 from pool.views.scope import post_auth_redirect
@@ -78,7 +78,15 @@ def register_view(request: HttpRequest) -> HttpResponse:
     activa (o es un perfil virtual) lo rechaza; si existe un preregistro
     sin estrenar lo completa; en otro caso crea el usuario. Al terminar
     inicia sesión y redirige a la primera ventana.
+
+    Si ninguna quiniela admite altas (todas con su fecha de cierre
+    pasada) muestra un aviso en vez del formulario.
     """
+    if not Quiniela.objects.open_for_registration().exists():
+        nxt = request.GET.get("next", "")
+        return render(
+            request, "auth/register.html", {"closed": True, "next": nxt})
+
     if request.method == "POST":
         form = RegistrationForm(request.POST)
         if form.is_valid():

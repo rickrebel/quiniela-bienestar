@@ -153,6 +153,20 @@ THEME_CHOICES = [
 ]
 
 
+class QuinielaQuerySet(models.QuerySet):
+    """QuerySet de quinielas con filtros de dominio."""
+
+    def open_for_registration(self) -> "QuinielaQuerySet":
+        """Quinielas que aún admiten altas nuevas.
+
+        Abierta = sin fecha de cierre, o con la fecha aún por venir.
+        """
+        now = timezone.now()
+        return self.filter(
+            models.Q(registration_deadline__isnull=True)
+            | models.Q(registration_deadline__gt=now))
+
+
 class Quiniela(models.Model):
     """Variante de quiniela (original, bienestar, …).
 
@@ -163,6 +177,14 @@ class Quiniela(models.Model):
 
     name = models.CharField(max_length=60, unique=True)
     slug = models.SlugField(max_length=40, unique=True)
+    registration_deadline = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Después de esta fecha no se admiten altas nuevas. "
+            "Vacío = registro abierto sin límite."
+        ),
+    )
     theme = models.CharField(
         max_length=20,
         choices=THEME_CHOICES,
@@ -172,12 +194,21 @@ class Quiniela(models.Model):
     rules = models.ManyToManyField(
         Rule, through="QuinielaRule", related_name="quinielas")
 
+    objects = QuinielaQuerySet.as_manager()
+
     class Meta:
         verbose_name = "quiniela"
         verbose_name_plural = "quinielas"
 
     def __str__(self) -> str:
         return self.name
+
+    def registration_open(self) -> bool:
+        """¿Se admiten altas nuevas ahora mismo?"""
+        return (
+            self.registration_deadline is None
+            or timezone.now() < self.registration_deadline
+        )
 
 
 class QuinielaRule(models.Model):

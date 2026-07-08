@@ -71,10 +71,19 @@ class RegistrationForm(forms.Form):
     )
     quinielas = forms.ModelMultipleChoiceField(
         label="¿A qué quinielas te inscribes?",
-        queryset=Quiniela.objects.all(),
+        # El queryset real se fija en __init__ para evaluar el cierre
+        # (timezone.now) por request, no al importar el módulo.
+        queryset=Quiniela.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         error_messages={"required": "Elige al menos una quiniela"},
     )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # Solo quinielas con registro abierto: un id cerrado enviado a mano
+        # cae en "opción no válida" al no estar en el queryset.
+        self.fields["quinielas"].queryset = (
+            Quiniela.objects.open_for_registration())
 
     def clean_first_name(self) -> str:
         return self.cleaned_data["first_name"].strip()

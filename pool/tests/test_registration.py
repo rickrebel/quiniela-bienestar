@@ -1,7 +1,10 @@
 """Tests del alta de jugadores por sí mismos (vista register)."""
 
+from datetime import timedelta
+
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from pool.models import (
     Quiniela, User, UserQuiniela, Window, WindowUser)
@@ -116,6 +119,54 @@ class RegisterViewTests(TestCase):
     def test_missing_name_rejected(self):
         response = self.client.post(self.url, self._payload(first_name=""))
         self.assertContains(response, "El nombre es requerido")
+
+
+class RegistrationDeadlineTests(TestCase):
+    """El cierre por fecha bloquea altas nuevas, no el login."""
+
+    url = reverse("register")
+
+    def _payload(self, quiniela) -> dict:
+        return {
+            "first_name": "Ana",
+            "email": "ana@example.com",
+            "password": "x",
+            "password_confirm": "x",
+            "quinielas": [quiniela.id],
+        }
+
+    def test_open_when_deadline_null(self):
+        q = Quiniela.objects.create(name="Q", slug="q")
+        response = self.client.post(self.url, self._payload(q))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(User.objects.filter(email="ana@example.com").exists())
+
+    def test_open_when_deadline_future(self):
+        q = Quiniela.objects.create(
+            name="Q", slug="q",
+            registration_deadline=timezone.now() + timedelta(days=1))
+        response = self.client.post(self.url, self._payload(q))
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(User.objects.filter(email="ana@example.com").exists())
+
+    def test_closed_page_when_all_deadlines_passed(self):
+        Quiniela.objects.create(
+            name="Q", slug="q",
+            registration_deadline=timezone.now() - timedelta(days=1))
+        response = self.client.get(self.url)
+        self.assertContains(response, "Los registros están cerrados")
+
+    def test_closed_quiniela_post_is_rejected(self):
+        # Aun forzando el id de una quiniela cerrada, no se crea usuario:
+        # queda una abierta para no caer en la página de cierre global.
+        Quiniela.objects.create(name="Abierta", slug="abierta")
+        closed = Quiniela.objects.create(
+            name="Cerrada", slug="cerrada",
+            registration_deadline=timezone.now() - timedelta(days=1))
+        response = self.client.post(self.url, self._payload(closed))
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            User.objects.filter(email="ana@example.com").exists())
 
 
 class WindowUserSignalTests(TestCase):

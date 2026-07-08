@@ -21,8 +21,8 @@ class QuinielaRuleInline(admin.TabularInline):
 
 @admin.register(Quiniela)
 class QuinielaAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "theme")
-    list_editable = ("theme",)
+    list_display = ("name", "slug", "theme", "registration_deadline")
+    list_editable = ("theme", "registration_deadline")
     prepopulated_fields = {"slug": ("name",)}
     search_fields = ("name", "slug")
     inlines = [QuinielaRuleInline]
