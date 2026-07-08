@@ -90,24 +90,28 @@
   </div>
 
   <div class="header-bottom">
-    {# Fila inferior: partidos del día (o del próximo día con partidos). #}
-    {% if today_matches %}
-    {% if matches_day_label %}
-    <span class="day-label">{{ matches_day_label }}</span>
-    {% endif %}
+    {# Fila inferior: partidos de hoy; con menos de 3 se suman el día con #}
+    {# partidos previo (atenuado) y el siguiente, separados por un divisor. #}
+    {% if today_groups %}
     {# Chips clicleables (abren el match-dialog como las tarjetas). Marcador #}
-    {# real arriba y predicción debajo en una sola columna; barrita de carga #}
-    {# si el partido está en juego. #}
+    {# real arriba y predicción/hora debajo; barrita de carga si está en juego. #}
     <div class="today-chips" aria-label="Partidos">
-        {% for m in today_matches %}
+        {% for g in today_groups %}
+        {% if not forloop.first %}<span class="tc-divider" aria-hidden="true"></span>{% endif %}
+        {% if g.label %}<span class="day-label">{{ g.label }}</span>{% endif %}
+        <div class="today-group{% if g.past %} today-group--past{% endif %}">
+        {% for m in g.chips %}
         <button class="today-chip{% if m.is_live %} today-chip--live{% endif %}"
                 type="button" data-dialog-match="{{ m.id }}">
             <span class="tc-team{% if m.winner == 'home' %} tc-winner{% endif %}">{{ m.home.code }}{% if m.home.flag %}<img src="{% static m.home.flag %}" alt="">{% endif %}</span>
             <span class="tc-scores">
                 {% if m.real %}<span class="tc-real">{{ m.real.0 }}-{{ m.real.1 }}</span>{% if m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% endif %}{% elif m.pred %}<span class="tc-pred">{{ m.pred.0 }}-{{ m.pred.1 }}</span>{% else %}<span class="tc-vs">vs</span>{% endif %}
+                {% if m.time %}<span class="tc-time" data-utc="{{ m.utc }}">{{ m.time }}</span>{% endif %}
             </span>
             <span class="tc-team{% if m.winner == 'away' %} tc-winner{% endif %}">{% if m.away.flag %}<img src="{% static m.away.flag %}" alt="">{% endif %}{{ m.away.code }}</span>
         </button>
+        {% endfor %}
+        </div>
         {% endfor %}
     </div>
     {% else %}

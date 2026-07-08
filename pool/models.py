@@ -452,13 +452,13 @@ class Prediction(models.Model):
 
 
 class ScoreSnapshot(models.Model):
-    """Acumulado de puntos de un usuario hasta un partido (tick).
+    """Acumulado de puntos de un usuario hasta un partido.
 
     Existe para cada par (usuario × partido FINISHED) aunque el usuario
-    no haya predicho ese partido: el tick avanza igual y su posición
-    puede cambiar. Los partidos simultáneos (mismo ``Match.datetime``,
-    p. ej. los pares de la jornada 3) comparten ``cumulative_points`` y
-    ``position``: el acumulado es por tanda, no por partido individual.
+    no haya predicho ese partido: el acumulado avanza igual. Se congela
+    partido a partido (orden ``datetime``, ``of_number``), también entre
+    simultáneos, para que la gráfica /historia atribuya a cada partido
+    su salto exacto.
     """
 
     user = models.ForeignKey(
@@ -471,7 +471,6 @@ class ScoreSnapshot(models.Model):
         Match, on_delete=models.CASCADE, related_name="snapshots")
     cumulative_points = models.DecimalField(
         max_digits=5, decimal_places=1, default=0)
-    position = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Acumulado por partido"

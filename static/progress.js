@@ -12,9 +12,9 @@
  * por orden de selección vía Tom Select).
  *
  * El eje X no es uniforme: una columna por partido, con ancho proporcional
- * a su multiplicador de ventana; los partidos simultáneos comparten tanda
- * (acumulado) y dejan un tramo plano. Líneas verticales tenues separan las
- * fases (Grupos | 16avos | …).
+ * a su multiplicador de ventana; cada columna trae su propio acumulado
+ * (también entre simultáneos), así cada bandera carga exactamente su
+ * salto. Líneas verticales tenues separan las fases (Grupos | 16avos | …).
  */
 (function () {
     const root = document.getElementById("history-chart");
@@ -85,23 +85,18 @@
         return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * pow;
     }
 
-    // Columnas del eje X: una por partido. Cada una apunta a su tick (de
-    // donde leer el acumulado) y lleva un ``weight`` = multiplicador de su
-    // ventana (ancho relativo del tramo). El origen pesa 0 (pegado al borde
-    // izquierdo). Los partidos simultáneos comparten tick → mismo acumulado
-    // → tramo plano, ya ponderado por el multiplicador.
+    // Columnas del eje X: una por partido, en el mismo orden en que las
+    // series traen sus puntos (índice 0 = salida y luego un valor por
+    // partido), así la columna i lee directamente points[i] y cada
+    // bandera carga exactamente su salto, también entre simultáneos.
+    // ``weight`` = multiplicador de la ventana (ancho relativo del
+    // tramo); el origen pesa 0 (pegado al borde izquierdo).
     function buildCols() {
-        const cols = [{ label: "0", vtick: 0, weight: 0, phase: "Salida" }];
+        const cols = [{ label: "0", weight: 0, phase: "Salida" }];
         TICKS.forEach((t, ti) => {
             if (ti === 0) return;
-            const last = t.matches.length - 1;
-            t.matches.forEach((mt, mi) => cols.push({
+            t.matches.forEach(mt => cols.push({
                 match: mt,
-                // Los partidos simultáneos comparten acumulado; para que el
-                // salto se alinee con la ÚLTIMA bandera de la tanda (y no con
-                // la primera), las columnas previas leen el valor de la tanda
-                // anterior (``ti - 1``) y sólo la última sube al de ésta.
-                vtick: mi === last ? ti : ti - 1,
                 weight: t.multiplier,
                 phase: t.phase,
             }));
@@ -216,10 +211,10 @@
             const xf = cols.map((c, i) => plotW ? (X(i) - pad.left) / plotW : 0);
             // Contorno de TODA la nube por columna: el más bajo y el más
             // alto de todos los participantes en cada momento.
-            const loPt = cols.map(c =>
-                Math.min(...SERIES.map(s => s.points[c.vtick])));
-            const hiPt = cols.map(c =>
-                Math.max(...SERIES.map(s => s.points[c.vtick])));
+            const loPt = cols.map((c, i) =>
+                Math.min(...SERIES.map(s => s.points[i])));
+            const hiPt = cols.map((c, i) =>
+                Math.max(...SERIES.map(s => s.points[i])));
             // Marco del cono: dos rectas continuas (mínimos cuadrados) entre
             // las que flota la nube. No se fuerza el ajuste columna a
             // columna, por eso la escala cambia suave y un anotador parejo
@@ -259,7 +254,7 @@
         }
 
         const dFor = s => cols.map(
-            (c, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(s.points[c.vtick], i).toFixed(1)}`
+            (c, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(s.points[i], i).toFixed(1)}`
         ).join(" ");
 
         // Rejilla y etiquetas Y (puntos): 4 niveles. El nivel 0 es el eje

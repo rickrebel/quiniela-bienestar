@@ -9,6 +9,7 @@ from pool.models import Prediction, UserQuiniela
 from pool.services.leaderboard import build_leaderboard
 from pool.services.match_dialog import build_match_dialog_payload
 from pool.services.membership import active_quiniela
+from pool.utils import format_time
 from tournament.models import Match
 
 logger = logging.getLogger(__name__)
@@ -109,13 +110,13 @@ def today_matches(request) -> dict:
             return {}
         today = timezone.localdate()
         now = timezone.now()
-        # Ventana amplia (hasta +14 d): si hoy no hay partidos hay que poder
-        # caer al siguiente día que sí tenga, y los huecos entre fases duran
-        # varios días.
+        # Ventana amplia (±14 d): con menos de 3 partidos hoy se suman el
+        # último día con partidos y el próximo, que pueden estar a varios
+        # días (descansos entre fases).
         matches = Match.objects.select_related(
             "home_team", "away_team", "stadium", "stage"
         ).filter(
-            datetime__date__gte=today - timedelta(days=1),
+            datetime__date__gte=today - timedelta(days=14),
             datetime__date__lte=today + timedelta(days=14),
         )
         # Agrupa por fecha LOCAL de la sede (Match.datetime es UTC).
@@ -125,54 +126,48 @@ def today_matches(request) -> dict:
                 hours=match.stadium.utc_offset
             )
             by_local_date.setdefault(local_dt.date(), []).append(match)
-        # Hoy si tiene partidos; si no, el primer día futuro que tenga.
-        if today in by_local_date:
-            target = today
+        # Hoy se basta con 3+ partidos; si no, se rodea del día con partidos
+        # más cercano hacia atrás (atenuado) y del próximo. Así también se
+        # llena el hueco cuando hoy no tiene ninguno.
+        today_list = by_local_date.get(today, [])
+        if len(today_list) >= 3:
+            days = [today]
         else:
-            future = sorted(d for d in by_local_date if d > today)
-            target = future[0] if future else None
-        if target is None:
+            prev = max((d for d in by_local_date if d < today), default=None)
+            nxt = min((d for d in by_local_date if d > today), default=None)
+            days = [d for d in (prev, today, nxt) if d in by_local_date]
+        if not days:
             return {}
-        day_matches = sorted(by_local_date[target], key=lambda m: m.datetime)
 
+        day_matches = [
+            m
+            for d in days
+            for m in sorted(by_local_date[d], key=lambda m: m.datetime)
+        ]
         preds = {
             p.match_id: p
             for p in Prediction.objects.filter(
                 user=user, quiniela=quiniela, match__in=day_matches
             )
         }
-        chips = []
-        for match in day_matches:
-            pred = preds.get(match.id)
-            finished = (
-                match.status == "FINISHED"
-                and match.home_goals is not None
-                and match.away_goals is not None
-            )
-            chips.append({
-                "id": match.id,
-                "home": _team_chip(match.home_team, match.home_placeholder),
-                "away": _team_chip(match.away_team, match.away_placeholder),
-                "winner": _chip_winner(match) if finished else None,
-                "pred": (
-                    (pred.home_goals, pred.away_goals) if pred else None
+        # Si hoy no hay partidos y el grupo no atenuado es justo mañana, se
+        # rotula "Mañana" para dar contexto (único caso con etiqueta).
+        tomorrow = today + timedelta(days=1)
+        groups = [
+            {
+                "past": d < today,
+                "label": (
+                    "Mañana" if not today_list and d == tomorrow else None
                 ),
-                "real": (
-                    (match.home_goals, match.away_goals) if finished else None
-                ),
-                "is_live": (
-                    not finished
-                    and match.datetime <= now
-                    < match.datetime + HEADER_LIVE_WINDOW
-                ),
-                "key": match.stage.key,
-            })
+                "chips": [
+                    _match_chip(m, preds.get(m.id), now)
+                    for m in sorted(by_local_date[d], key=lambda m: m.datetime)
+                ],
+            }
+            for d in days
+        ]
         return {
-            "today_matches": chips,
-            "matches_are_today": target == today,
-            "matches_day_label": (
-                None if target == today else _day_label(target, today)
-            ),
+            "today_groups": groups,
             "today_dialog_data": build_match_dialog_payload(
                 day_matches, user, quiniela
             ),
@@ -206,16 +201,37 @@ def quinielas(request) -> dict:
         return {}
 
 
-# Abreviaturas en español por weekday() (lunes=0); en código para no
-# depender del locale del servidor.
-_WEEKDAYS_ES = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
+def _match_chip(match, pred, now) -> dict:
+    """Datos de un chip del header para un partido.
 
-
-def _day_label(target, today) -> str:
-    """Etiqueta corta del día de los partidos cuando no son de hoy."""
-    if target == today + timedelta(days=1):
-        return "Mañana"
-    return f"{_WEEKDAYS_ES[target.weekday()]} {target.day}"
+    Lleva la hora local (``utc``/``time``) solo si el partido no ha
+    empezado; ``local_time.js`` reescribe ``time`` a la zona del navegador
+    usando ``utc`` como origen.
+    """
+    finished = (
+        match.status == "FINISHED"
+        and match.home_goals is not None
+        and match.away_goals is not None
+    )
+    not_started = now < match.datetime
+    local_dt = match.datetime + timedelta(hours=match.stadium.utc_offset)
+    return {
+        "id": match.id,
+        "home": _team_chip(match.home_team, match.home_placeholder),
+        "away": _team_chip(match.away_team, match.away_placeholder),
+        "winner": _chip_winner(match) if finished else None,
+        "pred": (pred.home_goals, pred.away_goals) if pred else None,
+        "real": (
+            (match.home_goals, match.away_goals) if finished else None
+        ),
+        "is_live": (
+            not finished
+            and match.datetime <= now < match.datetime + HEADER_LIVE_WINDOW
+        ),
+        "utc": match.datetime.isoformat() if not_started else None,
+        "time": format_time(local_dt) if not_started else None,
+        "key": match.stage.key,
+    }
 
 
 def _team_chip(team, placeholder: str) -> dict:

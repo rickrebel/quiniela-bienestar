@@ -183,8 +183,8 @@ The project venv lives at `venv/` inside the repo (interpreter:
   `evaluation.py:recompute_all`
   (idempotent, full rebuild) freezes `Prediction.points`/`base_points`/the
   `rules` M2M and rebuilds `ScoreSnapshot` (per user×match×quiniela cumulative
-  for the progress charts; simultaneous matches share the tick's
-  value/position). It
+  for the progress charts; the cumulative is per match, ordered by
+  `datetime, of_number`, also across simultaneous matches). It
   runs on every result capture (`views/results.py`);
   `manage.py recompute_scores` backfills. `leaderboard.py` and the result
   cards/dialog **read these stored values** — they no longer call

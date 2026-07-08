@@ -35,6 +35,9 @@
   let DH = -2.5;                // "explode": corrimiento horizontal (<0 comprime
                                 // izq/der al centro, a 7.5u)
   let FIN_DX = 0;               // corrimiento de la final respecto al centro
+  let STEM_BEND = 0.5;          // curvatura del tallo: fracción de la
+                                // distancia origen→destino a la que va el
+                                // punto de control (sobre la normal)
 
   function el(tag, attrs) {
     let node = document.createElementNS(SVGNS, tag);
@@ -73,7 +76,16 @@
     }
     // g1/g2 = grupo de "explode" de cada extremo (para correrlo luego).
     function sep(p, g, played) { links.push({ x1: p.a[0], y1: p.a[1], x2: p.b[0], y2: p.b[1], strong: true, played: played, g1: g, g2: g }); }
-    function stem(from, to, g1, g2, played) { links.push({ x1: from[0], y1: from[1], x2: to[0], y2: to[1], strong: false, played: played, g1: g1, g2: g2 }); }
+    // Tallo curvo: `along` = dirección del separador del par de origen (la
+    // tangente de la elipse en su θ). Se guarda la normal unitaria (nx,ny)
+    // orientada hacia el destino para que la Bézier SALGA perpendicular al
+    // separador (render() pone ahí el punto de control).
+    function stem(from, along, to, g1, g2, played) {
+      let m = Math.hypot(along[0], along[1]) || 1;
+      let nx = -along[1] / m, ny = along[0] / m;
+      if (nx * (to[0] - from[0]) + ny * (to[1] - from[1]) < 0) { nx = -nx; ny = -ny; }
+      links.push({ x1: from[0], y1: from[1], x2: to[0], y2: to[1], nx: nx, ny: ny, strong: false, played: played, g1: g1, g2: g2 });
+    }
 
     // C = intersección más cercana (a los padres) de la mediatriz de P0P1 con
     // la elipse `scale`. P0, P1 = centros (sobre la elipse externa) de los 2
@@ -211,7 +223,7 @@
 
       // octavos: 2 partidos; cada círculo = ganador de un 16avos. El centro va
       // equidistante de sus 2 padres (distancia real), no en el ángulo medio.
-      let midOct = [];
+      let midOct = [], tanOct = [];
       for (let g = 0; g < 2; g++) {
         // C = ápice de la mediatriz de los 2 centros padres de 16avos con la
         // elipse de octavos; ahí va el octavos (a la mitad de sus padres).
@@ -220,6 +232,7 @@
         th = nudgePole(K[1], th, NUDGE_OCT); // separa los octavos cercanos a los polos
         let po = pair(K[1], th, L[1]);
         midOct.push(po.mid);
+        tanOct.push(tang(K[1], th));
         let mLo = w.ms[2 * g], mHi = w.ms[2 * g + 1];
         // Los 2 círculos = participantes del octavos (avance real/estimado de
         // mLo y mHi). predWinner = avance pronosticado (difuminado hasta que
@@ -229,8 +242,8 @@
         nodes.push({ x: po.b[0], y: po.b[1], r: RAD[1], winner: mLo.winner || null, predWinner: (mLo.pred && mLo.pred.winner) || null, mid: po.mid, score: osc, side: "home", g: wi });
         nodes.push({ x: po.a[0], y: po.a[1], r: RAD[1], winner: mHi.winner || null, predWinner: (mHi.pred && mHi.pred.winner) || null, mid: po.mid, score: osc, side: "away", g: wi });
         sep(po, wi);
-        stem(mid16[2 * g], po.b, wi, wi, mLo.played);
-        stem(mid16[2 * g + 1], po.a, wi, wi, mHi.played);
+        stem(mid16[2 * g], tang(1, ang[2 * g]), po.b, wi, wi, mLo.played);
+        stem(mid16[2 * g + 1], tang(1, ang[2 * g + 1]), po.a, wi, wi, mHi.played);
       }
 
       // cuarto: C = ápice de la mediatriz de los 2 centros de octavos padres
@@ -247,9 +260,10 @@
       nodes.push({ x: pq.b[0], y: pq.b[1], r: RAD[2], winner: o0 && o0.real, predWinner: o0 && o0.pred, mid: pq.mid, score: qsc, side: "home", g: wi });
       nodes.push({ x: pq.a[0], y: pq.a[1], r: RAD[2], winner: o1 && o1.real, predWinner: o1 && o1.pred, mid: pq.mid, score: qsc, side: "away", g: wi });
       sep(pq, wi);
-      stem(midOct[0], pq.b, wi, wi);
-      stem(midOct[1], pq.a, wi, wi);
+      stem(midOct[0], tanOct[0], pq.b, wi, wi);
+      stem(midOct[1], tanOct[1], pq.a, wi, wi);
       w.quarterMid = pq.mid;
+      w.quarterTan = tang(K[2], thq);
       w.g = wi;
     });
 
@@ -285,10 +299,10 @@
       nodes.push({ x: lft[0], y: lft[1], r: RAD[3], winner: lq && lq.real, predWinner: lq && lq.pred, mid: ps.mid, score: ssc, side: "home", g: s.g });
       nodes.push({ x: rgt[0], y: rgt[1], r: RAD[3], winner: rq && rq.real, predWinner: rq && rq.pred, mid: ps.mid, score: ssc, side: "away", g: s.g });
       sep(ps, s.g);
-      stem(s.left.quarterMid, lft, s.left.g, s.g);
-      stem(s.right.quarterMid, rgt, s.right.g, s.g);
+      stem(s.left.quarterMid, s.left.quarterTan, lft, s.left.g, s.g);
+      stem(s.right.quarterMid, s.right.quarterTan, rgt, s.right.g, s.g);
       // cada semifinal se une a su propio círculo de la final (no al medio).
-      stem(ps.mid, s.finTo, s.g, 6);
+      stem(ps.mid, tang(K[3], s.th), s.finTo, s.g, 6);
     });
 
     // "Explode": corre cada grupo hacia afuera desde el centro. Alas en
@@ -367,12 +381,20 @@
         : (l.strong
             ? "color-mix(in oklch, var(--color-base-content) 38%, transparent)"
             : "color-mix(in oklch, var(--color-base-content) 18%, transparent)");
-      svg.appendChild(
-        el("line", {
-          x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2,
-          style: "stroke:" + stroke + ";stroke-width:" + (l.strong ? "1.5" : "1"),
-        })
-      );
+      let style = "stroke:" + stroke + ";stroke-width:" + (l.strong ? "1.5" : "1");
+      if (l.nx === undefined) {
+        // Separador del par: recta.
+        svg.appendChild(el("line", { x1: l.x1, y1: l.y1, x2: l.x2, y2: l.y2, style: style }));
+      } else {
+        // Tallo: Bézier cuadrática. El punto de control va sobre la normal
+        // al separador de origen → la curva SALE perpendicular a él y
+        // aterriza en el centro del círculo destino.
+        let d = Math.hypot(l.x2 - l.x1, l.y2 - l.y1) * STEM_BEND;
+        let path = "M " + l.x1 + " " + l.y1 +
+          " Q " + (l.x1 + l.nx * d) + " " + (l.y1 + l.ny * d) +
+          " " + l.x2 + " " + l.y2;
+        svg.appendChild(el("path", { d: path, style: style + ";fill:none" }));
+      }
     });
 
     geo.nodes.forEach(function (n) {
@@ -392,13 +414,16 @@
         cx: n.x, cy: n.y, r: n.r, style: "fill:var(--color-base-300)",
       });
       g.appendChild(bg);
-      // Contorno de ganador SOLO en el equipo que ganó su partido jugado
-      // (16avos). El círculo de octavos muestra quién avanzó, pero su propio
-      // partido aún no se juega → sin contorno.
-      let isWinner = !!(n.team && n.match && n.match.played &&
-        n.match.winner && n.match.winner.code &&
-        n.team.code && n.match.winner.code === n.team.code);
-      let entry = { bg: bg, ring: null, glow: null, winner: isWinner };
+      // Contorno de ganador en CUALQUIER fase cuyo partido ya se jugó: el
+      // lado con más goles o, en empate resuelto por penales, la bandera que
+      // coincide con pen_winner. Solo banderas reales (nunca estimaciones).
+      // El mismo `won` resalta el número de este lado en el marcador.
+      let won = !!(real && real.code && n.score && n.score.played &&
+        (n.score.pen_winner
+          ? real.code === n.score.pen_winner
+          : (n.score.home !== n.score.away &&
+             ((n.side === "home") === (n.score.home > n.score.away)))));
+      let entry = { bg: bg, ring: null, glow: null, winner: won };
 
       if (team && team.flag_url) {
         // Detrás de la bandera, en orden: 1) fuente del glow (radio un poco
@@ -436,13 +461,6 @@
         let goals = n.side === "home" ? n.score.home : n.score.away;
         if (goals !== null && goals !== undefined) {
           let played = n.score.played;
-          // Resalta el número del lado ganador: el de más goles, o —en empate
-          // resuelto por penales— la bandera que coincide con pen_winner.
-          let penWin = !!(n.score.pen_winner && team.code &&
-            team.code === n.score.pen_winner);
-          let hot = played && (penWin ||
-            (n.score.home !== n.score.away &&
-              ((n.side === "home") === (n.score.home > n.score.away))));
           let tx = n.x - n.mid[0], ty = n.y - n.mid[1];
           let td = Math.hypot(tx, ty) || 1;
           let ux = tx / td, uy = ty / td;
@@ -450,13 +468,13 @@
           let dot = px * (n.mid[0] - CX) + py * (n.mid[1] - CY);
           if (Math.abs(dot) < 0.001) { px = 0; py = 1; }
           else if (dot < 0) { px = -px; py = -py; }
-          let ALONG = 6, OUT = 16;
+          let ALONG = 8, OUT = 20;
           let num = el("text", {
             x: n.mid[0] + px * OUT + ux * ALONG,
             y: n.mid[1] + py * OUT + uy * ALONG,
             "text-anchor": "middle", "dominant-baseline": "central",
-            style: "font-size:10px;font-weight:600;fill:" + (played
-              ? (hot
+            style: "font-size:12px;font-weight:600;fill:" + (played
+              ? (won
                   ? "var(--color-primary)"
                   : "var(--color-base-content)")
               : "color-mix(in oklch, var(--color-base-content) 45%, transparent)"),

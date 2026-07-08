@@ -35,20 +35,24 @@ Data flow: `ScoreSnapshot` → `build_progress` → `json_script` → `progress.
 Returns a dict with three keys, serialized via `json_script`:
 
 - **`ticks`**: ordered list, one per **tanda** (all matches sharing the same
-  `datetime` share a tick — the cumulative is per-tanda, not per-match).
-  `ticks[0]` is the synthetic origin `{"date": "", "stage": "Salida",
-  "matches": [], "multiplier": 1}` so every line starts from a common zero.
-  Each real tick: `{date (local ISO), stage (short_name), matches[], multiplier}`.
-  `matches[]` carries FIFA codes + flag URLs for the X-axis (`_match_entry`).
+  `datetime` share a tick). `ticks[0]` is the synthetic origin `{"date": "",
+  "stage": "Salida", "matches": [], "multiplier": 1}` so every line starts
+  from a common zero. Each real tick: `{date (local ISO), stage (short_name),
+  matches[], multiplier}`. `matches[]` carries FIFA codes + flag URLs for the
+  X-axis (`_match_entry`).
 - **`series`**: one per player with `has_played`. Each:
   `{id, name, virtual, me, position, points[]}` where `points[i]` is the
-  cumulative at `ticks[i]` (0 where the player has no snapshot for that tick).
+  cumulative at **column i**: index 0 = origin, then one value per match in
+  `finished` order (`datetime, of_number`) — the same order in which the
+  ticks list their `matches`. Column index, not tick index.
 - **`defaults`**: preselected ids (top 1, top 2, worst real player). The
   active user (`me`) is drawn separately and never enters defaults.
 
-`points` is filled from `ScoreSnapshot` (`user_id, match__datetime,
-cumulative_points`), mapping each snapshot's datetime to its tick. Simultaneous
-matches repeat the cumulative, so assigning by tick is enough.
+`points` is filled from `ScoreSnapshot` (`user_id, match_id,
+cumulative_points`), mapping each snapshot's `match_id` to its column
+(`col_of_match`). Each match carries its **own** cumulative — simultaneous
+matches no longer share the value — so every X-axis flag shows exactly its
+own jump.
 
 ### Start cutoff — why the chart can begin mid-tournament
 
@@ -81,14 +85,13 @@ Self-invoking IIFE; bails if `#history-chart` or `#history-data` is missing.
   at the back, then the dimmed curtain (`hist-dim`, all unselected in grey),
   then up to 8 compared players (`hist-hi`, palette colors assigned by
   selection order). `MAX_COMPARE = 8`.
-- **Non-uniform X-axis (`buildCols`)**: each column's width is proportional to
-  its `weight` = number of matches × the window `multiplier`. Positions come
-  from a cumulative sum of weights, not equal spacing. The origin has weight 0
-  (pinned to the left edge). Three X-modes toggled by `[data-xmode]` buttons:
-  - `match` (default): one column per match; simultaneous matches share a tick
-    → flat segment. Labels are two stacked flags (home over away).
-  - `batch` ("Tanda"): one column per tick.
-  - `day` ("Día"): one column per local date (aggregates ticks of that date).
+- **Non-uniform X-axis (`buildCols`)**: one column per match (labels are two
+  stacked flags, home over away), each with width proportional to its
+  `weight` = the window `multiplier`. Positions come from a cumulative sum of
+  weights, not equal spacing. The origin has weight 0 (pinned to the left
+  edge). Column i reads `points[i]` directly — each flag carries exactly its
+  own cumulative jump, including simultaneous matches (no shared-tick flat
+  segment anymore).
 - **Y-axis** (simple view): 4 grid levels; level 0 is the solid axis, the
   rest dotted so they don't read as uncolored grey lines. `maxVal` is the max
   cumulative across all series (min 1). The **cono** view replaces this with an
@@ -206,7 +209,7 @@ any breaks the chart:
   `manage.py recompute_scores` backfills). If the chart looks stale or wrong
   after a result fix, the fix is to recompute snapshots, not to touch this code.
 - **Every finished match has a snapshot per user** (even unpredicted, at the
-  carried-forward cumulative), so there are no gaps — each tick has a value for
+  carried-forward cumulative), so there are no gaps — each column has a value for
   every player.
 - **Quiniela comes from the URL slug** (`request.quiniela` via `@with_quiniela`),
   and the cutoff + multipliers are per-quiniela. Test changes across

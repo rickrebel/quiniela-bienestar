@@ -10,8 +10,6 @@ resultado.
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
-from itertools import groupby
-
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -200,33 +198,17 @@ def recompute_all() -> None:
         rebuild_snapshots(quiniela, finished)
 
 
-def _dense_positions(
-    cumulative: dict[int, Decimal], ranked_ids: list[int]
-) -> dict[int, int]:
-    """Ranking denso (1-2-2-3) por puntos acumulados; empates comparten
-    lugar. Solo ordena a ``ranked_ids`` (excluye el perfil virtual)."""
-    positions = {}
-    previous_points = None
-    position = 0
-    for uid in sorted(ranked_ids, key=lambda u: -cumulative[u]):
-        if previous_points is None or cumulative[uid] != previous_points:
-            position += 1
-        positions[uid] = position
-        previous_points = cumulative[uid]
-    return positions
-
-
 def rebuild_snapshots(
     quiniela: Quiniela, finished: list[Match] | None = None
 ) -> None:
     """Recalcula el acumulado por (usuario × partido) de una quiniela.
 
-    El tick es el conjunto de partidos con el mismo ``datetime``: se
-    suma todo el tick antes de fijar acumulado y posición, así los
-    partidos simultáneos comparten el mismo valor. El perfil virtual
-    acumula y aparece, pero queda fuera del ranking (``position`` nula).
-    Solo participan los miembros de la quiniela (``UserQuiniela``); el
-    acumulado y la posición son independientes por quiniela.
+    El acumulado se congela partido a partido (orden ``datetime``,
+    ``of_number``): cada snapshot lleva SU acumulado, también entre
+    partidos simultáneos, para que la gráfica de avance pueda atribuir a
+    cada partido su salto exacto. Solo participan los miembros de la
+    quiniela (``UserQuiniela``); el acumulado es independiente por
+    quiniela.
     """
     if finished is None:
         finished = list(
@@ -244,7 +226,6 @@ def rebuild_snapshots(
         User.objects.filter(id__in=member_ids).filter(
             Q(is_active=True) | Q(is_virtual=True))
     )
-    ranked_ids = [u.id for u in users if not u.is_virtual]
 
     pred_points = {
         (uid, mid): pts
@@ -257,19 +238,14 @@ def rebuild_snapshots(
     cumulative = {u.id: ZERO for u in users}
     ScoreSnapshot.objects.filter(quiniela=quiniela).delete()
     rows = []
-    for _, tick in groupby(finished, key=lambda m: m.datetime):
-        tick_matches = list(tick)
-        for match in tick_matches:
-            for uid in cumulative:
-                cumulative[uid] += pred_points.get((uid, match.id), ZERO)
-        positions = _dense_positions(cumulative, ranked_ids)
-        for match in tick_matches:
-            for user in users:
-                rows.append(ScoreSnapshot(
-                    quiniela_id=quiniela.id,
-                    user_id=user.id,
-                    match_id=match.id,
-                    cumulative_points=cumulative[user.id],
-                    position=positions.get(user.id),
-                ))
+    for match in finished:
+        for user in users:
+            cumulative[user.id] += pred_points.get(
+                (user.id, match.id), ZERO)
+            rows.append(ScoreSnapshot(
+                quiniela_id=quiniela.id,
+                user_id=user.id,
+                match_id=match.id,
+                cumulative_points=cumulative[user.id],
+            ))
     ScoreSnapshot.objects.bulk_create(rows)

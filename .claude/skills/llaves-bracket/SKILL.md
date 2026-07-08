@@ -91,6 +91,8 @@ var INTER = 1.072;               // inter-octavos-pair gap (in `da` units)
 var DV = 4.5;                    // "explode" vertical  (separates top/bottom)
 var DH = -2.5;                   // "explode" horizontal (<0 compresses left/right)
 var FIN_DX = 0;                  // final's horizontal offset from center
+var STEM_BEND = 0.5;             // stem curvature: control point at this
+                                 // fraction of the from→to distance
 ```
 
 Phase index order everywhere is **`[16avos, octavos, cuartos, semis, final]`**.
@@ -172,10 +174,18 @@ the four constants.
 - Draws `links` first (played matches get solid strokes, pending ones faint),
   then `nodes` (a `base-300` bg circle + glow source + `ring` + the flag
   `<image>` clipped to a circle). Flag `<image>` size derives from `n.r` →
-  circles scale automatically with `RAD`.
+  circles scale automatically with `RAD`. Pair separators are straight
+  `<line>`s; **stems are quadratic Bézier `<path>`s** that leave the parent
+  pair's midpoint **perpendicular to its separator** (each stem link stores
+  the unit normal `nx`/`ny`, oriented toward the destination; control point
+  at `STEM_BEND` × distance along it) and land on the child circle's center.
+  The normal survives the explode SHIFT (pure translation).
 - Per node, the flag is `n.team || n.winner` (real) or, failing that,
-  `n.predWinner` painted at **opacity 0.28** (estimate). The real winner of a
-  played match gets a primary ring + `#win-glow` halo (`paint()`).
+  `n.predWinner` painted at **opacity 0.28** (estimate). The winner of a
+  played match — **any phase**, judged from the pair's `score` (more goals,
+  or `pen_winner` on a shootout draw) — gets a primary ring + `#win-glow`
+  halo (`paint()`); the same `won` flag paints its score number in primary.
+  Estimated flags never light up.
 - **Scores** render next to each pair on every phase that has one: real if
   played (winning side in primary), predicted in diluted `base-content`. The
   number sits on the outward perpendicular from the pair's `mid`, shifted

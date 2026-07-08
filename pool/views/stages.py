@@ -839,6 +839,10 @@ def team_detail_view(
         group_matches, group_preds
     ).get(team.group_name)
 
+    # Orden inverso: la final arriba y la fase de grupos al final (la tabla
+    # de posiciones, anclada a la fase de grupos, queda al pie del dialog).
+    phases.reverse()
+
     context = {
         "team": team,
         "phases": phases,

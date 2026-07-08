@@ -28,4 +28,10 @@
         }
         if (day) day.textContent = local.day;
     });
+
+    /* Chips del header: la hora bajo el marcador (fallback = hora de sede). */
+    document.querySelectorAll(".tc-time[data-utc]").forEach(el => {
+        const local = window.localMatchTime(el.dataset.utc);
+        if (local) el.textContent = local.time;
+    });
 })();

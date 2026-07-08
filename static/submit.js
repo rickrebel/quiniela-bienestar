@@ -269,9 +269,26 @@ document.addEventListener("DOMContentLoaded", initAutosave);
 
 const sendDialog = document.getElementById("send-dialog");
 
+// Empates de eliminatoria: el selector visible (.advancing-pick.show) sin
+// equipo elegido (.is-picked) queda pendiente. Devuelve el primero o null.
+function pendingAdvancing() {
+    return [...document.querySelectorAll(".advancing-pick.show")].find(
+        pick => !pick.querySelector(".advancing-opt.is-picked")
+    ) ?? null;
+}
+
 function sendPredictions() {
     if (!isComplete(buildPayload())) {
         alert("Tienes que llenar todos los partidos antes de enviar.");
+        return;
+    }
+    const pending = pendingAdvancing();
+    if (pending) {
+        alert(
+            "En los empates de fases finales debes elegir quién pasa " +
+            "antes de enviar."
+        );
+        pending.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
     }
     buildSummary();

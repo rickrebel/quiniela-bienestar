@@ -98,13 +98,24 @@
     font-size: 22px;
 }
 
-/* Fila inferior: etiqueta de día (cuando no son de hoy) + chips. */
+/* Fila inferior: chips de partidos. */
 .header-bottom {
     display: flex;
     align-items: center;
     gap: 8px;
     min-width: 0;
 }
+/* Grupo de chips de un mismo día. El día previo (pasado) se atenúa. */
+.today-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+.today-group--past {
+    opacity: 0.55;
+}
+/* Etiqueta de día: solo "Mañana" cuando hoy no hay partidos. */
 .day-label {
     flex: 0 0 auto;
     padding: 2px 8px;
@@ -113,7 +124,14 @@
     color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
     font-size: 12px;
     font-weight: 700;
-    text-transform: capitalize;
+}
+/* Divisor sutil entre días (sin texto). */
+.tc-divider {
+    flex: 0 0 auto;
+    align-self: stretch;
+    width: 1px;
+    margin: 4px 2px;
+    background: color-mix(in oklch, var(--color-base-content) 20%, transparent);
 }
 .no-matches {
     color: color-mix(in oklch, var(--color-base-content) 50%, transparent);
@@ -206,6 +224,13 @@
     font-size: 12px;
     font-weight: 600;
     color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+}
+/* Hora de inicio (local del espectador) bajo el marcador, solo si el
+   partido no ha empezado. */
+.today-chip .tc-time {
+    font-size: 11px;
+    font-weight: 600;
+    color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
 }
 .today-chip .tc-vs {
     color: color-mix(in oklch, var(--color-base-content) 60%, transparent);

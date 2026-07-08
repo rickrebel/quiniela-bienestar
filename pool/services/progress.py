@@ -5,7 +5,7 @@ Lee ``ScoreSnapshot`` (ya congelado por la evaluación) y arma una
 estructura lista para serializar a JSON e incrustar en la página. El
 ranking y la preselección por defecto salen de ``build_leaderboard``.
 Cada partido FINISHED tiene un snapshot por usuario aunque no lo haya
-predicho, así que no hay huecos: cada tick trae valor para todos.
+predicho, así que no hay huecos: cada columna trae valor para todos.
 """
 
 from datetime import timedelta
@@ -95,7 +95,10 @@ def build_progress(
       fecha local, el ``stage`` (nombre corto), la ``phase`` gruesa (las 3
       jornadas de grupos colapsan en "Grupos"; sirve para el divisor de
       fases) y los partidos que lo componen (eje X por partido).
-    - ``series``: una por jugador con sus puntos acumulados por tick.
+    - ``series``: una por jugador con sus puntos acumulados por
+      **columna**: índice 0 = salida y luego un valor por partido, en el
+      mismo orden en que los ticks los enlistan (así cada bandera del
+      eje X carga exactamente su salto, también entre simultáneos).
     - ``defaults``: ids preseleccionados. Si ``me`` ya guardó su
       comparación en ``UserQuiniela.history_compare`` se usa esa (saneada
       y en su orden); si no (``None``), se calculan (top 1, top 2 y peor
@@ -147,16 +150,19 @@ def build_progress(
     players = [r for r in board.rows if r.has_played]
     index_of_user = {r.user.id: i for i, r in enumerate(players)}
 
-    # Puntos por (jugador, tick). Los snapshots de partidos simultáneos
-    # repiten valor; asignar por tick basta.
-    points = [[0.0] * len(ticks) for _ in players]
+    # Puntos por (jugador, columna): columna 0 es la salida y sigue un
+    # valor por partido en el orden de ``finished`` (el mismo con que los
+    # ticks enlistan sus ``matches``). El snapshot ya trae el acumulado
+    # propio de cada partido, también entre simultáneos.
+    col_of_match = {m.id: i + 1 for i, m in enumerate(finished)}
+    points = [[0.0] * (len(finished) + 1) for _ in players]
     snaps = ScoreSnapshot.objects.filter(quiniela=quiniela).values_list(
-        "user_id", "match__datetime", "cumulative_points")
-    for uid, dt, cumulative in snaps:
+        "user_id", "match_id", "cumulative_points")
+    for uid, mid, cumulative in snaps:
         i = index_of_user.get(uid)
-        t = tick_of_dt.get(dt)
-        if i is not None and t is not None:
-            points[i][t] = float(cumulative)
+        c = col_of_match.get(mid)
+        if i is not None and c is not None:
+            points[i][c] = float(cumulative)
 
     series = [
         {
