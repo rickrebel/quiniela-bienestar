@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
-from pool.models import Prediction, Quiniela, User
+from pool.models import Prediction, Quiniela, User, Window
 from pool.services.evaluation import ScorelineEval
 from pool.services.match_dialog import (
     build_match_dialog_payload,
@@ -97,6 +97,14 @@ class DialogPayloadPrivacyTests(TestCase):
             key="LAST_32", name="Dieciseisavos", short_name="16avos",
             color="#2196F3", order=2, send_deadline=now - timedelta(days=1),
         )
+        # Ventanas 1:1 sin fechas: la privacidad resuelve por ventana de la
+        # quiniela con fallback al Stage (``resolved_send_deadline``).
+        for order, stage in enumerate(
+            (cls.open_stage, cls.closed_stage), start=1
+        ):
+            window = Window.objects.create(
+                quiniela=cls.bienestar, order=order)
+            window.stages.add(stage)
         cls.stadium = Stadium.objects.create(
             name="Estadio Azteca", city="CDMX", country="mx", utc_offset=-6,
         )
@@ -177,6 +185,24 @@ class DialogPayloadPrivacyTests(TestCase):
         self.assertEqual([g["label"] for g in payload["groups"]],
                          ["+1 gol", "+1 gol"])
 
+    def test_window_override_beats_stage_deadline(self):
+        # Fase compartida vencida, pero la ventana de la quiniela sigue
+        # abierta por override: las predicciones ajenas siguen ocultas.
+        window = self.bienestar.windows.get(stages=self.closed_stage)
+        window.send_deadline = timezone.now() + timedelta(days=1)
+        window.save()
+        payload = self._payload_for(self.closed_match)
+        self.assertFalse(payload["revealed"])
+        self.assertNotIn("groups", payload)
+
+    def test_stage_without_window_stays_hidden(self):
+        # Sin ventana que cubra la fase en esta quiniela no hay plazo que
+        # vencer: default seguro, nada se revela.
+        Window.objects.filter(quiniela=self.bienestar).delete()
+        payload = self._payload_for(self.closed_match)
+        self.assertFalse(payload["revealed"])
+        self.assertNotIn("groups", payload)
+
     def test_is_knockout_follows_stage(self):
         self.assertFalse(self._payload_for(self.open_match)["is_knockout"])
         self.assertTrue(self._payload_for(self.closed_match)["is_knockout"])
@@ -211,6 +237,9 @@ class PenaltySplitGateTests(TestCase):
             key="LAST_16", name="Octavos", short_name="8avos",
             color="#2196F3", order=3, send_deadline=now - timedelta(days=1),
         )
+        for quiniela in (cls.bienestar, cls.sanginiela):
+            window = Window.objects.create(quiniela=quiniela, order=1)
+            window.stages.add(cls.stage)
         cls.stadium = Stadium.objects.create(
             name="Azteca", city="CDMX", country="mx", utc_offset=-6)
         cls.mex = Team.objects.create(

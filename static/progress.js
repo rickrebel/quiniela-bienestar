@@ -209,12 +209,37 @@
             // Posición horizontal normalizada [0,1] de cada columna (no
             // depende del ancho; sobrevive al resize).
             const xf = cols.map((c, i) => plotW ? (X(i) - pad.left) / plotW : 0);
-            // Contorno de TODA la nube por columna: el más bajo y el más
-            // alto de todos los participantes en cada momento.
+            // Trolls fuera del CÁLCULO, no del dibujo: quien pierde a
+            // propósito es la envolvente inferior él solito y desalinea el
+            // cono para todos. Se decide POR JUGADOR (no por columna, para
+            // que el borde no parpadee) con mediana + MAD del acumulado
+            // final — robustas: el propio troll no las arrastra, y si el
+            // grupo va parejo no se excluye a nadie. Sale quien caiga >3
+            // MADs y >25% de la mediana por debajo (el piso relativo evita
+            // expulsar al último legítimo cuando la MAD es ~0); máximo 2,
+            // los más hundidos. Su línea se sigue pintando: queda bajo el
+            // cono y, si sale del área, se recorta contra el borde
+            // (decisión asumida).
+            const median = arr => {
+                const a = [...arr].sort((x, y) => x - y);
+                const m = a.length >> 1;
+                return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+            };
+            const totals = SERIES.map(s => s.points[cols.length - 1]);
+            const medT = median(totals);
+            const mad = median(totals.map(t => Math.abs(t - medT)));
+            const excluded = new Set(SERIES.length < 4 ? [] : SERIES
+                .map((s, j) => ({ j, dev: medT - totals[j] }))
+                .filter(o => o.dev > 3 * mad && o.dev > 0.25 * medT)
+                .sort((a, b) => b.dev - a.dev)
+                .slice(0, 2).map(o => o.j));
+            const cloud = SERIES.filter((s, j) => !excluded.has(j));
+            // Contorno de la nube por columna (ya sin excluidos): el más
+            // bajo y el más alto de los participantes en cada momento.
             const loPt = cols.map((c, i) =>
-                Math.min(...SERIES.map(s => s.points[i])));
+                Math.min(...cloud.map(s => s.points[i])));
             const hiPt = cols.map((c, i) =>
-                Math.max(...SERIES.map(s => s.points[i])));
+                Math.max(...cloud.map(s => s.points[i])));
             // Marco del cono: dos rectas continuas (mínimos cuadrados) entre
             // las que flota la nube. No se fuerza el ajuste columna a
             // columna, por eso la escala cambia suave y un anotador parejo
@@ -240,12 +265,21 @@
                 const cush = 0.02 * Math.max(hi - lo, 1); // colchón pequeño
                 const dlo = lo - cush;
                 const dataH = Math.max((hi + cush) - dlo, 0.5);
-                // Alto de la banda en píxeles: 45% (izq) → 100% (der),
-                // centrada. La nube se ve angosta a la izquierda aunque la
-                // escala (px/punto) sea mayor ahí.
-                const pxH = (0.45 + 0.55 * xf[i]) * plotH;
-                const botPx = pad.top + plotH - (plotH - pxH) / 2;
-                return { dlo, dataH, botPx, pxH };
+                return { dlo, dataH };
+            });
+            // Alto en píxeles ∝ dispersión^α, banda centrada: la columna
+            // más abierta ocupa el 100% del alto y las demás encogen según
+            // su apertura REAL, no con el 45%→100% fijo de antes (que se
+            // leía distinto según cuánto creciera la nube de cada
+            // quiniela). Con α<1 el inicio queda amplificado (más px/punto
+            // donde las diferencias son chicas) y se suaviza hacia el
+            // final, en la misma proporción relativa en toda quiniela;
+            // α=1 sería zoom constante y α=0 alto constante.
+            const CONE_ALPHA = 0.5;
+            const dataHMax = Math.max(...bands.map(b => b.dataH));
+            bands.forEach(b => {
+                b.pxH = Math.pow(b.dataH / dataHMax, CONE_ALPHA) * plotH;
+                b.botPx = pad.top + plotH - (plotH - b.pxH) / 2;
             });
             Y = (val, i) => bands[i].botPx
                 - ((val - bands[i].dlo) / bands[i].dataH) * bands[i].pxH;
@@ -306,14 +340,24 @@
             phaseDiv += `<line class="hist-phase" stroke="${COLOR_AXIS}" stroke-opacity=".22" x1="${xm}" x2="${xm}" y1="${pad.top}" y2="${yTickTop}"/>`;
         }
 
-        // Adornos del modo Cono: el marco (las dos rectas envolventes,
-        // rectas en pantalla → basta unir extremos) y la línea diagonal del
-        // 0 (imagen del valor 0: curva suave que se hunde fuera del área,
+        // Adornos del modo Cono: el marco (los dos bordes envolventes —
+        // curvas en pantalla desde que el alto va con dispersión^α, así
+        // que se trazan columna a columna) y la línea diagonal del 0
+        // (imagen del valor 0: curva suave que se hunde fuera del área,
         // recortada). Van al fondo, tenues, detrás de las líneas.
         let cono = "";
         if (view === "cono" && bands) {
-            const iN = cols.length - 1;
             const top = b => b.botPx - b.pxH, bot = b => b.botPx;
+            // Traza el borde del cono (superior o inferior) uniendo todas
+            // las columnas; ``rev`` lo recorre al revés para cerrar el
+            // polígono del relleno.
+            const edgePath = (sel, rev) => {
+                const idx = cols.map((c, i) => i);
+                if (rev) idx.reverse();
+                return idx.map((i, k) =>
+                    `${k ? "L" : "M"}${X(i).toFixed(1)} ${sel(bands[i]).toFixed(1)}`
+                ).join(" ");
+            };
             // Curva iso-valor: une Y(v, i) en cada columna (una "horizontal"
             // del eje fijo se vuelve curva con el eje elástico). Recortada.
             const isoPath = v => cols.map((c, i) =>
@@ -365,10 +409,8 @@
 
             // 1) "Anti-faro": oscurece el área del cono (relleno NEGRO con
             //    algo de opacidad), en vez de iluminarla.
-            const poly = `M${X(0).toFixed(1)} ${top(bands[0]).toFixed(1)}`
-                + ` L${X(iN).toFixed(1)} ${top(bands[iN]).toFixed(1)}`
-                + ` L${X(iN).toFixed(1)} ${bot(bands[iN]).toFixed(1)}`
-                + ` L${X(0).toFixed(1)} ${bot(bands[0]).toFixed(1)} Z`;
+            const poly = `${edgePath(top, false)} `
+                + `${edgePath(bot, true).replace("M", "L")} Z`;
             cono += `<path fill="#000" fill-opacity=".22" stroke="none" d="${poly}"/>`;
 
             // 2) Iso-líneas de puntos (curvas paralelas a la del 0), punteadas
@@ -380,9 +422,9 @@
                 cono += isoLabels(v, Math.round(v), true);
             }
 
-            // 3) Marco: dos rectas envolventes (límites real inferior/superior).
+            // 3) Marco: los dos bordes envolventes (límite inferior/superior).
             const edge = sel =>
-                `<line class="hist-envelope" fill="none" stroke="${COLOR_AXIS}" stroke-opacity=".2" x1="${X(0).toFixed(1)}" y1="${sel(bands[0]).toFixed(1)}" x2="${X(iN).toFixed(1)}" y2="${sel(bands[iN]).toFixed(1)}"/>`;
+                `<path class="hist-envelope" fill="none" stroke="${COLOR_AXIS}" stroke-opacity=".2" d="${edgePath(sel, false)}"/>`;
             cono += edge(top) + edge(bot);
 
             // 4) Línea del 0 (punteada); su "0" va sólo abajo, junto a las

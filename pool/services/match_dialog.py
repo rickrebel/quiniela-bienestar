@@ -2,8 +2,9 @@
 
 Construye los datos que cada página embebe con ``json_script`` y que
 ``static/match_dialog.js`` renderiza al hacer clic en un partido. La
-privacidad se resuelve aquí (servidor): las fases sin
-``Stage.is_past_deadline`` viajan sin predicciones, no ocultas por CSS.
+privacidad se resuelve aquí (servidor): las fases cuya ventana (de la
+quiniela activa) no ha vencido viajan sin predicciones, no ocultas por
+CSS.
 """
 
 from collections import defaultdict
@@ -138,7 +139,25 @@ def _team_payload(team, placeholder: str) -> dict:
     }
 
 
-def _match_payload(match: Match, finished: bool, can_record: bool) -> dict:
+def _revealed_stage_ids(quiniela: Quiniela) -> set[int]:
+    """Fases cuya ventana en esta quiniela ya venció su plazo de envío.
+
+    La privacidad es por ``Window`` (override o fallback al ``Stage`` vía
+    ``resolved_send_deadline``), nunca por el ``Stage`` compartido: dos
+    quinielas pueden cerrar la misma fase en momentos distintos. Una fase
+    sin ventana en la quiniela queda oculta (default seguro).
+    """
+    return {
+        stage.id
+        for window in quiniela.windows.prefetch_related("stages")
+        if window.is_past_deadline
+        for stage in window.stages.all()
+    }
+
+
+def _match_payload(
+    match: Match, finished: bool, can_record: bool, revealed: bool
+) -> dict:
     local_dt = match.datetime + timedelta(hours=match.stadium.utc_offset)
     payload = {
         "id": match.id,
@@ -165,7 +184,7 @@ def _match_payload(match: Match, finished: bool, can_record: bool) -> dict:
         "penalties": None,
         "cards": None,
         "scorers": None,
-        "revealed": match.stage.is_past_deadline,
+        "revealed": revealed,
     }
     if not finished:
         return payload
@@ -260,12 +279,14 @@ def build_match_dialog_payload(
     """Datos del dialog para una lista de partidos (ambas vistas).
 
     Una sola query de predicciones **de esta quiniela**, limitada a fases
-    ya cerradas: antes del deadline las predicciones ajenas son privadas y
-    el JSON no debe llevarlas. El puntaje hipotético usa las reglas y el
-    peso de la quiniela (no la default). Requiere ``select_related("stage",
-    "stadium", "home_team", "away_team")`` en ``matches`` (evita N+1).
+    cuya ventana ya venció (``_revealed_stage_ids``): antes del deadline
+    las predicciones ajenas son privadas y el JSON no debe llevarlas. El
+    puntaje hipotético usa las reglas y el peso de la quiniela (no la
+    default). Requiere ``select_related("stage", "stadium", "home_team",
+    "away_team")`` en ``matches`` (evita N+1).
     """
-    closed = {m.stage_id for m in matches if m.stage.is_past_deadline}
+    revealed_stages = _revealed_stage_ids(quiniela)
+    closed = {m.stage_id for m in matches if m.stage_id in revealed_stages}
     rows_by_match: dict[int, list[dict]] = defaultdict(list)
     if closed:
         predictions = (
@@ -296,7 +317,8 @@ def build_match_dialog_payload(
             and match.home_goals is not None
             and match.away_goals is not None
         )
-        payload = _match_payload(match, finished, records)
+        payload = _match_payload(
+            match, finished, records, match.stage_id in revealed_stages)
         if payload["revealed"]:
             multiplier = resolve_multiplier(match)
             is_draw = finished and match.home_goals == match.away_goals

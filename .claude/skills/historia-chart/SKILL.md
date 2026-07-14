@@ -132,22 +132,42 @@ cono trades *absolute-points readability* for *relative-position readability*:
 the axis follows the cloud so player gaps stay legible from start to end.
 
 **How (the `if (view === "cono")` block builds `bands`):**
-1. Per column, take min/max of **all** players → the cloud's lower/upper
-   envelope. All players, not the selection, so the axis does **not** jump when
-   you select/deselect — selection only changes which lines are highlighted.
-2. Fit **two straight lines** to those envelopes by least squares (`fitLine`),
+1. **Troll exclusion** — from the *math*, never from the *drawing*: a player
+   who tanks on purpose is single-handedly the lower envelope and misaligns
+   the cone for everyone. Decided **per player** (never per column, so the
+   edge doesn't flicker) on the **final cumulative**: excluded if
+   `median − total > 3·MAD` **and** `> 0.25·median` (the relative floor stops
+   the MAD≈0 tight-pack case from expelling a legit last place); max 2,
+   deepest first; skipped entirely with <4 players. Median/MAD are robust —
+   the troll can't drag them; a tight pack excludes nobody. The excluded line
+   still renders: it falls below the cone and **clips against the plot
+   bottom** where the cone is tall (decision: accepted, no reserved margin).
+   Real data check (2026-07): bienestar excludes 1, sanginiela none.
+2. Per column, take min/max of the **included** players → the cloud's
+   lower/upper envelope. All included players, not the selection, so the axis
+   does **not** jump when you select/deselect — selection only changes which
+   lines are highlighted.
+3. Fit **two straight lines** to those envelopes by least squares (`fitLine`),
    **excluding the origin column** (everyone at 0) so the fit isn't pinched to
    0 on the left.
-3. **Shift each line outward** by its max deviation (`dDown`/`dUp`) so the band
-   *contains* the cloud — the lines no longer pass through 0, and an early
-   tanker stays inside the cone instead of hitting the floor. Plus a tiny
-   `0.02` cushion.
-4. Map each column's data range `[dlo, dhi]` into a pixel band whose height
-   grows **45%→100%** left→right (`pxH = (0.45 + 0.55·xf)·plotH`), vertically
-   centered — the megaphone. `xf` is the **weighted** horizontal position
-   (cumulative weight = matches × `multiplier`, same as the X-axis), not the
-   date or column index.
-5. `Y(val, i) = botPx[i] - (val - dlo[i]) / dataH[i] · pxH[i]`. Only the column
+4. **Shift each line outward** by its max deviation (`dDown`/`dUp`) so the band
+   *contains* the included cloud — the lines no longer pass through 0, and an
+   early *legit* tanker stays inside the cone instead of hitting the floor.
+   Plus a tiny `0.02` cushion.
+5. Map each column's data range `[dlo, dhi]` into a pixel band of height
+   **`pxH = (dataH/dataHMax)^α · plotH`** (`CONE_ALPHA = 0.5`), vertically
+   centered — the widest column fills 100% of the plot and the others shrink
+   with their **real** dispersion. This replaced the fixed `45%→100%` ramp,
+   which read differently per quiniela (steep-then-soft vs ever-steeper)
+   depending on how much its cloud actually opened. `α` is the one knob:
+   `1` = constant px/point (cone = true dispersion shape), `0` = constant
+   height (max early exaggeration); `0.5` amplifies the start by
+   `√(final/initial dispersion)` — same relative feel in every quiniela.
+   With real data the computed start height lands around 25-27% (smaller
+   than the old 45%); lower `α` if the start needs more punch. `xf` (the
+   weighted horizontal position, cumulative weight = matches × `multiplier`)
+   still drives the envelope fit/eval.
+6. `Y(val, i) = botPx[i] - (val - dlo[i]) / dataH[i] · pxH[i]`. Only the column
    vertices are remapped (straight segments between), so the scale changes
    continuously and a constant-rate scorer renders as a **smooth curve**, not a
    straight line — by design, confirmed acceptable.
@@ -159,9 +179,12 @@ still fits.
 **Cono chrome** (only in `view === "cono"`, drawn behind the data):
 - Numeric Y grid is **skipped** (a constant value is no longer horizontal); the
   grey **curtain is kept** (it floats around the cone, clipped to the plot).
-- **Anti-faro fill**: the cone trapezoid filled `#000` at low opacity to
+- **Anti-faro fill**: the cone polygon filled `#000` at low opacity to
   *darken* the area (not lighten it — lightening was a bug).
-- **Frame**: the two envelope edges as straight `.hist-envelope` lines.
+- **Frame**: the two envelope edges as `.hist-envelope` paths traced column
+  by column (`edgePath`) — since `pxH ∝ dataH^α` they are **curves** on
+  screen, no longer straight lines joining the extremes; the fill polygon
+  follows the same paths.
 - **Iso-value curves**: constant-point reference lines at round steps
   (`niceStep`, ~`maxVal / 7`), dotted like the original grid, each labelled
   where it enters/exits the cone; the `0` line is dashed (`.hist-zero`).
@@ -170,14 +193,16 @@ still fits.
   (the original "anti-faro" artifact) and lines vanish when `tailwind.css` is
   stale.
 
-**Tunables** (literals in `render()`): cone start `0.45`, cushion `0.02`, fill
-opacity, iso count `maxVal / 7`. **Pending:** iso-line label placement
+**Tunables** (literals in `render()`): `CONE_ALPHA` `0.5`, exclusion
+thresholds (`3·MAD`, `0.25·median`, max 2, min 4 players), cushion `0.02`,
+fill opacity, iso count `maxVal / 7`. **Pending:** iso-line label placement
 (above/below the cone) still needs polish.
 
 **Math test:** `.claude/historia_cone_math_test.mjs` — `node` it; replicates
-`fitLine` + the band logic with synthetic data and asserts the invariants
-(containment incl. an early tanker, 45→100% cone, px/point decreasing, steady
-scorer curves). Re-run after touching the cono math.
+`fitLine` + troll exclusion + the band logic with synthetic data and asserts
+the invariants (troll excluded / legit early tanker kept & contained / tight
+pack excludes none, `dataH^α` heights, px/point decreasing, troll drawn below
+the cone, steady scorer curves). Re-run after touching the cono math.
 
 ## JS ↔ markup contract
 
